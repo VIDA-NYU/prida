@@ -1,4 +1,4 @@
-# Training Data Generation
+# Generation of Training Data
 
 ## Requirements
 
