@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 import json
+import numpy as np
 import os
 import pandas as pd
+import random
+import string
 
 
 def retrieve_dataset_information(dataset_dir):
@@ -67,6 +70,109 @@ def generate_training_data(data_name, data_path, target_variable, column_metadat
     and the corresponding performance scores.
     """
 
+    # params
+    output_dir = params['output_directory']
+    training_data_file = params['training_data_file']
+    algorithm = params['regression_algorithm']
+
+    n_columns_left = len(column_metadata) - 2  # removing target variable and 'd3mIndex'
+    # if there is only one column left, there is no way to
+    # generate both query and candidate datasets
+    if n_columns_left <= 1:
+        return
+
+    # potential numbers of columns in a query dataset
+    # for instance, if a dataset has 3 columns left (ignoring the target variable),
+    #   a query dataset could have either 1 or 2 of these columns (so that the
+    #   candidate dataset can have 1 or 2 columns, respectively)
+    # in this example, n_columns_query_dataset = [1, 2]
+    n_potential_columns_query_dataset = list(range(1, n_columns_left))
+
+    # maximum number of times that the original data will be vertically broken into
+    #   multiple datasets
+    n_vertical_data = np.random.choice(
+        list(range(1, min(params['max_times_break_data_vertical'], n_columns_left)))
+    )
+
+    # number of columns for each time the data is vertically broken
+    n_columns_query_dataset = np.random.choice(
+        n_potential_columns_query_dataset,
+        n_vertical_data,
+        replace=False
+    )
+
+    # list of column indices
+    all_columns = list(range(1, len(column_metadata)))
+    all_columns.remove(target_variable)
+
+    # generating the key column for the data
+    n_rows = pd.read_csv(data_path).shape[0]
+    key_column = [
+        ''.join(
+            [random.choice(string.ascii_letters + string.digits) for n in range(5)]
+        ) for _ in range(n_rows)
+    ]
+
+    query_data = list()
+    candidate_data = list()
+
+    for n in list(n_columns_query_dataset):
+        # randomly choose the columns
+        columns = list(np.random.choice(
+            all_columns,
+            n,
+            replace=False
+        ))
+
+        # generate query data
+        query_data += generate_data_from_columns(
+            data_path,
+            columns + [target_variable],
+            key_column,
+            params
+        )
+
+        # generate candidate data
+        candidate_data += generate_data_from_columns(
+            data_path,
+            list(set(all_columns).difference(set(columns))),
+            key_column,
+            params
+        )
+
+    return
+
+
+def generate_data_from_columns(data_path, columns, key_column, params):
+    """Generates datasets from the original data using only the columns specified
+    in 'columns'.
+    """
+
+    all_data = list()
+
+    original_data = pd.read_csv(data_path)
+    column_names = [original_data.columns[i] for i in columns]
+    new_data = original_data[column_names]
+    new_data.insert(0, 'key', key_column)
+
+    all_data.append(new_data)
+
+    # number of times to randomly remove records
+    n_times_remove_records = random.randint(1, params['max_times_records_removed'])
+    for i in range(n_times_remove_records):
+
+        # number of records to remove
+        n_records_remove = random.randint(
+            1,
+            int(params['max_ratio_records_removed'] * original_data.shape[0])
+        )
+
+        # rows to remove
+        drop_indices = np.random.choice(new_data.index, n_records_remove, replace=False)
+        all_data.append(new_data.drop(drop_indices))
+
+    return all_data
+    
 
 if __name__ == '__main__':
 
@@ -82,11 +188,10 @@ if __name__ == '__main__':
         if info['multiple_data']:
             continue
 
-        print("Dataset Name: %s" % dataset)
-        print("Data Path: %s" % info['data_path'])
-        print("Problem Type: %s" % info['problem_type'])
-        print("Target Variable: %d" % info['target_variable'])
-        print("Multiple Data? %s" % str(info['multiple_data']))
-        print("Column Metadata: %r" % info['column_metadata'])
-
-        pass
+        generate_training_data(
+            dataset,
+            info['data_path'],
+            info['target_variable'],
+            info['column_metadata'],
+            params
+        )
