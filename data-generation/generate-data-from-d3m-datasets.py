@@ -4,6 +4,10 @@ import numpy as np
 import os
 import pandas as pd
 import random
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score
+from sklearn.model_selection import train_test_split
 import string
 
 
@@ -140,6 +144,72 @@ def generate_training_data(data_name, data_path, target_variable, column_metadat
             params
         )
 
+    # saving data and setting index
+    query_data_names = list()
+    for i in range(len(query_data)):
+        name = 'query_%s_%d.csv' % (data_name, i)
+        query_data_names.append(name)
+        query_data[i].to_csv(
+            open(os.path.join(params['output_directory'], name), 'w'),
+            index=False
+        )
+        query_data[i].set_index(
+            'key',
+            drop=True,
+            inplace=True
+        )
+    candidate_data_names = list()
+    for i in range(len(candidate_data)):
+        name = 'candidate_%s_%d.csv' % (data_name, i)
+        candidate_data_names.append(name)
+        candidate_data[i].to_csv(
+            open(os.path.join(params['output_directory'], name), 'w'),
+            index=False
+        )
+        candidate_data[i].set_index(
+            'key',
+            drop=True,
+            inplace=True
+        )
+
+    target_variable_name = pd.read_csv(data_path).columns[target_variable]
+
+    training_data = open(params['training_data_file'], 'a')
+
+    # doing joins and computing performance scores
+    for i in range(len(query_data)):
+        q_data = query_data[i]
+        q_data_name = query_data_names[i]
+
+        # build model on query data only
+        score_before = get_performance_score(
+            q_data,
+            target_variable_name,
+            params['regression_algorithm']
+        )
+
+        for j in range(len(candidate_data)):
+            c_data = candidate_data[j]
+            c_data_name = candidate_data_names[j]
+
+            # join dataset
+            join_ = q_data.join(
+                c_data,
+                how='left',
+                rsuffix='_r'
+            )
+
+            # build model on joined data
+            score_after = get_performance_score(
+                c_data,
+                target_variable_name,
+                params['regression_algorithm']
+            )
+
+            training_data.write('%s,%s,%.10f,%.10f\n' % (q_data_name, c_data_name, score_before, score_after))
+
+    training_data.close()
+
     return
 
 
@@ -172,6 +242,32 @@ def generate_data_from_columns(data_path, columns, key_column, params):
         all_data.append(new_data.drop(drop_indices))
 
     return all_data
+
+
+def get_performance_score(data, target_variable_name, algorithm):
+    """Builds a model using data to predict the target variable,
+    return the corresponding r2 score.
+    """
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        data.drop(target_variable_name, axis=1),
+        data[target_variable_name],
+        test_size=0.33,
+        random_state=42
+    )
+
+    yfit = None
+
+    if algorithm == 'linear':
+        forest = RandomForestRegressor(n_estimators=100, random_state=42)
+        forest.fit(X_train, y_train)
+        yfit = forest.predict(X_test)
+    elif algorithm == 'random forest':
+        linear_r = LinearRegression(normalize=True)
+        linear_r.fit(X_train, y_train)
+        yfit = linear_r.predict(X_test)
+
+    return r2_score(y_test, yfit)
     
 
 if __name__ == '__main__':

@@ -1,8 +1,8 @@
 {
     "datasets_directory": "/home/fchirigati/projects/d3m/datasets/seed_datasets_data_augmentation",
-    "output_directory": "/home/fchirigati/projects/ViDA-NYU/dataset-ranking/data-generation/data",
+    "output_directory": "/home/fchirigati/projects/ViDA-NYU/dataset-ranking/data-generation/data/files",
     "training_data_file": "/home/fchirigati/projects/ViDA-NYU/dataset-ranking/data-generation/data/training-data",
-    "regression_algorithm": "svm",
+    "regression_algorithm": "random forest",
     "max_times_break_data_vertical": 5,
     "max_times_records_removed": 10,
     "max_ratio_records_removed": 0.7
