@@ -2,7 +2,6 @@
 import json
 import os
 import pandas as pd
-import sys
 
 
 def retrieve_dataset_information(dataset_dir):
@@ -63,23 +62,17 @@ def retrieve_dataset_information(dataset_dir):
                 column_metadata=column_metadata)
 
 
+def generate_training_data(data_name, data_path, target_variable, column_metadata, params):
+    """Generates training data, including query and cadidate datasets,
+    and the corresponding performance scores.
+    """
+
+
 if __name__ == '__main__':
-    # directory of D3M datasets
-    dir_ = sys.argv[1]
 
-    # output dir where files will be saved
-    # files are overwritten for the same datasets
-    output_dir_ = sys.argv[2]
+    params = json.load(open('params.json'))
 
-    # file that stores information about the training data
-    #   using the following format:
-    # 
-    # <query_data, candidate_data, score_before_join, score_after_join>
-    # 
-    # this file is append only! remove it to re-write records
-    training_data_file = sys.argv[3]
-
-
+    dir_ = params['datasets_directory']
     for dataset in os.listdir(dir_):
         info = retrieve_dataset_information(os.path.join(dir_, dataset))
         # regression problems only
@@ -89,11 +82,11 @@ if __name__ == '__main__':
         if info['multiple_data']:
             continue
 
-        # print("Dataset Name: %s" % dataset)
-        # print("Data Path: %s" % info['data_path'])
-        # print("Problem Type: %s" % info['problem_type'])
-        # print("Target Variable: %d" % info['target_variable'])
-        # print("Multiple Data? %s" % str(info['multiple_data']))
-        # print("Column Metadata: %r" % info['column_metadata'])
+        print("Dataset Name: %s" % dataset)
+        print("Data Path: %s" % info['data_path'])
+        print("Problem Type: %s" % info['problem_type'])
+        print("Target Variable: %d" % info['target_variable'])
+        print("Multiple Data? %s" % str(info['multiple_data']))
+        print("Column Metadata: %r" % info['column_metadata'])
 
         pass

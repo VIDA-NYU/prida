@@ -1,0 +1,6 @@
+{
+    "datasets_directory": "/home/fchirigati/projects/d3m/datasets/seed_datasets_data_augmentation",
+    "output_directory": "/home/fchirigati/projects/ViDA-NYU/dataset-ranking/data-generation/data",
+    "training_data_file": "/home/fchirigati/projects/ViDA-NYU/dataset-ranking/data-generation/data/training-data",
+    "regression_algorithm": "svm"
+}
