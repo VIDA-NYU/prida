@@ -18,4 +18,4 @@ TBD
 
 ## 3. Generate Training Data
 
-TBD
+The code to generate training data is available [here](data-generation).
