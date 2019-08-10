@@ -3,8 +3,9 @@
 ## Requirements
 
 * Python 3
-* Numpy
-* Pandas
+* NumPy
+* pandas
+* scikit-learn
 
 ## Generating Data
 
