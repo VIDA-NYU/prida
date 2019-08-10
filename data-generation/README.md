@@ -25,3 +25,9 @@ To generate training data, first, configure the file [`params.json`](params.json
 Then, run the following:
 
     $ python generate-data-from-d3m-datasets.py
+
+The script will generate all the query and candidate datasets under `output_directory`, and the file `training_data_file` will contain lines of the following format:
+
+    <query dataset, candidate dataset, score before augmentation, score after augmentation>
+
+The performance score is computed using the `R^2` regression function score.
