@@ -1,0 +1,34 @@
+# Prediction of Performance Improvement
+
+## Requirements
+
+* Python 3
+* NumPy
+* pandas
+* scikit-learn
+
+## Predicting Improvement
+
+To predict performance improvement, first, configure the file [`params.json`](params.json):
+
+```
+{
+    "learning_data_file": file that stores information about the learning task, with each line in the format <query dataset path, target attribute name, candidate dataset path, `R^2` score before augmentation, `R^2` score after augmentation>
+		"n_splits": number of folds for cross-validation when evaluating the learning task
+		"output_filename": output filename where all predictions, along with original lines in learning_data_file, are saved
+}
+```
+
+Then, run the following:
+
+    $ python predict-performance-improvement.py
+
+The script will predict the likelihood of improving the performance of a machine learning model by augmenting the initial query dataset with a candidate dataset. 
+
+
+
+generate all the query and candidate datasets under `output_directory`, and the file `training_data_file` will contain lines of the following format:
+
+    <query dataset, candidate dataset, score before augmentation, score after augmentation>
+
+The performance score is computed using the `R^2` regression function score.
