@@ -79,10 +79,22 @@ def generate_training_data(data_name, data_path, target_variable, column_metadat
     training_data_file = params['training_data_file']
     algorithm = params['regression_algorithm']
 
-    n_columns_left = len(column_metadata) - 2  # removing target variable and 'd3mIndex'
+    # non-numeric attributes
+    n_non_numeric_att = 0
+    non_numeric_att_list = list()
+    for col in column_metadata:
+        if col == 0:
+            continue
+        if 'real' not in column_metadata[col] and 'integer' not in column_metadata[col]:
+            n_non_numeric_att += 1
+            non_numeric_att_list.append(col)
+
+    # removing target variable, 'd3mIndex', and non-numeric attributes
+    n_columns_left = len(column_metadata) - 2 - n_non_numeric_att
     # if there is only one column left, there is no way to
     # generate both query and candidate datasets
     if n_columns_left <= 1:
+        print('The following dataset does not have enough columns for the data generation process: %s' % data_name)
         return
 
     # potential numbers of columns in a query dataset
@@ -108,12 +120,14 @@ def generate_training_data(data_name, data_path, target_variable, column_metadat
     # list of column indices
     all_columns = list(range(1, len(column_metadata)))
     all_columns.remove(target_variable)
+    for non_numeric_att in non_numeric_att_list:
+        all_columns.remove(non_numeric_att)
 
     # generating the key column for the data
     n_rows = pd.read_csv(data_path).shape[0]
     key_column = [
         ''.join(
-            [random.choice(string.ascii_letters + string.digits) for n in range(5)]
+            [random.choice(string.ascii_letters + string.digits) for n in range(10)]
         ) for _ in range(n_rows)
     ]
 
@@ -132,6 +146,7 @@ def generate_training_data(data_name, data_path, target_variable, column_metadat
         query_data += generate_data_from_columns(
             data_path,
             columns + [target_variable],
+            column_metadata,
             key_column,
             params
         )
@@ -140,6 +155,7 @@ def generate_training_data(data_name, data_path, target_variable, column_metadat
         candidate_data += generate_data_from_columns(
             data_path,
             list(set(all_columns).difference(set(columns))),
+            column_metadata,
             key_column,
             params
         )
@@ -181,6 +197,8 @@ def generate_training_data(data_name, data_path, target_variable, column_metadat
         q_data = query_data[i]
         q_data_name = query_data_names[i]
 
+        # print("Query Data: %s\n" % q_data_name)
+
         # build model on query data only
         score_before = get_performance_score(
             q_data,
@@ -192,28 +210,31 @@ def generate_training_data(data_name, data_path, target_variable, column_metadat
             c_data = candidate_data[j]
             c_data_name = candidate_data_names[j]
 
+            # print("  Candidate Data: %s\n" % c_data_name)
+
             # join dataset
             join_ = q_data.join(
                 c_data,
                 how='left',
                 rsuffix='_r'
             )
+            join_.dropna(inplace=True)
 
             # build model on joined data
             score_after = get_performance_score(
-                c_data,
+                join_,
                 target_variable_name,
                 params['regression_algorithm']
             )
 
-            training_data.write('%s,%s,%.10f,%.10f\n' % (q_data_name, c_data_name, score_before, score_after))
+            training_data.write('%s,%s,%s,%.10f,%.10f\n' % (q_data_name, target_variable_name, c_data_name, score_before, score_after))
 
     training_data.close()
 
     return
 
 
-def generate_data_from_columns(data_path, columns, key_column, params):
+def generate_data_from_columns(data_path, columns, column_metadata, key_column, params):
     """Generates datasets from the original data using only the columns specified
     in 'columns'.
     """
@@ -221,8 +242,13 @@ def generate_data_from_columns(data_path, columns, key_column, params):
     all_data = list()
 
     original_data = pd.read_csv(data_path)
+    for col in column_metadata:
+        if 'real' in column_metadata[col] or 'integer' in column_metadata[col]:
+            original_data[original_data.columns[col]] = pd.to_numeric(original_data[original_data.columns[col]], errors='coerce')
     column_names = [original_data.columns[i] for i in columns]
-    new_data = original_data[column_names]
+    new_data = original_data[column_names].copy()
+    new_data.fillna(value=0, inplace=True)
+    # new_data.dropna(inplace=True)
     new_data.insert(0, 'key', key_column)
 
     all_data.append(new_data)
