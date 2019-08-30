@@ -298,7 +298,7 @@ def get_performance_score(data, target_variable_name, algorithm):
 
 if __name__ == '__main__':
 
-    params = json.load(open('params.json'))
+    params = json.load(open('.params.json'))
 
     dir_ = params['datasets_directory']
     for dataset in os.listdir(dir_):

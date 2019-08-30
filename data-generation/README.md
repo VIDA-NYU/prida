@@ -9,7 +9,7 @@
 
 ## Generating Data
 
-To generate training data, first, configure the file [`params.json`](params.json):
+To generate training data, first, copy the file [`params.json`](params.json), name it as `.params.json`, and configure it appropriately. The structure of this file is the following:
 
 ```
 {
