@@ -32,3 +32,7 @@ The script will generate all the query and candidate datasets under `output_dire
     <query dataset, target variable name, candidate dataset, score before augmentation, score after augmentation>
 
 The performance score is computed using the `R^2` regression function score.
+
+## OpenML Datasets
+
+If you want to download [OpenML](https://www.openml.org/) datasets to use them in the data generation process, check it [here](openml-datasets).
