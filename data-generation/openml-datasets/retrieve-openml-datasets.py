@@ -82,10 +82,10 @@ if __name__ == '__main__':
         try:
             dataset = openml.datasets.get_dataset(task['source_data'])
         except openml.exceptions.OpenMLServerException as e:
-            print("Dataset skipped due to OpenML exception: %s" % dataset.name)
+            print("Dataset skipped due to OpenML exception: %d" % task['source_data'])
             continue
         except Exception as e:
-            print("Dataset skipped due to an exception: %s" % dataset.name)
+            print("Dataset skipped due to an exception: %d" % task['source_data'])
             print("  Exception on dataset: %s" % str(e))
             continue
         if dataset.name in seen_datasets:
