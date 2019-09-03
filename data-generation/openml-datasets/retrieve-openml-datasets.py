@@ -77,6 +77,6 @@ if __name__ == '__main__':
         try:
             dataset = openml.datasets.get_dataset(task['source_data'])
             save_dataset(output_dir, dataset, task)
-            break
         except openml.exceptions.OpenMLServerException as e:
+            print("Dataset skipped due to OpenML exception: %s" % dataset.name)
             continue
