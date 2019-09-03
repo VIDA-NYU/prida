@@ -305,9 +305,11 @@ if __name__ == '__main__':
         info = retrieve_dataset_information(os.path.join(dir_, dataset))
         # regression problems only
         if info['problem_type'] != 'regression':
+            print('The following dataset does not belong to a regression problem: %s (%s)' % (dataset, info['problem_type']))
             continue
         # single data tables only
         if info['multiple_data']:
+            print('The following dataset is composed by multiple files: %s' % dataset)
             continue
 
         generate_training_data(
