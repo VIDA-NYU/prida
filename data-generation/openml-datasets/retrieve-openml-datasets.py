@@ -15,6 +15,10 @@ def save_dataset(directory, dataset, task):
         dataset_format='dataframe'
     )
     numeric_attributes = dataset.get_features_by_type('numeric')
+    target_id = attribute_names.index(task['target_feature'])
+
+    if target_id not in numeric_attributes:
+        return
 
     # creating directory
     dir_name = os.path.join(directory, dataset.name)
@@ -62,7 +66,7 @@ def save_dataset(directory, dataset, task):
     problem_doc['inputs']['data'][0]['targets'].append(
         dict(
             colName=task['target_feature'],
-            colIndex=attribute_names.index(task['target_feature'])
+            colIndex=target_id
         )
     )
     with open(os.path.join(problem_dir_name, 'problemDoc.json'), 'w') as f:
@@ -72,11 +76,24 @@ def save_dataset(directory, dataset, task):
 if __name__ == '__main__':
     output_dir = sys.argv[1]
     regression_tasks = openml.tasks.list_tasks(task_type_id=2)
+    seen_datasets = set()
     for task_id in regression_tasks:
         task = regression_tasks[task_id]
         try:
             dataset = openml.datasets.get_dataset(task['source_data'])
-            save_dataset(output_dir, dataset, task)
         except openml.exceptions.OpenMLServerException as e:
             print("Dataset skipped due to OpenML exception: %s" % dataset.name)
             continue
+        except Exception as e:
+            print("Dataset skipped due to an exception: %s" % dataset.name)
+            print("  Exception on dataset: %s" % str(e))
+            continue
+        if dataset.name in seen_datasets:
+            continue
+        seen_datasets.add(dataset.name)
+        print("Saving dataset %s" % dataset.name)
+        try:
+            save_dataset(output_dir, dataset, task)
+        except Exception as e:
+            print("  Exception on dataset: %s" % str(e))
+       
