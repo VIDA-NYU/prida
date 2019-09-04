@@ -79,6 +79,11 @@ def generate_training_data(data_name, data_path, target_variable, column_metadat
     training_data_file = params['training_data_file']
     algorithm = params['regression_algorithm']
 
+    # create output_directory if it does not exists yet
+    if not os.path.exists(output_dir):
+        print('Creating output_directory=[{}]'.format(output_dir))
+        os.makedirs(output_dir)
+
     # non-numeric attributes
     n_non_numeric_att = 0
     non_numeric_att_list = list()
@@ -166,7 +171,7 @@ def generate_training_data(data_name, data_path, target_variable, column_metadat
         name = 'query_%s_%d.csv' % (data_name, i)
         query_data_names.append(name)
         query_data[i].to_csv(
-            open(os.path.join(params['output_directory'], name), 'w'),
+            open(os.path.join(output_dir, name), 'w'),
             index=False
         )
         query_data[i].set_index(
@@ -179,7 +184,7 @@ def generate_training_data(data_name, data_path, target_variable, column_metadat
         name = 'candidate_%s_%d.csv' % (data_name, i)
         candidate_data_names.append(name)
         candidate_data[i].to_csv(
-            open(os.path.join(params['output_directory'], name), 'w'),
+            open(os.path.join(output_dir, name), 'w'),
             index=False
         )
         candidate_data[i].set_index(
@@ -190,7 +195,7 @@ def generate_training_data(data_name, data_path, target_variable, column_metadat
 
     target_variable_name = pd.read_csv(data_path).columns[target_variable]
 
-    training_data = open(params['training_data_file'], 'a')
+    training_data = open(training_data_file, 'a')
 
     # doing joins and computing performance scores
     for i in range(len(query_data)):
