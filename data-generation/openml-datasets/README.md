@@ -4,7 +4,7 @@
 
 * Python 3
 * pandas
-* openml
+* [openml](https://pypi.org/project/openml/)
 
 ## Downloading Data
 

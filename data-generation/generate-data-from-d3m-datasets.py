@@ -89,6 +89,10 @@ def generate_training_data(data_name, data_path, target_variable, column_metadat
             n_non_numeric_att += 1
             non_numeric_att_list.append(col)
 
+    if target_variable in non_numeric_att_list:
+        print('The following dataset has a non-numerical target variable: %s' % data_name)
+        return
+
     # removing target variable, 'd3mIndex', and non-numeric attributes
     n_columns_left = len(column_metadata) - 2 - n_non_numeric_att
     # if there is only one column left, there is no way to
