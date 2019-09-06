@@ -87,11 +87,12 @@ def convert_arff_to_csv(arff_file_path, csv_file_path, data_format):
     """
 
     columns = []
-    data = []
     csv_file = open(csv_file_path, "w")
     with open(arff_file_path, "r") as arff_file:
         data_flag = 0
         for line in arff_file:
+            if line.strip() == '':
+                continue
             if line[:2].lower() == '@a':
                 # find indices
                 indices = [i for i, x in enumerate(line) if x == ' ']
@@ -102,16 +103,15 @@ def convert_arff_to_csv(arff_file_path, csv_file_path, data_format):
             elif data_flag == 1:
                 if data_format.lower() == 'arff':
                     # regular ARFF
-                    data.append(line)
+                    csv_file.write(line)
                 else:
                     # sparse ARFF
-                    if line.strip()[1:-1] == '':
-                        continue
-                    elements = line.strip()[1:-1].split(",")
                     row_data = ['0' for i in columns]
-                    for element in elements:
-                        index, value = element.strip().split(" ")
-                        row_data[int(index)] = value
+                    if line.strip()[1:-1] != '':
+                        elements = line.strip()[1:-1].split(",")
+                        for element in elements:
+                            index, value = element.strip().split(" ")
+                            row_data[int(index)] = value
                     csv_file.write(','.join(row_data) + '\n')
 
     csv_file.close()
