@@ -88,6 +88,7 @@ def convert_arff_to_csv(arff_file_path, csv_file_path, data_format):
 
     columns = []
     data = []
+    csv_file = open(csv_file_path, "w")
     with open(arff_file_path, "r") as arff_file:
         data_flag = 0
         for line in arff_file:
@@ -96,6 +97,7 @@ def convert_arff_to_csv(arff_file_path, csv_file_path, data_format):
                 indices = [i for i, x in enumerate(line) if x == ' ']
                 columns.append(re.sub(r'^[\'\"]|[\'\"]$|\\+', '', line[indices[0] + 1:indices[-1]]))
             elif line[:2].lower() == '@d':
+                csv_file.write(','.join(columns) + '\n')
                 data_flag = 1
             elif data_flag == 1:
                 if data_format.lower() == 'arff':
@@ -110,12 +112,9 @@ def convert_arff_to_csv(arff_file_path, csv_file_path, data_format):
                     for element in elements:
                         index, value = element.strip().split(" ")
                         row_data[int(index)] = value
-                    data.append(','.join(row_data) + '\n')
+                    csv_file.write(','.join(row_data) + '\n')
 
-    content = ','.join(columns) + '\n' + ''.join(data)
-
-    with open(csv_file_path, "w") as csv_file:
-        csv_file.write(content)
+    csv_file.close()
 
 
 if __name__ == '__main__':
