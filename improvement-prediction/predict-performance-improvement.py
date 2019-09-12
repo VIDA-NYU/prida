@@ -27,4 +27,4 @@ if __name__ == '__main__':
     augmentation_instances = parse_learning_data_filename(learning_data_filename)
     for instance in augmentation_instances:
         feature_factory = FeatureFactory(instance.get_query_dataset().get_data())
-        #feature_factory.compute_individual_features(instance.get_query_dataset().get_data()) 
+        print(feature_factory.get_covariances())
