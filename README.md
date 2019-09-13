@@ -18,4 +18,6 @@ The code to predict performance improvements is available [here](improvement-pre
 
 ## 3. Generate Training Data
 
+The generate ground-truth data for training and testing, we use datasets from the D3M project. The main idea is to break each dataset into different query and candidate datasets, randomly choosing the columns. We also randomly remove records from query and candidate datasets, to avoid perfect joins.
+
 The code to generate training data is available [here](data-generation).

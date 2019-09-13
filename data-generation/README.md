@@ -9,7 +9,7 @@
 
 ## Generating Data
 
-To generate training data, first, configure the file [`params.json`](params.json):
+To generate training data, first, copy the file [`params.json`](params.json), name it as `.params.json`, and configure it appropriately. The structure of this file is the following:
 
 ```
 {
@@ -29,6 +29,10 @@ Then, run the following:
 
 The script will generate all the query and candidate datasets under `output_directory`, and the file `training_data_file` will contain lines of the following format:
 
-    <query dataset, candidate dataset, score before augmentation, score after augmentation>
+    <query dataset, target variable name, candidate dataset, score before augmentation, score after augmentation>
 
 The performance score is computed using the `R^2` regression function score.
+
+## OpenML Datasets
+
+If you want to download [OpenML](https://www.openml.org/) datasets to use them in the data generation process, check it [here](openml-datasets).
