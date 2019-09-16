@@ -179,7 +179,7 @@ def generate_training_data(data_name, data_path, target_variable, column_metadat
             index=False
         )
         query_data[i].set_index(
-            'key',
+            'key-for-ranking',
             drop=True,
             inplace=True
         )
@@ -192,7 +192,7 @@ def generate_training_data(data_name, data_path, target_variable, column_metadat
             index=False
         )
         candidate_data[i].set_index(
-            'key',
+            'key-for-ranking',
             drop=True,
             inplace=True
         )
@@ -229,6 +229,9 @@ def generate_training_data(data_name, data_path, target_variable, column_metadat
             )
             join_.dropna(inplace=True)
 
+            if join_.shape[0] < 50:
+                continue
+
             # build model on joined data
             score_after = get_performance_score(
                 join_,
@@ -258,7 +261,7 @@ def generate_data_from_columns(data_path, columns, column_metadata, key_column, 
     new_data = original_data[column_names].copy()
     new_data.fillna(value=0, inplace=True)
     # new_data.dropna(inplace=True)
-    new_data.insert(0, 'key', key_column)
+    new_data.insert(0, 'key-for-ranking', key_column)
 
     all_data.append(new_data)
 
