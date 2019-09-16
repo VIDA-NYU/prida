@@ -25,6 +25,6 @@ if __name__ == '__main__':
     validation_n_splits = params['n_splits']
     output_filename = params['output_filename']
     augmentation_instances = parse_learning_data_filename(learning_data_filename)
-    feature_factory = FeatureFactory()
     for instance in augmentation_instances:
-        features = feature_factory.get_dataset_features(instance.get_query_dataset().get_data()) 
+        feature_factory = FeatureFactory(instance.get_query_dataset().get_data())
+        print(feature_factory.get_covariances())
