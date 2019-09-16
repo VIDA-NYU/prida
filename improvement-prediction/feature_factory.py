@@ -2,12 +2,13 @@ import numpy as np
 from scipy import stats
 import pandas as pd
 from sklearn import preprocessing
+from sklearn.metrics.cluster import normalized_mutual_info_score
 
 # reference document: https://arxiv.org/pdf/1810.03548.pdf
 class FeatureFactory:
     def __init__(self, data):
         self.data = data
-        self.get_entropy_levels_float()
+        print(self.get_normalized_mutual_information())
         
     def _is_integer(self, column_name):
         return self.data[column_name].dtype == np.int64 or self.data[column_name].dtype == np.int32
@@ -116,6 +117,7 @@ class FeatureFactory:
                 entropy_levels_int[column] = stats.entropy(counts)
         return entropy_levels_int
 
+    #TODO does it make sense to treat ints and floats differently here?
     def get_entropy_levels_float(self):
         entropy_levels_float = {}
         for column in self.data:
@@ -125,6 +127,14 @@ class FeatureFactory:
                 scaled_values = min_max_scaler.fit_transform(original_values)
                 entropy_levels_float[column] = stats.entropy(np.histogram(scaled_values)[0])
         return entropy_levels_float
-    
-    #TODO: implement mutual information, entropy
+
+    def get_normalized_mutual_information(self):
+        mutual_infos = []
+        for index1, column1 in enumerate(self.data):
+            for index2, column2 in enumerate(self.data):
+                if column1 != column2 and index1 < index2 and self._is_numerical(column1) and self._is_numerical(column2):
+                    norm_mutual_info = normalized_mutual_info_score(self.data[column1], self.data[column2])
+                    mutual_infos.append(((column1, column2), norm_mutual_info))
+        return mutual_infos
+
     #TODO: implement concentration, ANOVA p-value
