@@ -1,13 +1,22 @@
 import numpy as np
 from scipy import stats
+import pandas as pd
+from sklearn import preprocessing
 
 # reference document: https://arxiv.org/pdf/1810.03548.pdf
 class FeatureFactory:
     def __init__(self, data):
         self.data = data
+        self.get_entropy_levels_float()
+        
+    def _is_integer(self, column_name):
+        return self.data[column_name].dtype == np.int64 or self.data[column_name].dtype == np.int32
 
+    def _is_float(self, column_name):
+        return self.data[column_name].dtype == np.float64 or self.data[column_name].dtype == np.float32
+    
     def _is_numerical(self, column_name):
-        return self.data[column].dtype == np.int64 or self.data[column].dtype == np.float64
+        return self.data[column_name].dtype == np.int64 or self.data[column_name].dtype == np.int32 or self.data[column_name].dtype == np.float64 or self.data[column_name].dtype == np.float32
     
     def get_number_of_columns(self):
         return self.data.shape[1]
@@ -99,4 +108,23 @@ class FeatureFactory:
                     covariances.append(((column1, column2), covs[column1][column2]))
         return covariances
 
-    #TODO: implement concentration, ANOVA p-value, mutual information, entropy
+    def get_entropy_levels_int(self):
+        entropy_levels_int = {}
+        for column in self.data:
+            if self._is_integer(column):
+                value, counts = np.unique(self.data[column], return_counts=True)            
+                entropy_levels_int[column] = stats.entropy(counts)
+        return entropy_levels_int
+
+    def get_entropy_levels_float(self):
+        entropy_levels_float = {}
+        for column in self.data:
+            if self._is_integer(column):
+                original_values = self.data[column]
+                min_max_scaler = preprocessing.MinMaxScaler()
+                scaled_values = min_max_scaler.fit_transform(original_values)
+                entropy_levels_float[column] = stats.entropy(np.histogram(scaled_values)[0])
+        return entropy_levels_float
+    
+    #TODO: implement mutual information, entropy
+    #TODO: implement concentration, ANOVA p-value
