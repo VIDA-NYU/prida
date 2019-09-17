@@ -8,7 +8,6 @@ from sklearn.metrics.cluster import normalized_mutual_info_score
 class FeatureFactory:
     def __init__(self, data):
         self.data = data
-        print(self.get_normalized_mutual_information())
         
     def _is_integer(self, column_name):
         return self.data[column_name].dtype == np.int64 or self.data[column_name].dtype == np.int32
@@ -73,6 +72,19 @@ class FeatureFactory:
                 number_of_unique_values[column] = self.data[column].nunique()
         return number_of_unique_values
 
+    def get_individual_metrics(self, func=max):
+        metrics = [self.get_number_of_columns(),
+                   self.get_number_of_rows(),
+                   self.get_row_to_column_ratio(),
+                   self.get_number_of_numerical_columns()]
+        metrics.append(func(self.get_means_of_numerical_columns().values()))
+        metrics.append(func(self.get_percentages_of_missing_values().values()))
+        metrics.append(func(self.get_outlier_percentages_of_numerical_columns().values()))
+        metrics.append(func(self.get_skewness_of_numerical_columns().values()))
+        metrics.append(func(self.get_kurtosis_of_numerical_columns().values()))
+        metrics.append(func(self.get_number_of_unique_values_of_numerical_columns().values()))
+        return metrics
+        
     def get_pearson_correlations(self):
         corrs = self.data.corr(method='pearson')
         correlations = []

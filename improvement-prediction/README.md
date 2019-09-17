@@ -25,7 +25,7 @@ Then, run the following:
 
 Each line in `learning_data_file` is in the format
 
-<query dataset filename, candidate dataset filename, target attribute name, `R^2` score before augmentation, `R^2` score after augmentation>
+<query dataset filename, target attribute name, candidate dataset filename, `R^2` score before augmentation, `R^2` score after augmentation>
 
 and each line in `output_filename` is in the format
 

@@ -1,5 +1,5 @@
 {
-    "learning_data_filename": "/home/alibezz/dataset-ranking/improvement-prediction/learning-data",
+    "learning_data_filename": "/home/alibezz/dataset-ranking/improvement-prediction/data-linear/training-data",
 		"n_splits": 0,
 		"output_filename": "/home/alibezz/dataset-ranking/improvement-prediction/prediction-output-file"
 }
