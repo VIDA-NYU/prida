@@ -1,5 +1,5 @@
 import numpy as np
-from scipy import stats
+from scipy import stats, cov
 import pandas as pd
 from sklearn import preprocessing
 from sklearn.metrics.cluster import normalized_mutual_info_score
@@ -72,6 +72,25 @@ class FeatureFactory:
                 number_of_unique_values[column] = self.data[column].nunique()
         return number_of_unique_values
 
+    def get_entropy_levels_float(self):
+        entropy_levels = {}
+        for column in self.data:
+            if self._is_float(column):
+                original_values = self.data[column]
+                original_values = original_values.values.reshape(1, -1)
+                min_max_scaler = preprocessing.MinMaxScaler()
+                scaled_values = min_max_scaler.fit_transform(original_values)
+                entropy_levels[column] = stats.entropy(np.histogram(scaled_values)[0])
+        return entropy_levels
+    
+    def get_entropy_levels_integer(self):
+        entropy_levels = {}
+        for column in self.data:
+            if self._is_integer(column):
+                value, counts = np.unique(self.data[column], return_counts=True)            
+                entropy_levels[column] = stats.entropy(counts)
+        return entropy_levels
+
     def get_individual_metrics(self, func=max):
         metrics = [self.get_number_of_columns(),
                    self.get_number_of_rows(),
@@ -83,6 +102,10 @@ class FeatureFactory:
         metrics.append(func(self.get_skewness_of_numerical_columns().values()))
         metrics.append(func(self.get_kurtosis_of_numerical_columns().values()))
         metrics.append(func(self.get_number_of_unique_values_of_numerical_columns().values()))
+        entropy_levels_float = self.get_entropy_levels_float()
+        metrics.append(func(entropy_levels_float.values())) if entropy_levels_float else metrics.append(0.0)
+        entropy_levels_int = self.get_entropy_levels_integer()
+        metrics.append(func(entropy_levels_int.values())) if entropy_levels_int else metrics.append(0)
         return metrics
         
     def get_pearson_correlations(self):
@@ -121,25 +144,6 @@ class FeatureFactory:
                     covariances.append(((column1, column2), covs[column1][column2]))
         return covariances
 
-    def get_entropy_levels_int(self):
-        entropy_levels_int = {}
-        for column in self.data:
-            if self._is_integer(column):
-                value, counts = np.unique(self.data[column], return_counts=True)            
-                entropy_levels_int[column] = stats.entropy(counts)
-        return entropy_levels_int
-
-    #TODO does it make sense to treat ints and floats differently here?
-    def get_entropy_levels_float(self):
-        entropy_levels_float = {}
-        for column in self.data:
-            if self._is_integer(column):
-                original_values = self.data[column]
-                min_max_scaler = preprocessing.MinMaxScaler()
-                scaled_values = min_max_scaler.fit_transform(original_values)
-                entropy_levels_float[column] = stats.entropy(np.histogram(scaled_values)[0])
-        return entropy_levels_float
-
     def get_normalized_mutual_information(self):
         mutual_infos = []
         for index1, column1 in enumerate(self.data):
@@ -149,4 +153,78 @@ class FeatureFactory:
                     mutual_infos.append(((column1, column2), norm_mutual_info))
         return mutual_infos
 
-    #TODO: implement concentration, ANOVA p-value
+    def get_pairwise_metrics(self, func=max):
+        metrics = []
+        pearson = func([i[1] for i in self.get_pearson_correlations()])
+        spearman = func([i[1] for i in self.get_spearman_correlations()])
+        kendalltau = func([i[1] for i in self.get_kendall_tau_correlations()])
+        covariance = func([i[1] for i in self.get_covariances()])
+        mutual_info = func([i[1] for i in self.get_normalized_mutual_information()])
+        metrics.append(pearson) if not np.isnan(pearson) else metrics.append(0.0)
+        metrics.append(spearman) if not np.isnan(spearman) else metrics.append(0.0)
+        metrics.append(kendalltau) if not np.isnan(kendalltau) else metrics.append(0.0)
+        metrics.append(covariance) if not np.isnan(covariance) else metrics.append(0.0)
+        metrics.append(mutual_info) if not np.isnan(mutual_info) else metrics.append(0.0)
+        return metrics
+
+    def get_pearson_correlations_with_target(self, target_column_name):
+        correlations = {}
+        for column in self.data:
+            if column != target_column_name and self._is_numerical(column) and self._is_numerical(target_column_name):
+                coefficient, pvalue = stats.pearsonr(self.data[column], self.data[target_column_name])
+                #for now, i am ignoring the pvalues
+                if not np.isnan(coefficient):
+                    correlations[column] = coefficient
+        return correlations
+
+    def get_spearman_correlations_with_target(self, target_column_name):
+        correlations = {}
+        for column in self.data:
+            if column != target_column_name and self._is_numerical(column) and self._is_numerical(target_column_name):
+                coefficient, pvalue = stats.spearmanr(self.data[column], self.data[target_column_name])
+                #for now, i am ignoring the pvalues
+                if not np.isnan(coefficient):
+                    correlations[column] = coefficient
+        return correlations
+
+    def get_kendall_tau_correlations_with_target(self, target_column_name):
+        correlations = {}
+        for column in self.data:
+            if column != target_column_name and self._is_numerical(column) and self._is_numerical(target_column_name):
+                coefficient, pvalue = stats.kendalltau(self.data[column], self.data[target_column_name])
+                #for now, i am ignoring the pvalues
+                if not np.isnan(coefficient):
+                    correlations[column] = coefficient
+        return correlations
+
+    def get_covariances_with_target(self, target_column_name):
+        covariances = {}
+        for column in self.data:
+            if column != target_column_name and self._is_numerical(column) and self._is_numerical(target_column_name):
+                covariance = cov(self.data[column], self.data[target_column_name])[0,1]
+                if not np.isnan(covariance):
+                    covariances[column] = covariance
+        return covariances
+
+    def get_normalized_mutual_information_with_target(self, target_column_name):
+        mutual_infos = {}
+        for column in self.data:
+            if column != target_column_name and self._is_numerical(column) and self._is_numerical(target_column_name):
+                norm_mutual_info = normalized_mutual_info_score(self.data[column], self.data[target_column_name])
+                mutual_infos[column] = norm_mutual_info
+        return mutual_infos
+
+    def get_pairwise_metrics_with_target(self, target_column_name, func=max):
+        metrics = []
+        pearson = func(self.get_pearson_correlations_with_target(target_column_name).values())
+        spearman = func(self.get_spearman_correlations_with_target(target_column_name).values())
+        kendalltau = func(self.get_kendall_tau_correlations_with_target(target_column_name).values())
+        covariance = func(self.get_covariances_with_target(target_column_name).values())
+        mutual_info = func(self.get_normalized_mutual_information_with_target(target_column_name).values())
+        #TODO refactor to avoid repetition
+        metrics.append(pearson) if not np.isnan(pearson) else metrics.append(0.0)
+        metrics.append(spearman) if not np.isnan(spearman) else metrics.append(0.0)
+        metrics.append(kendalltau) if not np.isnan(kendalltau) else metrics.append(0.0)
+        metrics.append(covariance) if not np.isnan(covariance) else metrics.append(0.0)
+        metrics.append(mutual_info) if not np.isnan(mutual_info) else metrics.append(0.0)
+        return metrics

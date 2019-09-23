@@ -27,7 +27,11 @@ if __name__ == '__main__':
     augmentation_instances = parse_learning_data_filename(learning_data_filename)
     for instance in augmentation_instances:
         feature_factory_query = FeatureFactory(instance.get_joined_query_data())
-        query_individual_features = feature_factory_query.get_individual_metrics()
+        query_individual_metrics = feature_factory_query.get_individual_metrics()
         feature_factory_candidate = FeatureFactory(instance.get_joined_candidate_data())
-        candidate_individual_features = feature_factory_candidate.get_individual_metrics()
-        #TODO get pairwise features
+        candidate_individual_metrics = feature_factory_candidate.get_individual_metrics()
+        feature_factory_full_dataset = FeatureFactory(instance.get_joined_data())
+        full_dataset_pairwise_metrics = feature_factory_full_dataset.get_pairwise_metrics()
+        pairwise_metrics_with_target = feature_factory_full_dataset.get_pairwise_metrics_with_target(instance.get_target_column_name())
+        print(len(query_individual_metrics), len(candidate_individual_metrics), len(full_dataset_pairwise_metrics), len(pairwise_metrics_with_target))
+        #TODO (1) use func == max(np.fabs) (2) formalize the gain with r2_score attributes (3) model the regression task

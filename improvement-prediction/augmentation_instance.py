@@ -34,3 +34,9 @@ class AugmentationInstance:
     def get_joined_candidate_data(self):
         candidate_column_names = self.candidate_dataset.get_column_names()
         return self.joined_dataset.get_data_columns(candidate_column_names, '_right')
+
+    def get_joined_data(self):
+        return self.joined_dataset.get_data()
+
+    def get_target_column_name(self):
+        return self.target_name
