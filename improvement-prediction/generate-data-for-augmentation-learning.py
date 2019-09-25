@@ -3,6 +3,7 @@ import json
 from augmentation_instance import *
 from feature_factory import *
 from constants import *
+from learning_task import *
 
 def parse_learning_data_filename(filename):
     with open(filename, 'r') as f:
@@ -22,9 +23,9 @@ if __name__ == '__main__':
 
     params = json.load(open('params.json'))
     learning_data_filename = params['learning_data_filename']
-    validation_n_splits = params['n_splits']
-    output_filename = params['output_filename']
+    augmentation_learning_data_filename = params['augmentation_learning_data_filename']
     augmentation_instances = parse_learning_data_filename(learning_data_filename)
+    learning_task = LearningTask()
     for instance in augmentation_instances:
         feature_factory_query = FeatureFactory(instance.get_joined_query_data())
         query_individual_metrics = feature_factory_query.get_individual_metrics(func=max_in_modulus)
@@ -34,5 +35,9 @@ if __name__ == '__main__':
         full_dataset_pairwise_metrics = feature_factory_full_dataset.get_pairwise_metrics(func=max_in_modulus)
         pairwise_metrics_with_target = feature_factory_full_dataset.get_pairwise_metrics_with_target(instance.get_target_column_name(), func=max_in_modulus)
         r2_gain = instance.compute_r2_gain()
-        print(len(query_individual_metrics), len(candidate_individual_metrics), len(full_dataset_pairwise_metrics), len(pairwise_metrics_with_target), r2_gain)
-        #TODO (1) model the regression task
+
+        learning_features = query_individual_metrics + candidate_individual_metrics + full_dataset_pairwise_metrics + pairwise_metrics_with_target
+        learning_target = r2_gain
+        learning_task.add_learning_instance(learning_features, learning_target)
+    learning_task.dump_learning_instances(augmentation_learning_data_filename)
+    print('done processing augmentation instances and creating data')

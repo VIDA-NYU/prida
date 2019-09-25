@@ -42,4 +42,4 @@ class AugmentationInstance:
         return self.target_name
 
     def compute_r2_gain(self):
-        return np.fabs((self.final_r2_score - self.initial_r2_score))/np.fabs(self.initial_r2_score)
+        return (self.final_r2_score - self.initial_r2_score)/np.fabs(self.initial_r2_score)
