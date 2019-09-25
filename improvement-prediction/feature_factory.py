@@ -4,6 +4,11 @@ import pandas as pd
 from sklearn import preprocessing
 from sklearn.metrics.cluster import normalized_mutual_info_score
 
+GAUSSIAN_OUTLIER_THRESHOLD = 3
+
+def max_in_modulus(values):
+    return max(values, key=abs)
+    
 # reference document: https://arxiv.org/pdf/1810.03548.pdf
 class FeatureFactory:
     def __init__(self, data):
@@ -47,7 +52,7 @@ class FeatureFactory:
         outlier_percentages = {}
         for column in self.data:
             if self._is_numerical(column): 
-                outlier_percentages[column] = len([i for i in stats.zscore(self.data[column]) if np.fabs(i) > 3])/self.data.shape[0]
+                outlier_percentages[column] = len([i for i in stats.zscore(self.data[column]) if np.fabs(i) > GAUSSIAN_OUTLIER_THRESHOLD])/self.data.shape[0]
         return outlier_percentages
 
     def get_skewness_of_numerical_columns(self):
