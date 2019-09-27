@@ -1,7 +1,7 @@
 {
-    "learning_data_filename": "/home/alibezz/dataset-ranking/improvement-prediction/data-linear/training-data",
-		"augmentation_learning_data_filename": "/home/alibezz/dataset-ranking/improvement-prediction/data_for_learning_augmentation.txt", 
+    "learning_data_filename": "/Users/alibezz/dataset-ranking/improvement-prediction/data-linear/training-data",
+		"augmentation_learning_data_filename": "/Users/alibezz/dataset-ranking/improvement-prediction/data_for_learning_augmentation.txt", 
 		"n_splits": 5,
-		"output_filename": "/home/alibezz/dataset-ranking/improvement-prediction/prediction-output-file"
+		"output_filename": "/Users/alibezz/dataset-ranking/improvement-prediction/prediction-output-file"
 }
 

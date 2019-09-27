@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+from learning_task import *
 
 if __name__ == '__main__':
 
@@ -9,4 +10,4 @@ if __name__ == '__main__':
     output_filename = params['output_filename']
     learning_task = LearningTask()
     learning_task.read_data(augmentation_learning_data_filename)
-    learning_data.execute_linear_regression(n_splits)
+    learning_task.execute_linear_regression(n_splits)
