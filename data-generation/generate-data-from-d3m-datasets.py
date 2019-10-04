@@ -64,6 +64,7 @@ def retrieve_dataset_information(dataset_dir):
                 break
 
     return dict(data_path=data_path,
+                data_size_gb=os.stat(data_path).st_size/1073741824,
                 problem_type=problem_type,
                 target_variable=target_variable,
                 multiple_data=multiple_data,
@@ -440,6 +441,9 @@ if __name__ == '__main__':
 
     for dataset in os.listdir(dir_):
         info = retrieve_dataset_information(os.path.join(dir_, dataset))
+        if info['data_size_gb'] > 5:
+            print('The following dataset has more than 5GB of data: %s' % dataset)
+            continue
         # regression problems only
         if info['problem_type'] != 'regression':
             print('The following dataset does not belong to a regression problem: %s (%s)' % (dataset, info['problem_type']))
