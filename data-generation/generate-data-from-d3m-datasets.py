@@ -93,8 +93,8 @@ def generate_positive_training_data(data_name, data_path, target_variable, colum
     n_non_numeric_att = 0
     non_numeric_att_list = list()
     for col in column_metadata:
-        if col == 0:
-            continue
+        # if col == 0:
+        #     continue
         if 'real' not in column_metadata[col] and 'integer' not in column_metadata[col]:
             n_non_numeric_att += 1
             non_numeric_att_list.append(col)
@@ -103,8 +103,8 @@ def generate_positive_training_data(data_name, data_path, target_variable, colum
         print('The following dataset has a non-numerical target variable: %s' % data_name)
         return
 
-    # removing target variable, 'd3mIndex', and non-numeric attributes
-    n_columns_left = len(column_metadata) - 2 - n_non_numeric_att
+    # removing target variable and non-numeric attributes
+    n_columns_left = len(column_metadata) - 1 - n_non_numeric_att
     # if there is only one column left, there is no way to
     # generate both query and candidate datasets
     if n_columns_left <= 1:
@@ -132,7 +132,7 @@ def generate_positive_training_data(data_name, data_path, target_variable, colum
     )
 
     # list of column indices
-    all_columns = list(range(1, len(column_metadata)))
+    all_columns = list(range(0, len(column_metadata)))
     all_columns.remove(target_variable)
     for non_numeric_att in non_numeric_att_list:
         all_columns.remove(non_numeric_att)
