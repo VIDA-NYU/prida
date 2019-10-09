@@ -3,45 +3,56 @@ import json
 import numpy as np
 import os
 import pandas as pd
+from pyspark import SparkContext
 import random
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split
 import string
+import sys
 import time
+import uuid
+
+if sys.version_info[0] < 3: 
+    from StringIO import StringIO
+else:
+    from io import StringIO
 
 
-def retrieve_dataset_information(dataset_dir):
-    """Retrieves some information about a D3M dataset,
-    including data path, problem type, target variable,
-    a boolean value that indicates whether the dataset
-    is composed by multiple data, and data type for
-    each column of the learningData file.
+def generate_positive_training_data(input_dataset, regression_algorithm):
+    """Generates training data, including query and cadidate datasets,
+    and the corresponding performance scores, from a single dataset.
+
+    The format of the input_dataset is as follows:
+
+      (dataset_name, [('learningData.csv', ...),
+                      ('datasetDoc.json', ...),
+                      ('problemDoc.json', ...)])
     """
+
+    result = list()
+
+    # retrieving some dataset information
 
     problem_type = None
     target_variable = None
     multiple_data = False
     column_metadata = dict()
 
-    dataset_name = os.path.basename(os.path.normpath(dataset_dir))
-    
-    # data path
-    data_path = os.path.join(
-        dataset_dir,
-        dataset_name + '_dataset',
-        'tables',
-        'learningData.csv')
-
-    dataset_doc =  json.load(open(os.path.join(
-        dataset_dir,
-        dataset_name + '_dataset',
-        'datasetDoc.json')))
-    problem_doc = json.load(open(os.path.join(
-        dataset_dir,
-        dataset_name + '_problem',
-        'problemDoc.json')))
+    data_name = input_dataset[0]
+    data_file = None
+    dataset_doc =  None
+    problem_doc = None
+    for d in input_dataset[1]:
+        if d[0] == 'learningData.csv':
+            data_file = d[1]
+            continue
+        if d[0] == 'datasetDoc.json':
+            dataset_doc = json.loads(d[1])
+            continue
+        if d[0] == 'problemDoc.json':
+            problem_doc = json.loads(d[1])
 
     # problem type
     if problem_doc.get('about') and problem_doc['about'].get('taskType'):
@@ -63,53 +74,38 @@ def retrieve_dataset_information(dataset_dir):
                     column_metadata[column['colIndex']] = column['colType']
                 break
 
-    return dict(data_path=data_path,
-                data_size_gb=os.stat(data_path).st_size/1073741824,
-                problem_type=problem_type,
-                target_variable=target_variable,
-                multiple_data=multiple_data,
-                column_metadata=column_metadata)
-
-
-def generate_positive_training_data(data_name, data_path, target_variable, column_metadata, params, identifier):
-    """Generates training data, including query and cadidate datasets,
-    and the corresponding performance scores, from a single dataset.
-    """
+    # regression problems only
+    if problem_type != 'regression':
+        print('The following dataset does not belong to a regression problem: %s (%s)' % (data_name, problem_type))
+        return result
+    # single data tables only
+    if multiple_data:
+        print('The following dataset is composed by multiple files: %s' % data_name)
+        return result
 
     # params
-    output_dir = params['output_directory']
-    training_data_file = params['training_data_file']
     algorithm = params['regression_algorithm']
-
-    # create output_directory if it does not exist yet
-    if not os.path.exists(output_dir):
-        # print('Creating output_directory=[{}]'.format(output_dir))
-        os.makedirs(output_dir)
-
-    # create identifier directory
-    os.makedirs(os.path.join(output_dir, identifier))
+    max_times_break_data_vertical = params['max_times_break_data_vertical']
 
     # non-numeric attributes
     n_non_numeric_att = 0
     non_numeric_att_list = list()
     for col in column_metadata:
-        if col == 0:
-            continue
         if 'real' not in column_metadata[col] and 'integer' not in column_metadata[col]:
             n_non_numeric_att += 1
             non_numeric_att_list.append(col)
 
     if target_variable in non_numeric_att_list:
         print('The following dataset has a non-numerical target variable: %s' % data_name)
-        return
+        return result
 
-    # removing target variable, 'd3mIndex', and non-numeric attributes
-    n_columns_left = len(column_metadata) - 2 - n_non_numeric_att
+    # removing target variable and non-numeric attributes
+    n_columns_left = len(column_metadata) - 1 - n_non_numeric_att
     # if there is only one column left, there is no way to
     # generate both query and candidate datasets
     if n_columns_left <= 1:
         print('The following dataset does not have enough columns for the data generation process: %s' % data_name)
-        return
+        return result
 
     # potential numbers of columns in a query dataset
     # for instance, if a dataset has 3 columns left (ignoring the target variable),
@@ -121,7 +117,7 @@ def generate_positive_training_data(data_name, data_path, target_variable, colum
     # maximum number of times that the original data will be vertically broken into
     #   multiple datasets
     n_vertical_data = np.random.choice(
-        list(range(1, min(params['max_times_break_data_vertical'], n_columns_left)))
+        list(range(1, min(max_times_break_data_vertical, n_columns_left)))
     )
 
     # number of columns for each time the data is vertically broken
@@ -132,13 +128,16 @@ def generate_positive_training_data(data_name, data_path, target_variable, colum
     )
 
     # list of column indices
-    all_columns = list(range(1, len(column_metadata)))
+    all_columns = list(range(0, len(column_metadata)))
     all_columns.remove(target_variable)
     for non_numeric_att in non_numeric_att_list:
         all_columns.remove(non_numeric_att)
 
+    # pandas dataset
+    original_data = pd.read_csv(StringIO(data_file))
+
     # generating the key column for the data
-    n_rows = pd.read_csv(data_path).shape[0]
+    n_rows = original_data.shape[0]
     key_column = [
         ''.join(
             [random.choice(string.ascii_letters + string.digits) for n in range(10)]
@@ -158,7 +157,7 @@ def generate_positive_training_data(data_name, data_path, target_variable, colum
 
         # generate query data
         query_data += generate_data_from_columns(
-            data_path,
+            original_data,
             columns + [target_variable],
             column_metadata,
             key_column,
@@ -167,22 +166,20 @@ def generate_positive_training_data(data_name, data_path, target_variable, colum
 
         # generate candidate data
         candidate_data += generate_data_from_columns(
-            data_path,
+            original_data,
             list(set(all_columns).difference(set(columns))),
             column_metadata,
             key_column,
             params
         )
 
-    # saving data and setting index
+    identifier = str(uuid.uuid4())
+
+    # generating name and setting index
     query_data_names = list()
     for i in range(len(query_data)):
-        name = 'query_%s_%d.csv' % (data_name, i)
+        name = identifier + os.path.sep + 'query_%s_%d.csv' % (data_name, i)
         query_data_names.append(name)
-        query_data[i].to_csv(
-            open(os.path.join(output_dir, identifier, name), 'w'),
-            index=False
-        )
         query_data[i].set_index(
             'key-for-ranking',
             drop=True,
@@ -190,41 +187,33 @@ def generate_positive_training_data(data_name, data_path, target_variable, colum
         )
     candidate_data_names = list()
     for i in range(len(candidate_data)):
-        name = 'candidate_%s_%d.csv' % (data_name, i)
+        name = identifier + os.path.sep + 'candidate_%s_%d.csv' % (data_name, i)
         candidate_data_names.append(name)
-        candidate_data[i].to_csv(
-            open(os.path.join(output_dir, identifier, name), 'w'),
-            index=False
-        )
         candidate_data[i].set_index(
             'key-for-ranking',
             drop=True,
             inplace=True
         )
 
-    target_variable_name = pd.read_csv(data_path).columns[target_variable]
-
-    training_data = open(training_data_file, 'a')
+    target_variable_name = original_data.columns[target_variable]
 
     # doing joins and computing performance scores
     for i in range(len(query_data)):
         q_data = query_data[i]
         q_data_name = query_data_names[i]
 
-        # print("Query Data: %s\n" % q_data_name)
-
         # build model on query data only
         score_before = get_performance_score(
             q_data,
             target_variable_name,
-            params['regression_algorithm']
+            algorithm
         )
+
+        query_results = list()
 
         for j in range(len(candidate_data)):
             c_data = candidate_data[j]
             c_data_name = candidate_data_names[j]
-
-            # print("  Candidate Data: %s\n" % c_data_name)
 
             # join dataset
             join_ = q_data.join(
@@ -241,28 +230,23 @@ def generate_positive_training_data(data_name, data_path, target_variable, colum
             score_after = get_performance_score(
                 join_,
                 target_variable_name,
-                params['regression_algorithm']
+                algorithm
             )
 
-            training_data.write('%s,%s,%s,%.10f,%.10f\n' % (os.path.join(identifier, q_data_name),
-                                                            target_variable_name,
-                                                            os.path.join(identifier, c_data_name),
-                                                            score_before,
-                                                            score_after))
+            query_results.append((c_data_name, c_data, score_before, score_after))
 
-    training_data.close()
+        result.append(((q_data_name, q_data, target_variable_name), query_results))
 
-    return
+    return result
 
 
-def generate_data_from_columns(data_path, columns, column_metadata, key_column, params):
+def generate_data_from_columns(original_data, columns, column_metadata, key_column, params):
     """Generates datasets from the original data using only the columns specified
     in 'columns'.
     """
 
     all_data = list()
 
-    original_data = pd.read_csv(data_path)
     for col in column_metadata:
         if 'real' in column_metadata[col] or 'integer' in column_metadata[col]:
             original_data[original_data.columns[col]] = pd.to_numeric(original_data[original_data.columns[col]], errors='coerce')
@@ -289,6 +273,15 @@ def generate_data_from_columns(data_path, columns, column_metadata, key_column, 
         all_data.append(new_data.drop(drop_indices))
 
     return all_data
+
+
+def get_candidate_files(record):
+    """Extracts the files for candidate datasets.
+    """
+    names = list()
+    for v in x[1]:
+        names.append((v[0], v[1]))
+    return names
 
 
 def generate_negative_training_data(query_dataset, candidate_set, max_number_random_candidates, params, identifier):
@@ -433,66 +426,81 @@ if __name__ == '__main__':
 
     start_time = time.time()
 
-    params = json.load(open('.params.json'))
+    # Spark context
+    sc = SparkContext()
+
+    # parameters
+    params_stdin = ''
+    for line in sys.stdin:
+        params_stdin += line
+    params = json.loads(params_stdin)
     dir_ = params['datasets_directory']
-    id_ = 0
-
-    # generating positive examples
-
-    for dataset in os.listdir(dir_):
-        info = retrieve_dataset_information(os.path.join(dir_, dataset))
-        if info['data_size_gb'] > 5:
-            print('The following dataset has more than 5GB of data: %s' % dataset)
-            continue
-        # regression problems only
-        if info['problem_type'] != 'regression':
-            print('The following dataset does not belong to a regression problem: %s (%s)' % (dataset, info['problem_type']))
-            continue
-        # single data tables only
-        if info['multiple_data']:
-            print('The following dataset is composed by multiple files: %s' % dataset)
-            continue
-
-        generate_positive_training_data(
-            dataset,
-            info['data_path'],
-            info['target_variable'],
-            info['column_metadata'],
-            params,
-            str(id_)
-        )
-
-        id_ += 1
-
-    # generating negative examples
-
     output_dir = params['output_directory']
     training_data_file = params['training_data_file']
 
-    query_set = set()
-    candidate_set = set()
+    # dataset files
+    data_files = list()
+    hadoop = sc._jvm.org.apache.hadoop
+    fs = hadoop.fs.FileSystem
+    conf = hadoop.conf.Configuration()
+    path = hadoop.fs.Path(dir_)
+    for f in fs.get(conf).listStatus(path):
+        data_files.append(f.getPath().toString())
 
-    training_data = open(training_data_file, 'r')
-    size_training_data = 0
-    line = training_data.readline()
-    while line != '':
-        size_training_data += 1
-        line_elems = line.split(",")
-        query_set.add(",".join(line_elems[:2] + [line_elems[3]]))
-        candidate_set.add(line_elems[2])
-        line = training_data.readline()
-    training_data.close()
+    # loading all files
+    data_rdd = list()
+    for data_file in data_files:
+        # dataset = os.path.basename(os.path.normpath(data_file))
+        data_rdd.append(sc.wholeTextFiles(data_file))
+    all_files = sc.union(data_rdd)
 
-    for query_dataset in query_set:
+    # grouping files from same dataset
+    # (dataset_name, [('learningData.csv', ...),
+    #                 ('datasetDoc.json', ...),
+    #                 ('problemDoc.json', ...)])
+    all_files = all_files.map(lambda x: (x[0].split(os.path.sep)[-2], [(os.path.basename(os.path.normpath(x[0])), x[1])]))
+    all_files = all_files.reduceByKey(lambda x1, x2: x1 + x2)
 
-        generate_negative_training_data(
-            query_dataset,
-            candidate_set,
-            size_training_data/len(query_set),
-            params,
-            str(id_)
-        )
+    # generating positive examples
+    positive_examples = all_files.flatMap(lambda x: generate_positive_training_data(x, params))
 
-        id_ += 1
+    # saving files
+    query_filenames = positive_examples.map(lambda x: x[0][0]).collect()
+    candidate_files = positive_examples.flatMap(lambda x: get_candidate_files(x))
+    candidate_filenames = candidate_files.map(lambda x: x[0]).collect()
+    for query_filename in query_filenames:
+        identifier_dir = query_filename.split(os.path.sep)[0]
+        fs.get(conf).mkdirs(hadoop.fs.Path(output_dir + os.path.sep + identifier_dir))
+        positive_examples.filter(lambda x: x[0][0] == query_filename).map(lambda x: x[0][1]).saveAsTextFile(output_dir + os.path.sep + query_filename)
+    for candidate_filename in candidate_filenames:
+        candidate_files.filter(lambda x: x[0] == candidate_filename).map(lambda x: x[1]).saveAsTextFile(output_dir + os.path.sep + candidate_filename)
 
-    print("Duration: %.4f seconds" % (time.time() - start_time))
+    # # generating negative examples
+
+    # query_set = set()
+    # candidate_set = set()
+
+    # training_data = open(training_data_file, 'r')
+    # size_training_data = 0
+    # line = training_data.readline()
+    # while line != '':
+    #     size_training_data += 1
+    #     line_elems = line.split(",")
+    #     query_set.add(",".join(line_elems[:2] + [line_elems[3]]))
+    #     candidate_set.add(line_elems[2])
+    #     line = training_data.readline()
+    # training_data.close()
+
+    # for query_dataset in query_set:
+
+    #     generate_negative_training_data(
+    #         query_dataset,
+    #         candidate_set,
+    #         size_training_data/len(query_set),
+    #         params,
+    #         str(id_)
+    #     )
+
+    #     id_ += 1
+
+    # print("Duration: %.4f seconds" % (time.time() - start_time))
