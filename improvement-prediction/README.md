@@ -32,7 +32,8 @@ and each line in `augmentation_learning_data_filename` is in the format
 
 <feature_1, ..., feature_N, relative `R^2` score improvement>
 
-Note that `learning_data_file` and `augmentation_learning_data_filename` have the same number of lines (instances for learning).
+Note that `learning_data_file` and `augmentation_learning_data_filename` have the same number of lines (instances for learning), and that the lines in 
+`augmentation_learning_data_filename` are the output of generate-data-for-augmentation-learning.py
 
 Then, run the following to learn how to augment, creating a model that learns to discern between good and bad data augmentations: 
 

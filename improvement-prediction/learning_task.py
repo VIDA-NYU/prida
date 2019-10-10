@@ -1,5 +1,6 @@
 import numpy as np
 from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import KFold 
 from sklearn.metrics import mean_squared_error
 from matplotlib import pyplot as plt
@@ -36,8 +37,11 @@ class LearningTask:
         for train_index, test_index in kf.split(self.learning_data):
             X_train, X_test = np.array(self.learning_data)[train_index], np.array(self.learning_data)[test_index]
             y_train, y_test = np.array(self.learning_targets)[train_index], np.array(self.learning_targets)[test_index]
+            #rf = RandomForestRegressor(n_estimators=100, random_state=42)
+            #rf.fit(X_train, y_train)
+            #predictions = rf.predict(X_test)
             lm = LinearRegression()
-            model = lm.fit(X_train, y_train)
+            lm.fit(X_train, y_train)
             predictions = lm.predict(X_test)
             plt.scatter(y_test, predictions)
             plt.xlabel('Real values')
@@ -46,5 +50,5 @@ class LearningTask:
             plt.savefig('predicted_r2_score_gains_fold_' + str(i) + '.png', dpi=300)
             plt.close()
             i += 1
-            print(mean_squared_error(predictions, y_test))
+            print('Mean squared error:', mean_squared_error(predictions, y_test))
             
