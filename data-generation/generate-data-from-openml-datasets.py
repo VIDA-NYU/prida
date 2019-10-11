@@ -430,10 +430,7 @@ if __name__ == '__main__':
     sc = SparkContext()
 
     # parameters
-    params_stdin = ''
-    for line in sys.stdin:
-        params_stdin += line
-    params = json.loads(params_stdin)
+    params = json.load(open(".params.json"))
     dir_ = params['datasets_directory']
     output_dir = params['output_directory']
     training_data_file = params['training_data_file']
