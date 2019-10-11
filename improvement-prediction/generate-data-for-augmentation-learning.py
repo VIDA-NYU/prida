@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import sys
 from augmentation_instance import *
 from feature_factory import *
 from constants import *
@@ -21,11 +22,16 @@ def parse_learning_data_filename(filename):
 
 if __name__ == '__main__':
 
-    params = json.load(open('params.json'))
+    if len(sys.argv) == 1:
+        params = json.load(open('params.json'))
+    else:
+        params = json.load(open(sys.argv[1]))
     learning_data_filename = params['learning_data_filename']
     augmentation_learning_data_filename = params['augmentation_learning_data_filename']
     augmentation_instances = parse_learning_data_filename(learning_data_filename)
+    print('Done parsing instances')
     learning_task = LearningTask()
+    i = 0
     for instance in augmentation_instances:
         feature_factory_query = FeatureFactory(instance.get_joined_query_data())
         query_individual_metrics = feature_factory_query.get_individual_metrics(func=max_in_modulus)
@@ -39,5 +45,8 @@ if __name__ == '__main__':
         learning_features = query_individual_metrics + candidate_individual_metrics + full_dataset_pairwise_metrics + pairwise_metrics_with_target
         learning_target = r2_gain
         learning_task.add_learning_instance(learning_features, learning_target)
+        i += 1
+        if (i % 100 == 0):
+            print(i)
     learning_task.dump_learning_instances(augmentation_learning_data_filename)
     print('done processing augmentation instances and creating data')
