@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
+import hdfs
 import json
 import numpy as np
 import os
 import pandas as pd
 from pyspark import SparkContext
 import random
+import shutil
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
@@ -20,20 +22,88 @@ else:
     from io import StringIO
 
 
-def generate_positive_training_data(input_dataset, regression_algorithm):
-    """Generates training data, including query and cadidate datasets,
-    and the corresponding performance scores, from a single dataset.
+def organize_dataset_files(file_path, cluster_execution):
+    """Map function to organizes the dataset files from one dataset.
+    """
+
+    dataset_name = ''
+    file_name = os.path.basename(os.path.normpath(file_path))
+    if cluster_execution:
+        # path is 'DATASET_NAME/FILE_NAME'
+        dataset_name = file_path.split(os.path.sep)[-2]
+    else:
+        if file_name == 'learningData.csv':
+            # path is 'DATASET_NAME/DATASET_NAME_dataset/tables/learningData.csv'
+            dataset_name = file_path.split(os.path.sep)[-4]
+        else:
+            # path is 'DATASET_NAME/DATASET_NAME_dataset/datasetDoc.json' or
+            #   'DATASET_NAME/DATASET_NAME_problem/problemDoc.json'
+            dataset_name = file_path.split(os.path.sep)[-3]
+
+    return (dataset_name, [(file_name, file_path)])
+
+
+def read_file(file_path, use_hdfs=False):
+    """Opens a file for read and returns its corresponding file object.
+    """
+
+    if use_hdfs:
+        fs = hadoop_lib.fs.FileSystem
+        conf = hadoop_lib.conf.Configuration()
+        path = hadoop_lib.fs.Path(file_path)
+        return fs.get(conf).open(path)
+    return open(file_path)
+
+
+def save_file(file_path, use_hdfs=False):
+    """Opens a file for write and returns its corresponding file object.
+    """
+
+    if use_hdfs:
+        fs = hadoop_lib.fs.FileSystem
+        conf = hadoop_lib.conf.Configuration()
+        path = hadoop_lib.fs.Path(file_path)
+        return fs.get(conf).create(path)
+    return open(file_path, 'w')
+
+
+def create_dir(file_path, use_hdfs=False):
+    """Creates a new directory specified by file_path.
+    Returns True on success.
+    """
+
+    if use_hdfs:
+        fs = hadoop_lib.fs.FileSystem
+        conf = hadoop_lib.conf.Configuration()
+        path = hadoop_lib.fs.Path(file_path)
+        if fs.get(conf).exists(path):
+            fs.get(conf).delete(path, recursive=True)
+        fs.get(conf).mkdirs(path)
+    else:
+        if os.path.exists(file_path):
+            shutil.rmtree(file_path)
+        os.makedirs(file_path)
+    return True
+
+
+def generate_query_and_candidate_datasets(input_dataset, params):
+    """Generates query and cadidate datasets from a single dataset.
 
     The format of the input_dataset is as follows:
 
-      (dataset_name, [('learningData.csv', ...),
-                      ('datasetDoc.json', ...),
-                      ('problemDoc.json', ...)])
+      (dataset_name, [('learningData.csv', path),
+                      ('datasetDoc.json', path),
+                      ('problemDoc.json', path)])
     """
 
     result = list()
 
-    # retrieving some dataset information
+    # params
+    algorithm = params['regression_algorithm']
+    max_times_break_data_vertical = params['max_times_break_data_vertical']
+    ignore_first_attribute = params['ignore_first_attribute']
+    cluster_execution = params['cluster']
+    output_dir = params['output_directory']
 
     problem_type = None
     target_variable = None
@@ -46,13 +116,13 @@ def generate_positive_training_data(input_dataset, regression_algorithm):
     problem_doc = None
     for d in input_dataset[1]:
         if d[0] == 'learningData.csv':
-            data_file = d[1]
+            data_file = read_file(d[1], hadoop_lib, cluster_execution)
             continue
         if d[0] == 'datasetDoc.json':
-            dataset_doc = json.loads(d[1])
+            dataset_doc = json.load(read_file(d[1], hadoop_lib, cluster_execution))
             continue
         if d[0] == 'problemDoc.json':
-            problem_doc = json.loads(d[1])
+            problem_doc = json.load(read_file(d[1], hadoop_lib, cluster_execution))
 
     # problem type
     if problem_doc.get('about') and problem_doc['about'].get('taskType'):
@@ -83,14 +153,12 @@ def generate_positive_training_data(input_dataset, regression_algorithm):
         print('The following dataset is composed by multiple files: %s' % data_name)
         return result
 
-    # params
-    algorithm = params['regression_algorithm']
-    max_times_break_data_vertical = params['max_times_break_data_vertical']
-
     # non-numeric attributes
     n_non_numeric_att = 0
     non_numeric_att_list = list()
     for col in column_metadata:
+        if col == 0 and ignore_first_attribute:
+            continue
         if 'real' not in column_metadata[col] and 'integer' not in column_metadata[col]:
             n_non_numeric_att += 1
             non_numeric_att_list.append(col)
@@ -99,8 +167,10 @@ def generate_positive_training_data(input_dataset, regression_algorithm):
         print('The following dataset has a non-numerical target variable: %s' % data_name)
         return result
 
-    # removing target variable and non-numeric attributes
+    # removing target variable, non-numeric attributes, and first attribute (if it is to be ignored)
     n_columns_left = len(column_metadata) - 1 - n_non_numeric_att
+    if ignore_first_attribute:
+        n_columns_left -= 1
     # if there is only one column left, there is no way to
     # generate both query and candidate datasets
     if n_columns_left <= 1:
@@ -128,13 +198,14 @@ def generate_positive_training_data(input_dataset, regression_algorithm):
     )
 
     # list of column indices
-    all_columns = list(range(0, len(column_metadata)))
+    range_start = 1 if ignore_first_attribute else 0
+    all_columns = list(range(range_start, len(column_metadata)))
     all_columns.remove(target_variable)
     for non_numeric_att in non_numeric_att_list:
         all_columns.remove(non_numeric_att)
 
     # pandas dataset
-    original_data = pd.read_csv(StringIO(data_file))
+    original_data = pd.read_csv(data_file)
 
     # generating the key column for the data
     n_rows = original_data.shape[0]
@@ -173,71 +244,92 @@ def generate_positive_training_data(input_dataset, regression_algorithm):
             params
         )
 
+    # saving datasets
     identifier = str(uuid.uuid4())
-
-    # generating name and setting index
-    query_data_names = list()
-    for i in range(len(query_data)):
-        name = identifier + os.path.sep + 'query_%s_%d.csv' % (data_name, i)
-        query_data_names.append(name)
-        query_data[i].set_index(
-            'key-for-ranking',
-            drop=True,
-            inplace=True
-        )
-    candidate_data_names = list()
-    for i in range(len(candidate_data)):
-        name = identifier + os.path.sep + 'candidate_%s_%d.csv' % (data_name, i)
-        candidate_data_names.append(name)
-        candidate_data[i].set_index(
-            'key-for-ranking',
-            drop=True,
-            inplace=True
-        )
-
+    create_dir(os.path.join(output_dir, identifier), hadoop_lib, cluster_execution)
     target_variable_name = original_data.columns[target_variable]
-
-    # doing joins and computing performance scores
+    results = list()
     for i in range(len(query_data)):
-        q_data = query_data[i]
-        q_data_name = query_data_names[i]
-
-        # build model on query data only
-        score_before = get_performance_score(
-            q_data,
-            target_variable_name,
-            algorithm
+        name = 'query_%s_%d.csv' % (data_name, i)
+        file_path = os.path.join(output_dir, identifier, name)
+        query_data[i].to_csv(
+            save_file(file_path, hadoop_lib, cluster_execution),
+            index=False
         )
+        results.append(file_path)
+    for i in range(len(candidate_data)):
+        name = 'candidate_%s_%d.csv' % (data_name, i)
+        file_path = os.path.join(output_dir, identifier, name)
+        candidate_data[i].to_csv(
+            save_file(file_path, hadoop_lib, cluster_execution),
+            index=False
+        )
+        results.append(file_path)
 
-        query_results = list()
+    return [(identifier, target_variable_name, results)]
 
-        for j in range(len(candidate_data)):
-            c_data = candidate_data[j]
-            c_data_name = candidate_data_names[j]
 
-            # join dataset
-            join_ = q_data.join(
-                c_data,
-                how='left',
-                rsuffix='_r'
-            )
-            join_.dropna(inplace=True)
+ # # generating name and setting index
+ #    query_data_names = list()
+ #    for i in range(len(query_data)):
+ #        name = identifier + os.path.sep + 'query_%s_%d.csv' % (data_name, i)
+ #        query_data_names.append(name)
+ #        query_data[i].set_index(
+ #            'key-for-ranking',
+ #            drop=True,
+ #            inplace=True
+ #        )
+ #    candidate_data_names = list()
+ #    for i in range(len(candidate_data)):
+ #        name = identifier + os.path.sep + 'candidate_%s_%d.csv' % (data_name, i)
+ #        candidate_data_names.append(name)
+ #        candidate_data[i].set_index(
+ #            'key-for-ranking',
+ #            drop=True,
+ #            inplace=True
+ #        )
 
-            if join_.shape[0] < 50:
-                continue
+ #    target_variable_name = original_data.columns[target_variable]
 
-            # build model on joined data
-            score_after = get_performance_score(
-                join_,
-                target_variable_name,
-                algorithm
-            )
+ #    # doing joins and computing performance scores
+ #    for i in range(len(query_data)):
+ #        q_data = query_data[i]
+ #        q_data_name = query_data_names[i]
 
-            query_results.append((c_data_name, c_data, score_before, score_after))
+ #        # build model on query data only
+ #        score_before = get_performance_score(
+ #            q_data,
+ #            target_variable_name,
+ #            algorithm
+ #        )
 
-        result.append(((q_data_name, q_data, target_variable_name), query_results))
+ #        query_results = list()
 
-    return result
+ #        for j in range(len(candidate_data)):
+ #            c_data = candidate_data[j]
+ #            c_data_name = candidate_data_names[j]
+
+ #            # join dataset
+ #            join_ = q_data.join(
+ #                c_data,
+ #                how='left',
+ #                rsuffix='_r'
+ #            )
+ #            join_.dropna(inplace=True)
+
+ #            if join_.shape[0] < 50:
+ #                continue
+
+ #            # build model on joined data
+ #            score_after = get_performance_score(
+ #                join_,
+ #                target_variable_name,
+ #                algorithm
+ #            )
+
+ #            query_results.append((c_data_name, c_data, score_before, score_after))
+
+ #        result.append(((q_data_name, q_data, target_variable_name), query_results))
 
 
 def generate_data_from_columns(original_data, columns, column_metadata, key_column, params):
@@ -410,11 +502,11 @@ def get_performance_score(data, target_variable_name, algorithm):
 
     yfit = None
 
-    if algorithm == 'linear':
+    if algorithm == 'random forest':
         forest = RandomForestRegressor(n_estimators=100, random_state=42)
         forest.fit(X_train, y_train)
         yfit = forest.predict(X_test)
-    elif algorithm == 'random forest':
+    elif algorithm == 'linear':
         linear_r = LinearRegression(normalize=True)
         linear_r.fit(X_train, y_train)
         yfit = linear_r.predict(X_test)
@@ -434,43 +526,59 @@ if __name__ == '__main__':
     dir_ = params['datasets_directory']
     output_dir = params['output_directory']
     training_data_file = params['training_data_file']
+    cluster_execution = params['cluster']
+    hdfs_address = params['hdfs_address']
+    hdfs_user = params['hdfs_user']
+
+    create_dir(output_dir, cluster_execution)
 
     # dataset files
-    data_files = list()
     hadoop = sc._jvm.org.apache.hadoop
     fs = hadoop.fs.FileSystem
     conf = hadoop.conf.Configuration()
-    path = hadoop.fs.Path(dir_)
-    for f in fs.get(conf).listStatus(path):
-        data_files.append(f.getPath().toString())
+    dataset_files = list()
+    if cluster_execution:
+        # if executing on cluster, need to read from HDFS
+        path = hadoop.fs.Path(dir_)
+        for dataset_path in fs.get(conf).listStatus(path):
+            for f in fs.get(conf).listStatus(dataset_path.getPath()):
+                dataset_files.append(f.getPath().toString())
+    else:
+        # if executing locally, need to read from local file
+        for dataset in os.listdir(dir_):
+            data_path = os.path.join(
+                dir_,
+                dataset,
+                dataset + '_dataset',
+                'tables',
+                'learningData.csv')
+            dataset_doc = os.path.join(
+                dir_,
+                dataset,
+                dataset + '_dataset',
+                'datasetDoc.json')
+            problem_doc = os.path.join(
+                dir_,
+                dataset,
+                dataset + '_problem',
+                'problemDoc.json')
+            dataset_files.append(data_path)
+            dataset_files.append(dataset_doc)
+            dataset_files.append(problem_doc)
 
-    # loading all files
-    data_rdd = list()
-    for data_file in data_files:
-        # dataset = os.path.basename(os.path.normpath(data_file))
-        data_rdd.append(sc.wholeTextFiles(data_file))
-    all_files = sc.union(data_rdd)
+    all_files = sc.parallelize(dataset_files)
 
     # grouping files from same dataset
-    # (dataset_name, [('learningData.csv', ...),
-    #                 ('datasetDoc.json', ...),
-    #                 ('problemDoc.json', ...)])
-    all_files = all_files.map(lambda x: (x[0].split(os.path.sep)[-2], [(os.path.basename(os.path.normpath(x[0])), x[1])]))
+    # (dataset_name, [('learningData.csv', path),
+    #                 ('datasetDoc.json', path),
+    #                 ('problemDoc.json', path)])
+    all_files = all_files.map(lambda x: organize_dataset_files(x, cluster_execution))
     all_files = all_files.reduceByKey(lambda x1, x2: x1 + x2)
 
-    # generating positive examples
-    positive_examples = all_files.flatMap(lambda x: generate_positive_training_data(x, params))
-
-    # saving files
-    query_filenames = positive_examples.map(lambda x: x[0][0]).collect()
-    candidate_files = positive_examples.flatMap(lambda x: get_candidate_files(x))
-    candidate_filenames = candidate_files.map(lambda x: x[0]).collect()
-    for query_filename in query_filenames:
-        identifier_dir = query_filename.split(os.path.sep)[0]
-        fs.get(conf).mkdirs(hadoop.fs.Path(output_dir + os.path.sep + identifier_dir))
-        positive_examples.filter(lambda x: x[0][0] == query_filename).map(lambda x: x[0][1]).saveAsTextFile(output_dir + os.path.sep + query_filename)
-    for candidate_filename in candidate_filenames:
-        candidate_files.filter(lambda x: x[0] == candidate_filename).map(lambda x: x[1]).saveAsTextFile(output_dir + os.path.sep + candidate_filename)
+    # generating query and candidate datasets
+    query_and_candidate_data = all_files.flatMap(
+        lambda x: generate_query_and_candidate_datasets(x, params)
+    ).collect()
 
     # # generating negative examples
 

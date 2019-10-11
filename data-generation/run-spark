@@ -1,1 +1,0 @@
-spark2-submit --master yarn --deploy-mode cluster --files .params.json generate-data-from-openml-datasets.py
