@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from hdfs import InsecureClient
 from io import StringIO
+from itertools import combinations
 import json
 import numpy as np
 import os
@@ -63,13 +64,11 @@ def save_file(file_path, content, use_hdfs=False, hdfs_address=None, hdfs_user=N
         hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
         if hdfs_client.status(file_path, strict=False):
             print('File already exists: %s' % file_path)
-            sys.exit(0)
         with hdfs_client.write(file_path) as writer:
             writer.write(content)
     else:
         if os.path.exists(file_path):
             print('File already exists: %s' % file_path)
-            sys.exit(0)
         with open(file_path, 'w') as writer:
             writer.write(content)
 
@@ -117,6 +116,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
     # params
     max_times_break_data_vertical = params['max_times_break_data_vertical']
     ignore_first_attribute = params['ignore_first_attribute']
+    candidate_single_column = params['candidate_single_column']
     output_dir = params['new_datasets_directory']
     cluster_execution = params['cluster']
     hdfs_address = params['hdfs_address']
@@ -221,6 +221,12 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
     for non_numeric_att in non_numeric_att_list:
         all_columns.remove(non_numeric_att)
 
+    # if candidate datasets should have a single column, try all combinations
+    all_combinations = None
+    if candidate_single_column:
+        all_combinations = list(combinations(all_columns, n_columns_left - 1))
+        n_columns_query_dataset = [n_columns_left - 1 for _ in all_combinations]
+
     # pandas dataset
     original_data = pd.read_csv(StringIO(data_file))
 
@@ -237,24 +243,29 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
         ) for _ in range(n_rows)
     ]
 
-    # information for saving datasets
-    identifier = str(uuid.uuid4())
-    identifier_dir = os.path.join(output_dir, 'files', identifier)
-    create_dir(identifier_dir, cluster_execution, hdfs_address, hdfs_user)
-
     # creating and saving query and candidate datasets
-    query_data_paths = list()
-    candidate_data_paths = list()
+    results = list()
+    id_ = 0
     for n in list(n_columns_query_dataset):
-        # randomly choose the columns
-        columns = list(np.random.choice(
-            all_columns,
-            n,
-            replace=False
-        ))
+
+        # information for saving datasets
+        identifier = str(uuid.uuid4())
+        identifier_dir = os.path.join(output_dir, 'files', identifier)
+        create_dir(identifier_dir, cluster_execution, hdfs_address, hdfs_user)
+
+        if not candidate_single_column:
+            # randomly choose the columns
+            columns = list(np.random.choice(
+                all_columns,
+                n,
+                replace=False
+            ))
+        else:
+            # get column indices from combinations
+            columns = list(all_combinations[id_])
 
         # generate query data
-        query_data_paths += generate_data_from_columns(
+        query_data_paths = generate_data_from_columns(
             original_data=original_data,
             columns=columns + [target_variable],
             column_metadata=column_metadata,
@@ -262,12 +273,11 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
             params=params,
             dataset_path=identifier_dir,
             dataset_name=data_name,
-            id_=len(query_data_paths),
             query=True
         )
 
         # generate candidate data
-        candidate_data_paths += generate_data_from_columns(
+        candidate_data_paths = generate_data_from_columns(
             original_data=original_data,
             columns=list(set(all_columns).difference(set(columns))),
             column_metadata=column_metadata,
@@ -275,25 +285,29 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
             params=params,
             dataset_path=identifier_dir,
             dataset_name=data_name,
-            id_=len(candidate_data_paths),
             query=False
         )
 
-    # saving target information
-    save_file(
-        os.path.join(identifier_dir, '.target'),
-        original_data.columns[target_variable],
-        params['cluster'],
-        params['hdfs_address'],
-        params['hdfs_user']
-    )
+        # saving target information
+        save_file(
+            os.path.join(identifier_dir, '.target'),
+            original_data.columns[target_variable],
+            params['cluster'],
+            params['hdfs_address'],
+            params['hdfs_user']
+        )
 
-    return [(
-        identifier,
-        original_data.columns[target_variable],
-        query_data_paths,
-        candidate_data_paths
-    )]
+        results.append((
+            identifier,
+            original_data.columns[target_variable],
+            query_data_paths,
+            candidate_data_paths,
+            data_name
+        ))
+
+        id_ += 1
+
+    return results
 
 
 def generate_candidate_datasets_negative_examples(target_variable, query_dataset, candidate_datasets, params):
@@ -320,6 +334,7 @@ def generate_candidate_datasets_negative_examples(target_variable, query_dataset
     query_data = pd.read_csv(StringIO(query_data_str))
     query_data_key_column = list(query_data['key-for-ranking'])
 
+    id_ = 0
     for candidate_dataset in candidate_datasets:
 
         # reading candidate dataset
@@ -345,7 +360,8 @@ def generate_candidate_datasets_negative_examples(target_variable, query_dataset
         )
         
         # saving candidate dataset
-        file_path = os.path.join(identifier_dir, os.path.basename(candidate_dataset))
+        dataset_name = "%s_%d.csv" % (os.path.splitext(os.path.basename(candidate_dataset))[0], id_)
+        file_path = os.path.join(identifier_dir, dataset_name)
         save_file(
             file_path,
             candidate_data.to_csv(index=False),
@@ -355,6 +371,8 @@ def generate_candidate_datasets_negative_examples(target_variable, query_dataset
         )
 
         new_candidate_datasets.append(file_path)
+
+        id_ += 1
 
     # saving query dataset
     query_dataset_path = os.path.join(identifier_dir, os.path.basename(query_dataset))
@@ -379,7 +397,7 @@ def generate_candidate_datasets_negative_examples(target_variable, query_dataset
 
 
 def generate_data_from_columns(original_data, columns, column_metadata, key_column,
-                               params, dataset_path, dataset_name, id_, query=True):
+                               params, dataset_path, dataset_name, query=True):
     """Generates datasets from the original data using only the columns specified
     in 'columns'. It also saves the datasets to disk.
     """
@@ -395,6 +413,7 @@ def generate_data_from_columns(original_data, columns, column_metadata, key_colu
     new_data.insert(0, 'key-for-ranking', key_column)
 
     # saving dataset
+    id_ = 0
     name_identifier = 'query' if query else 'candidate'
     name = '%s_%s_%d.csv' % (name_identifier, dataset_name, id_)
     save_file(
@@ -610,7 +629,7 @@ if __name__ == '__main__':
 
         # generating query and candidate datasets for positive examples
         #   format is the following:
-        #   (identifier, target_variable, query_dataset_paths, candidate_dataset_paths)
+        #   (identifier, target_variable, query_dataset_paths, candidate_dataset_paths, dataset_name)
         query_and_candidate_data_positive = all_files.flatMap(
             lambda x: generate_query_and_candidate_datasets_positive_examples(x, params)
         ).persist(StorageLevel.MEMORY_AND_DISK)
@@ -636,13 +655,13 @@ if __name__ == '__main__':
         n_random_candidates_per_query = int(n_positive_examples / n_query_datasets)
         query_data_by_id = dict(
             query_and_candidate_data_positive.map(
-                lambda x: (x[0], [x[1], x[2]])
+                lambda x: (x[0], [x[1], x[2], x[4]])
             ).collect()
         )
         for identifier in query_data_by_id.keys():
-            # getting candidate datasets from different identifiers
+            # getting candidate datasets from different datasets
             other_candidates = query_and_candidate_data_positive.filter(
-                lambda x: x[0] != identifier
+                lambda x: x[0] != identifier and x[4] != query_data_by_id[identifier][2]
             ).flatMap(
                 lambda x: x[3]
             ).collect()
