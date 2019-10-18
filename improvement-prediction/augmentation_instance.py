@@ -24,7 +24,7 @@ class AugmentationInstance:
         return self.candidate_filename
 
     def join_query_and_candidate_datasets(self):
-        result_data = self.query_dataset.join_with(self.candidate_dataset)
+        result_data = self.query_dataset.join_with(self.candidate_dataset, key='key-for-ranking')
         return Dataset(result_data, result_data.columns)
 
     def get_joined_query_data(self):

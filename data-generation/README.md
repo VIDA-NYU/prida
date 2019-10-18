@@ -3,6 +3,7 @@
 ## Requirements
 
 * Python 3
+* HdfsCLI
 * NumPy
 * pandas
 * scikit-learn

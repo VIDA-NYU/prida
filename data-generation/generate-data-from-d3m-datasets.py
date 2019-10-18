@@ -9,6 +9,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split
 import string
+import time
 
 
 def retrieve_dataset_information(dataset_dir):
@@ -63,15 +64,16 @@ def retrieve_dataset_information(dataset_dir):
                 break
 
     return dict(data_path=data_path,
+                data_size_gb=os.stat(data_path).st_size/1073741824,
                 problem_type=problem_type,
                 target_variable=target_variable,
                 multiple_data=multiple_data,
                 column_metadata=column_metadata)
 
 
-def generate_training_data(data_name, data_path, target_variable, column_metadata, params):
+def generate_positive_training_data(data_name, data_path, target_variable, column_metadata, params, identifier):
     """Generates training data, including query and cadidate datasets,
-    and the corresponding performance scores.
+    and the corresponding performance scores, from a single dataset.
     """
 
     # params
@@ -79,10 +81,13 @@ def generate_training_data(data_name, data_path, target_variable, column_metadat
     training_data_file = params['training_data_file']
     algorithm = params['regression_algorithm']
 
-    # create output_directory if it does not exists yet
+    # create output_directory if it does not exist yet
     if not os.path.exists(output_dir):
-        print('Creating output_directory=[{}]'.format(output_dir))
+        # print('Creating output_directory=[{}]'.format(output_dir))
         os.makedirs(output_dir)
+
+    # create identifier directory
+    os.makedirs(os.path.join(output_dir, identifier))
 
     # non-numeric attributes
     n_non_numeric_att = 0
@@ -175,7 +180,7 @@ def generate_training_data(data_name, data_path, target_variable, column_metadat
         name = 'query_%s_%d.csv' % (data_name, i)
         query_data_names.append(name)
         query_data[i].to_csv(
-            open(os.path.join(output_dir, name), 'w'),
+            open(os.path.join(output_dir, identifier, name), 'w'),
             index=False
         )
         query_data[i].set_index(
@@ -188,7 +193,7 @@ def generate_training_data(data_name, data_path, target_variable, column_metadat
         name = 'candidate_%s_%d.csv' % (data_name, i)
         candidate_data_names.append(name)
         candidate_data[i].to_csv(
-            open(os.path.join(output_dir, name), 'w'),
+            open(os.path.join(output_dir, identifier, name), 'w'),
             index=False
         )
         candidate_data[i].set_index(
@@ -239,7 +244,11 @@ def generate_training_data(data_name, data_path, target_variable, column_metadat
                 params['regression_algorithm']
             )
 
-            training_data.write('%s,%s,%s,%.10f,%.10f\n' % (q_data_name, target_variable_name, c_data_name, score_before, score_after))
+            training_data.write('%s,%s,%s,%.10f,%.10f\n' % (os.path.join(identifier, q_data_name),
+                                                            target_variable_name,
+                                                            os.path.join(identifier, c_data_name),
+                                                            score_before,
+                                                            score_after))
 
     training_data.close()
 
@@ -282,6 +291,118 @@ def generate_data_from_columns(data_path, columns, column_metadata, key_column, 
     return all_data
 
 
+def generate_negative_training_data(query_dataset, candidate_set, max_number_random_candidates, params, identifier):
+    """Generates training data by randomly choosing candidate datasets
+    for the input query dataset.
+    """
+
+    # params
+    output_dir = params['output_directory']
+    training_data_file = params['training_data_file']
+
+    # create identifier directory
+    os.makedirs(os.path.join(output_dir, identifier))
+
+    # query dataset
+    query_dataset_name = query_dataset.split(",")[0]
+    target_variable_name = query_dataset.split(",")[1]
+    score_before = query_dataset.split(",")[2]
+    query_dataset_source = "_".join(query_dataset_name.split("_")[1:-1])
+
+    # candidate datasets
+    candidate_datasets = list(candidate_set)
+    random.shuffle(candidate_datasets)
+
+    training_data = open(training_data_file, 'a')
+
+    size = 0
+    for i in range(len(candidate_datasets)):
+        candidate_dataset = candidate_datasets[i]
+        candidate_dataset_source = "_".join(candidate_dataset.split("_")[1:-1])
+        if query_dataset_source == candidate_dataset_source:
+            continue
+
+        query_dataframe = pd.read_csv(os.path.join(output_dir, query_dataset_name))
+        query_dataframe.drop(columns=['key-for-ranking'], inplace=True)
+        candidate_dataframe = pd.read_csv(os.path.join(output_dir, candidate_dataset))
+        candidate_dataframe.drop(columns=['key-for-ranking'], inplace=True)
+
+        # generating the key column for the data and setting the index
+        n_rows = max(query_dataframe.shape[0], candidate_dataframe.shape[0])
+        key_column = [
+            ''.join(
+                [random.choice(string.ascii_letters + string.digits) for n in range(10)]
+            ) for _ in range(n_rows)
+        ]
+
+        query_name = os.path.splitext(os.path.basename(query_dataset_name))[0] + "_" + str(size) + ".csv"
+        query_dataframe.insert(
+            0,
+            'key-for-ranking',
+            key_column[:min(len(key_column), query_dataframe.shape[0])]
+        )
+        query_dataframe.set_index(
+            'key-for-ranking',
+            drop=True,
+            inplace=True
+        )
+
+        candidate_name = os.path.splitext(os.path.basename(candidate_dataset))[0] + "_" + str(size) + ".csv"
+        candidate_dataframe.insert(
+            0,
+            'key-for-ranking',
+            key_column[:min(len(key_column), candidate_dataframe.shape[0])]
+        )
+        candidate_dataframe.set_index(
+            'key-for-ranking',
+            drop=True,
+            inplace=True
+        )
+
+        # join dataset
+        join_ = query_dataframe.join(
+            candidate_dataframe,
+            how='left',
+            rsuffix='_r'
+        )
+        join_.dropna(inplace=True)
+
+        if join_.shape[0] < 50:
+            continue
+
+        # build model on joined data
+        score_after = get_performance_score(
+            join_,
+            target_variable_name,
+            params['regression_algorithm']
+        )
+        
+        size += 1
+
+        # saving data
+        query_dataframe.to_csv(
+            open(os.path.join(output_dir, identifier, query_name), 'w'),
+            index=True
+        )
+        candidate_dataframe.to_csv(
+            open(os.path.join(output_dir, identifier, candidate_name), 'w'),
+            index=True
+        )
+
+        training_data.write('%s,%s,%s,%s,%.10f\n' % (os.path.join(identifier, query_name),
+                                                     target_variable_name,
+                                                     os.path.join(identifier, candidate_name),
+                                                     score_before,
+                                                     score_after))
+
+        if size >= max_number_random_candidates:
+            break
+
+    training_data.close()
+
+    return
+
+
 def get_performance_score(data, target_variable_name, algorithm):
     """Builds a model using data to predict the target variable,
     return the corresponding r2 score.
@@ -310,11 +431,19 @@ def get_performance_score(data, target_variable_name, algorithm):
 
 if __name__ == '__main__':
 
-    params = json.load(open('.params.json'))
+    start_time = time.time()
 
+    params = json.load(open('.params.json'))
     dir_ = params['datasets_directory']
+    id_ = 0
+
+    # generating positive examples
+
     for dataset in os.listdir(dir_):
         info = retrieve_dataset_information(os.path.join(dir_, dataset))
+        if info['data_size_gb'] > 5:
+            print('The following dataset has more than 5GB of data: %s' % dataset)
+            continue
         # regression problems only
         if info['problem_type'] != 'regression':
             print('The following dataset does not belong to a regression problem: %s (%s)' % (dataset, info['problem_type']))
@@ -324,10 +453,46 @@ if __name__ == '__main__':
             print('The following dataset is composed by multiple files: %s' % dataset)
             continue
 
-        generate_training_data(
+        generate_positive_training_data(
             dataset,
             info['data_path'],
             info['target_variable'],
             info['column_metadata'],
-            params
+            params,
+            str(id_)
         )
+
+        id_ += 1
+
+    # generating negative examples
+
+    output_dir = params['output_directory']
+    training_data_file = params['training_data_file']
+
+    query_set = set()
+    candidate_set = set()
+
+    training_data = open(training_data_file, 'r')
+    size_training_data = 0
+    line = training_data.readline()
+    while line != '':
+        size_training_data += 1
+        line_elems = line.split(",")
+        query_set.add(",".join(line_elems[:2] + [line_elems[3]]))
+        candidate_set.add(line_elems[2])
+        line = training_data.readline()
+    training_data.close()
+
+    for query_dataset in query_set:
+
+        generate_negative_training_data(
+            query_dataset,
+            candidate_set,
+            size_training_data/len(query_set),
+            params,
+            str(id_)
+        )
+
+        id_ += 1
+
+    print("Duration: %.4f seconds" % (time.time() - start_time))

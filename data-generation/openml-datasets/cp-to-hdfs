@@ -1,0 +1,1 @@
+nohup stdbuf -oL python cp-to-hdfs.py $1 $2 &

@@ -1,0 +1,1 @@
+spark2-submit --master yarn --deploy-mode cluster --files .params.json generate-training-data-from-datasets.py
