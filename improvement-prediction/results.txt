@@ -1,0 +1,9 @@
+- 10/16
+-- MSE errors are lower for data generated with random forests (the names are flipped: params-linear-regression.json corresponds to random forests and vice-versa), using 
+linear regression to predict relative gain in r2 score
+-- The higher the relative gain in modulus, the higher the squared error (see images squared_error_vs_relative_gain_linear_regression*png)
+-- There is no clear relation between the symmetric absolute percentage error and the relative gain (see images symm_abs_percent_error_vs_relative_gain_linear_regression*png):
+when the relative gain is close to zero, and this is often the case, there are all sorts of errors. When the error is maximum or close to maximum, this is associated with all sorts of relative gain...
+-- The true best relative gains are not corresponding to the highest predicted values, which is bad for ranking
+-- Top-5 most important features when learning relative gain for the data that Fernando generated with random forests:
+--- IDS = 29, 30, 31, 3, 0 (see data-for-learning-augmentation.header) ===> pearson_with_target, spearman_with_target, kendalltau_with_target, initial_dataset_number_of_numerical_columns, initial_dataset_number_of_columns

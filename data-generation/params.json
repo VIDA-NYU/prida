@@ -1,13 +1,15 @@
 {
-    "datasets_directory": "/home/fchirigati/projects/d3m/datasets/seed_datasets_data_augmentation",
-    "output_directory": "/home/fchirigati/projects/ViDA-NYU/dataset-ranking/data-generation/data/files",
-    "training_data_file": "/home/fchirigati/projects/ViDA-NYU/dataset-ranking/data-generation/data/training-data",
-    "regression_algorithm": "linear",
-    "max_times_break_data_vertical": 5,
-    "max_times_records_removed": 10,
-    "max_ratio_records_removed": 0.7,
+    "original_datasets_directory": "/home/fchirigati/projects/d3m/datasets/seed_datasets_data_augmentation",
+    "new_datasets_directory": "/home/fchirigati/projects/ViDA-NYU/dataset-ranking/data-generation/data",
     "cluster": false,
-    "ignore_first_attribute": true,
     "hdfs_address": "http://gray01.poly.edu:50070",
-    "hdfs_user": "fsc234"
+    "hdfs_user": "fsc234",
+    "ignore_first_attribute": true,
+    "skip_dataset_creation": false,
+    "candidate_single_column": false,
+    "regression_algorithm": "linear",
+    "min_number_records": 50,
+    "max_times_break_data_vertical": 8,
+    "max_times_records_removed": 10,
+    "max_ratio_records_removed": 0.7
 }

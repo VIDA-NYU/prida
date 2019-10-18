@@ -1,25 +1,23 @@
 #!/usr/bin/env python3
-import hdfs
+from hdfs import InsecureClient
+from io import StringIO
+from itertools import combinations
 import json
 import numpy as np
 import os
 import pandas as pd
-from pyspark import SparkContext
+from pyspark import SparkConf, SparkContext, StorageLevel
 import random
 import shutil
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, SGDRegressor
 from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 import string
 import sys
 import time
 import uuid
-
-if sys.version_info[0] < 3: 
-    from StringIO import StringIO
-else:
-    from io import StringIO
 
 
 def organize_dataset_files(file_path, cluster_execution):
@@ -43,42 +41,50 @@ def organize_dataset_files(file_path, cluster_execution):
     return (dataset_name, [(file_name, file_path)])
 
 
-def read_file(file_path, use_hdfs=False):
-    """Opens a file for read and returns its corresponding file object.
+def read_file(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+    """Opens a file for read and returns its corresponding content.
     """
 
+    output = None
     if use_hdfs:
-        fs = hadoop_lib.fs.FileSystem
-        conf = hadoop_lib.conf.Configuration()
-        path = hadoop_lib.fs.Path(file_path)
-        return fs.get(conf).open(path)
-    return open(file_path)
+        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
+        if hdfs_client.status(file_path, strict=False):
+            with hdfs_client.read(file_path) as reader:
+                output = reader.read()
+    else:
+        if os.path.exists(file_path):
+            with open(file_path) as reader:
+                output = reader.read()
+    return output
 
 
-def save_file(file_path, use_hdfs=False):
+def save_file(file_path, content, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """Opens a file for write and returns its corresponding file object.
     """
 
     if use_hdfs:
-        fs = hadoop_lib.fs.FileSystem
-        conf = hadoop_lib.conf.Configuration()
-        path = hadoop_lib.fs.Path(file_path)
-        return fs.get(conf).create(path)
-    return open(file_path, 'w')
+        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
+        if hdfs_client.status(file_path, strict=False):
+            print('File already exists: %s' % file_path)
+        with hdfs_client.write(file_path) as writer:
+            writer.write(content)
+    else:
+        if os.path.exists(file_path):
+            print('File already exists: %s' % file_path)
+        with open(file_path, 'w') as writer:
+            writer.write(content)
 
 
-def create_dir(file_path, use_hdfs=False):
+def create_dir(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """Creates a new directory specified by file_path.
     Returns True on success.
     """
 
     if use_hdfs:
-        fs = hadoop_lib.fs.FileSystem
-        conf = hadoop_lib.conf.Configuration()
-        path = hadoop_lib.fs.Path(file_path)
-        if fs.get(conf).exists(path):
-            fs.get(conf).delete(path, recursive=True)
-        fs.get(conf).mkdirs(path)
+        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
+        if hdfs_client.status(file_path, strict=False):
+            hdfs_client.delete(file_path, recursive=True)
+        hdfs_client.makedirs(file_path)
     else:
         if os.path.exists(file_path):
             shutil.rmtree(file_path)
@@ -86,10 +92,21 @@ def create_dir(file_path, use_hdfs=False):
     return True
 
 
-def generate_query_and_candidate_datasets(input_dataset, params):
-    """Generates query and cadidate datasets from a single dataset.
+def list_dir(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+    """Lists all the files inside the directory specified by file_path.
+    """
 
-    The format of the input_dataset is as follows:
+    if use_hdfs:
+        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
+        return hdfs_client.list(file_path)
+    return os.listdir(file_path)
+
+
+def generate_query_and_candidate_datasets_positive_examples(input_dataset, params):
+    """Generates query and candidate datasets from a single dataset
+    for positive examples.
+
+    The format of input_dataset is as follows:
 
       (dataset_name, [('learningData.csv', path),
                       ('datasetDoc.json', path),
@@ -99,11 +116,13 @@ def generate_query_and_candidate_datasets(input_dataset, params):
     result = list()
 
     # params
-    algorithm = params['regression_algorithm']
     max_times_break_data_vertical = params['max_times_break_data_vertical']
     ignore_first_attribute = params['ignore_first_attribute']
+    candidate_single_column = params['candidate_single_column']
+    output_dir = params['new_datasets_directory']
     cluster_execution = params['cluster']
-    output_dir = params['output_directory']
+    hdfs_address = params['hdfs_address']
+    hdfs_user = params['hdfs_user']
 
     problem_type = None
     target_variable = None
@@ -116,14 +135,20 @@ def generate_query_and_candidate_datasets(input_dataset, params):
     problem_doc = None
     for d in input_dataset[1]:
         if d[0] == 'learningData.csv':
-            data_file = read_file(d[1], hadoop_lib, cluster_execution)
+            data_file = read_file(d[1], cluster_execution, hdfs_address, hdfs_user)
             continue
         if d[0] == 'datasetDoc.json':
-            dataset_doc = json.load(read_file(d[1], hadoop_lib, cluster_execution))
+            dataset_doc = read_file(d[1], cluster_execution, hdfs_address, hdfs_user)
             continue
         if d[0] == 'problemDoc.json':
-            problem_doc = json.load(read_file(d[1], hadoop_lib, cluster_execution))
+            problem_doc = read_file(d[1], cluster_execution, hdfs_address, hdfs_user)
 
+    if not data_file or not dataset_doc or not problem_doc:
+        print('The following dataset does not have the appropriate files: %s ' % data_name)
+        return result
+    dataset_doc = json.loads(dataset_doc)
+    problem_doc = json.loads(problem_doc)
+    
     # problem type
     if problem_doc.get('about') and problem_doc['about'].get('taskType'):
         problem_type = problem_doc['about']['taskType']
@@ -204,140 +229,188 @@ def generate_query_and_candidate_datasets(input_dataset, params):
     for non_numeric_att in non_numeric_att_list:
         all_columns.remove(non_numeric_att)
 
+    # if candidate datasets should have a single column, try all combinations
+    all_combinations = None
+    if candidate_single_column:
+        all_combinations = list(combinations(all_columns, n_columns_left - 1))
+        n_columns_query_dataset = [n_columns_left - 1 for _ in all_combinations]
+
     # pandas dataset
-    original_data = pd.read_csv(data_file)
+    original_data = pd.read_csv(StringIO(data_file))
+
+    # ignore very small datasets
+    n_rows = original_data.shape[0]
+    if n_rows < params['min_number_records']:
+        print('The following dataset does not have the minimum number of records: %s' % data_name)
+        return result
 
     # generating the key column for the data
-    n_rows = original_data.shape[0]
     key_column = [
         ''.join(
             [random.choice(string.ascii_letters + string.digits) for n in range(10)]
         ) for _ in range(n_rows)
     ]
 
-    query_data = list()
-    candidate_data = list()
-
+    # creating and saving query and candidate datasets
+    results = list()
+    id_ = 0
     for n in list(n_columns_query_dataset):
-        # randomly choose the columns
-        columns = list(np.random.choice(
-            all_columns,
-            n,
-            replace=False
-        ))
+
+        # information for saving datasets
+        identifier = str(uuid.uuid4())
+        identifier_dir = os.path.join(output_dir, 'files', identifier)
+        create_dir(identifier_dir, cluster_execution, hdfs_address, hdfs_user)
+
+        if not candidate_single_column:
+            # randomly choose the columns
+            columns = list(np.random.choice(
+                all_columns,
+                n,
+                replace=False
+            ))
+        else:
+            # get column indices from combinations
+            columns = list(all_combinations[id_])
 
         # generate query data
-        query_data += generate_data_from_columns(
-            original_data,
-            columns + [target_variable],
-            column_metadata,
-            key_column,
-            params
+        query_data_paths = generate_data_from_columns(
+            original_data=original_data,
+            columns=columns + [target_variable],
+            column_metadata=column_metadata,
+            key_column=key_column,
+            params=params,
+            dataset_path=identifier_dir,
+            dataset_name=data_name,
+            query=True
         )
 
         # generate candidate data
-        candidate_data += generate_data_from_columns(
-            original_data,
-            list(set(all_columns).difference(set(columns))),
-            column_metadata,
-            key_column,
-            params
+        candidate_data_paths = generate_data_from_columns(
+            original_data=original_data,
+            columns=list(set(all_columns).difference(set(columns))),
+            column_metadata=column_metadata,
+            key_column=key_column,
+            params=params,
+            dataset_path=identifier_dir,
+            dataset_name=data_name,
+            query=False
         )
 
-    # saving datasets
-    identifier = str(uuid.uuid4())
-    create_dir(os.path.join(output_dir, identifier), hadoop_lib, cluster_execution)
-    target_variable_name = original_data.columns[target_variable]
-    results = list()
-    for i in range(len(query_data)):
-        name = 'query_%s_%d.csv' % (data_name, i)
-        file_path = os.path.join(output_dir, identifier, name)
-        query_data[i].to_csv(
-            save_file(file_path, hadoop_lib, cluster_execution),
-            index=False
+        # saving target information
+        save_file(
+            os.path.join(identifier_dir, '.target'),
+            original_data.columns[target_variable],
+            params['cluster'],
+            params['hdfs_address'],
+            params['hdfs_user']
         )
-        results.append(file_path)
-    for i in range(len(candidate_data)):
-        name = 'candidate_%s_%d.csv' % (data_name, i)
-        file_path = os.path.join(output_dir, identifier, name)
-        candidate_data[i].to_csv(
-            save_file(file_path, hadoop_lib, cluster_execution),
-            index=False
-        )
-        results.append(file_path)
 
-    return [(identifier, target_variable_name, results)]
+        results.append((
+            identifier,
+            original_data.columns[target_variable],
+            query_data_paths,
+            candidate_data_paths,
+            data_name
+        ))
 
+        id_ += 1
 
- # # generating name and setting index
- #    query_data_names = list()
- #    for i in range(len(query_data)):
- #        name = identifier + os.path.sep + 'query_%s_%d.csv' % (data_name, i)
- #        query_data_names.append(name)
- #        query_data[i].set_index(
- #            'key-for-ranking',
- #            drop=True,
- #            inplace=True
- #        )
- #    candidate_data_names = list()
- #    for i in range(len(candidate_data)):
- #        name = identifier + os.path.sep + 'candidate_%s_%d.csv' % (data_name, i)
- #        candidate_data_names.append(name)
- #        candidate_data[i].set_index(
- #            'key-for-ranking',
- #            drop=True,
- #            inplace=True
- #        )
-
- #    target_variable_name = original_data.columns[target_variable]
-
- #    # doing joins and computing performance scores
- #    for i in range(len(query_data)):
- #        q_data = query_data[i]
- #        q_data_name = query_data_names[i]
-
- #        # build model on query data only
- #        score_before = get_performance_score(
- #            q_data,
- #            target_variable_name,
- #            algorithm
- #        )
-
- #        query_results = list()
-
- #        for j in range(len(candidate_data)):
- #            c_data = candidate_data[j]
- #            c_data_name = candidate_data_names[j]
-
- #            # join dataset
- #            join_ = q_data.join(
- #                c_data,
- #                how='left',
- #                rsuffix='_r'
- #            )
- #            join_.dropna(inplace=True)
-
- #            if join_.shape[0] < 50:
- #                continue
-
- #            # build model on joined data
- #            score_after = get_performance_score(
- #                join_,
- #                target_variable_name,
- #                algorithm
- #            )
-
- #            query_results.append((c_data_name, c_data, score_before, score_after))
-
- #        result.append(((q_data_name, q_data, target_variable_name), query_results))
+    return results
 
 
-def generate_data_from_columns(original_data, columns, column_metadata, key_column, params):
-    """Generates datasets from the original data using only the columns specified
-    in 'columns'.
+def generate_candidate_datasets_negative_examples(target_variable, query_dataset, candidate_datasets, params):
+    """Generates candidate datasets for negative examples.
+    This is necessary because query and candidate datasets must match for the join;
+    therefore, we need to re-create the key column.
     """
 
-    all_data = list()
+    new_candidate_datasets = list()
+
+    # params
+    output_dir = params['new_datasets_directory']
+    cluster_execution = params['cluster']
+    hdfs_address = params['hdfs_address']
+    hdfs_user = params['hdfs_user']
+
+    # information for saving datasets
+    identifier = str(uuid.uuid4())
+    identifier_dir = os.path.join(output_dir, 'files', identifier)
+    create_dir(identifier_dir, cluster_execution, hdfs_address, hdfs_user)
+
+    # reading query dataset
+    query_data_str = read_file(query_dataset, cluster_execution, hdfs_address, hdfs_user)
+    query_data = pd.read_csv(StringIO(query_data_str))
+    query_data_key_column = list(query_data['key-for-ranking'])
+
+    id_ = 0
+    for candidate_dataset in candidate_datasets:
+
+        # reading candidate dataset
+        candidate_data_str = read_file(candidate_dataset, cluster_execution, hdfs_address, hdfs_user)
+        candidate_data = pd.read_csv(StringIO(candidate_data_str))
+        candidate_data.drop(columns=['key-for-ranking'], inplace=True)
+
+        # generating extra key column entries, if necessary
+        extra_key_column = list()
+        if query_data.shape[0] < candidate_data.shape[0]:
+            extra_key_column = [
+                ''.join(
+                    [random.choice(string.ascii_letters + string.digits) for n in range(10)]
+                ) for _ in range(candidate_data.shape[0] - query_data.shape[0])
+            ]
+
+        # adding the key column to the candidate data
+        min_size = min(query_data.shape[0], candidate_data.shape[0])
+        candidate_data.insert(
+            0,
+            'key-for-ranking',
+            query_data_key_column[:min_size] + extra_key_column
+        )
+        
+        # saving candidate dataset
+        dataset_name = "%s_%d.csv" % (os.path.splitext(os.path.basename(candidate_dataset))[0], id_)
+        file_path = os.path.join(identifier_dir, dataset_name)
+        save_file(
+            file_path,
+            candidate_data.to_csv(index=False),
+            params['cluster'],
+            params['hdfs_address'],
+            params['hdfs_user']
+        )
+
+        new_candidate_datasets.append(file_path)
+
+        id_ += 1
+
+    # saving query dataset
+    query_dataset_path = os.path.join(identifier_dir, os.path.basename(query_dataset))
+    save_file(
+        query_dataset_path,
+        query_data.to_csv(index=False),
+        params['cluster'],
+        params['hdfs_address'],
+        params['hdfs_user']
+    )
+
+    # saving target information
+    save_file(
+        os.path.join(identifier_dir, '.target'),
+        target_variable,
+        params['cluster'],
+        params['hdfs_address'],
+        params['hdfs_user']
+    )
+
+    return (target_variable, query_dataset_path, new_candidate_datasets)
+
+
+def generate_data_from_columns(original_data, columns, column_metadata, key_column,
+                               params, dataset_path, dataset_name, query=True):
+    """Generates datasets from the original data using only the columns specified
+    in 'columns'. It also saves the datasets to disk.
+    """
+
+    paths = list()
 
     for col in column_metadata:
         if 'real' in column_metadata[col] or 'integer' in column_metadata[col]:
@@ -345,10 +418,20 @@ def generate_data_from_columns(original_data, columns, column_metadata, key_colu
     column_names = [original_data.columns[i] for i in columns]
     new_data = original_data[column_names].copy()
     new_data.fillna(value=0, inplace=True)
-    # new_data.dropna(inplace=True)
     new_data.insert(0, 'key-for-ranking', key_column)
 
-    all_data.append(new_data)
+    # saving dataset
+    id_ = 0
+    name_identifier = 'query' if query else 'candidate'
+    name = '%s_%s_%d.csv' % (name_identifier, dataset_name, id_)
+    save_file(
+        os.path.join(dataset_path, name),
+        new_data.to_csv(index=False),
+        params['cluster'],
+        params['hdfs_address'],
+        params['hdfs_user']
+    )
+    paths.append(os.path.join(dataset_path, name))
 
     # number of times to randomly remove records
     n_times_remove_records = random.randint(1, params['max_times_records_removed'])
@@ -362,130 +445,89 @@ def generate_data_from_columns(original_data, columns, column_metadata, key_colu
 
         # rows to remove
         drop_indices = np.random.choice(new_data.index, n_records_remove, replace=False)
-        all_data.append(new_data.drop(drop_indices))
 
-    return all_data
-
-
-def get_candidate_files(record):
-    """Extracts the files for candidate datasets.
-    """
-    names = list()
-    for v in x[1]:
-        names.append((v[0], v[1]))
-    return names
-
-
-def generate_negative_training_data(query_dataset, candidate_set, max_number_random_candidates, params, identifier):
-    """Generates training data by randomly choosing candidate datasets
-    for the input query dataset.
-    """
-
-    # params
-    output_dir = params['output_directory']
-    training_data_file = params['training_data_file']
-
-    # create identifier directory
-    os.makedirs(os.path.join(output_dir, identifier))
-
-    # query dataset
-    query_dataset_name = query_dataset.split(",")[0]
-    target_variable_name = query_dataset.split(",")[1]
-    score_before = query_dataset.split(",")[2]
-    query_dataset_source = "_".join(query_dataset_name.split("_")[1:-1])
-
-    # candidate datasets
-    candidate_datasets = list(candidate_set)
-    random.shuffle(candidate_datasets)
-
-    training_data = open(training_data_file, 'a')
-
-    size = 0
-    for i in range(len(candidate_datasets)):
-        candidate_dataset = candidate_datasets[i]
-        candidate_dataset_source = "_".join(candidate_dataset.split("_")[1:-1])
-        if query_dataset_source == candidate_dataset_source:
+        # ignoring small datasets
+        if (new_data.shape[0] - len(drop_indices)) < params['min_number_records']:
             continue
 
-        query_dataframe = pd.read_csv(os.path.join(output_dir, query_dataset_name))
-        query_dataframe.drop(columns=['key-for-ranking'], inplace=True)
-        candidate_dataframe = pd.read_csv(os.path.join(output_dir, candidate_dataset))
-        candidate_dataframe.drop(columns=['key-for-ranking'], inplace=True)
-
-        # generating the key column for the data and setting the index
-        n_rows = max(query_dataframe.shape[0], candidate_dataframe.shape[0])
-        key_column = [
-            ''.join(
-                [random.choice(string.ascii_letters + string.digits) for n in range(10)]
-            ) for _ in range(n_rows)
-        ]
-
-        query_name = os.path.splitext(os.path.basename(query_dataset_name))[0] + "_" + str(size) + ".csv"
-        query_dataframe.insert(
-            0,
-            'key-for-ranking',
-            key_column[:min(len(key_column), query_dataframe.shape[0])]
+        # saving dataset
+        name = '%s_%s_%d.csv' % (name_identifier, dataset_name, id_ + i + 1)
+        save_file(
+            os.path.join(dataset_path, name),
+            new_data.drop(drop_indices).to_csv(index=False),
+            params['cluster'],
+            params['hdfs_address'],
+            params['hdfs_user']
         )
-        query_dataframe.set_index(
-            'key-for-ranking',
-            drop=True,
-            inplace=True
-        )
+        paths.append(os.path.join(dataset_path, name))
 
-        candidate_name = os.path.splitext(os.path.basename(candidate_dataset))[0] + "_" + str(size) + ".csv"
-        candidate_dataframe.insert(
-            0,
-            'key-for-ranking',
-            key_column[:min(len(key_column), candidate_dataframe.shape[0])]
-        )
-        candidate_dataframe.set_index(
+    return paths
+
+
+def generate_performance_scores(query_dataset, target_variable, candidate_datasets, params):
+    """Generates all the performance scores.
+    The format of the output is the following:
+
+      (query dataset, target variable name, candidate dataset,
+       score before augmentation, score after augmentation)
+
+    """
+
+    performance_scores = list()
+
+    # params
+    algorithm = params['regression_algorithm']
+    cluster_execution = params['cluster']
+    hdfs_address = params['hdfs_address']
+    hdfs_user = params['hdfs_user']
+
+    # reading query dataset
+    query_data_str = read_file(query_dataset, cluster_execution, hdfs_address, hdfs_user)
+    query_data = pd.read_csv(StringIO(query_data_str))
+    query_data.set_index(
+        'key-for-ranking',
+        drop=True,
+        inplace=True
+    )
+
+    # build model on query data only
+    score_before = get_performance_score(
+        query_data,
+        target_variable,
+        algorithm
+    )
+
+    for candidate_dataset in candidate_datasets:
+
+        # reading candidate dataset
+        candidate_data_str = read_file(candidate_dataset, cluster_execution, hdfs_address, hdfs_user)
+        candidate_data = pd.read_csv(StringIO(candidate_data_str))
+        candidate_data.set_index(
             'key-for-ranking',
             drop=True,
             inplace=True
         )
 
         # join dataset
-        join_ = query_dataframe.join(
-            candidate_dataframe,
+        join_ = query_data.join(
+            candidate_data,
             how='left',
             rsuffix='_r'
         )
         join_.dropna(inplace=True)
 
-        if join_.shape[0] < 50:
-            continue
-
         # build model on joined data
         score_after = get_performance_score(
             join_,
-            target_variable_name,
-            params['regression_algorithm']
-        )
-        
-        size += 1
-
-        # saving data
-        query_dataframe.to_csv(
-            open(os.path.join(output_dir, identifier, query_name), 'w'),
-            index=True
-        )
-        candidate_dataframe.to_csv(
-            open(os.path.join(output_dir, identifier, candidate_name), 'w'),
-            index=True
+            target_variable,
+            algorithm
         )
 
-        training_data.write('%s,%s,%s,%s,%.10f\n' % (os.path.join(identifier, query_name),
-                                                     target_variable_name,
-                                                     os.path.join(identifier, candidate_name),
-                                                     score_before,
-                                                     score_after))
+        performance_scores.append(
+            (query_dataset, target_variable, candidate_dataset, score_before, score_after)
+        )
 
-        if size >= max_number_random_candidates:
-            break
-
-    training_data.close()
-
-    return
+    return performance_scores
 
 
 def get_performance_score(data, target_variable_name, algorithm):
@@ -510,6 +552,18 @@ def get_performance_score(data, target_variable_name, algorithm):
         linear_r = LinearRegression(normalize=True)
         linear_r.fit(X_train, y_train)
         yfit = linear_r.predict(X_test)
+    elif algorithm == 'sgd':
+        # normalizing data first
+        scaler_X = StandardScaler().fit(X_train)
+        scaler_y = StandardScaler().fit(y_train.values.reshape(-1, 1))
+        X_train = scaler_X.transform(X_train)
+        y_train = scaler_y.transform(y_train.values.reshape(-1, 1))
+        X_test = scaler_X.transform(X_test)
+        y_test = scaler_y.transform(y_test.values.reshape(-1, 1))
+
+        sgd = SGDRegressor()
+        sgd.fit(X_train, y_train.ravel())
+        yfit = sgd.predict(X_test)
 
     return r2_score(y_test, yfit)
     
@@ -519,93 +573,192 @@ if __name__ == '__main__':
     start_time = time.time()
 
     # Spark context
-    sc = SparkContext()
+    conf = SparkConf().setAppName("Data Generation")
+    sc = SparkContext(conf=conf)
 
     # parameters
     params = json.load(open(".params.json"))
-    dir_ = params['datasets_directory']
-    output_dir = params['output_directory']
-    training_data_file = params['training_data_file']
+    output_dir = params['new_datasets_directory']
+    skip_dataset_creation = params['skip_dataset_creation']
     cluster_execution = params['cluster']
     hdfs_address = params['hdfs_address']
     hdfs_user = params['hdfs_user']
 
-    create_dir(output_dir, cluster_execution)
+    # all query and candidate datasets
+    #   format is the following:
+    #   (target_variable, query_dataset_path, candidate_dataset_paths)
+    query_candidate_datasets = None
 
-    # dataset files
-    hadoop = sc._jvm.org.apache.hadoop
-    fs = hadoop.fs.FileSystem
-    conf = hadoop.conf.Configuration()
-    dataset_files = list()
-    if cluster_execution:
-        # if executing on cluster, need to read from HDFS
-        path = hadoop.fs.Path(dir_)
-        for dataset_path in fs.get(conf).listStatus(path):
-            for f in fs.get(conf).listStatus(dataset_path.getPath()):
-                dataset_files.append(f.getPath().toString())
+    if not skip_dataset_creation:
+
+        dir_ = params['original_datasets_directory']
+        create_dir(output_dir, cluster_execution, hdfs_address, hdfs_user)
+        create_dir(os.path.join(output_dir, 'files'), cluster_execution, hdfs_address, hdfs_user)
+
+        # dataset files
+        dataset_files = list()
+        if cluster_execution:
+            for dataset_path in list_dir(dir_, cluster_execution, hdfs_address, hdfs_user):
+                for f in list_dir(os.path.join(dir_, dataset_path), cluster_execution, hdfs_address, hdfs_user):
+                    dataset_files.append(os.path.join(dir_, dataset_path, f))
+        else:
+            for dataset in list_dir(dir_, cluster_execution, hdfs_address, hdfs_user):
+                if dataset == '.DS_Store':
+                    # ignoring .DS_Store on Mac
+                    continue
+                data_path = os.path.join(
+                    dir_,
+                    dataset,
+                    dataset + '_dataset',
+                    'tables',
+                    'learningData.csv')
+                dataset_doc = os.path.join(
+                    dir_,
+                    dataset,
+                    dataset + '_dataset',
+                    'datasetDoc.json')
+                problem_doc = os.path.join(
+                    dir_,
+                    dataset,
+                    dataset + '_problem',
+                    'problemDoc.json')
+                dataset_files.append(data_path)
+                dataset_files.append(dataset_doc)
+                dataset_files.append(problem_doc)
+
+        all_files = sc.parallelize(dataset_files)
+
+        # grouping files from same dataset
+        # (dataset_name, [('learningData.csv', path),
+        #                 ('datasetDoc.json', path),
+        #                 ('problemDoc.json', path)])
+        all_files = all_files.map(lambda x: organize_dataset_files(x, cluster_execution))
+        all_files = all_files.reduceByKey(lambda x1, x2: x1 + x2)
+
+        # generating query and candidate datasets for positive examples
+        #   format is the following:
+        #   (identifier, target_variable, query_dataset_paths, candidate_dataset_paths, dataset_name)
+        query_and_candidate_data_positive = all_files.flatMap(
+            lambda x: generate_query_and_candidate_datasets_positive_examples(x, params)
+        ).persist(StorageLevel.MEMORY_AND_DISK)
+
+        # total number of query datasets
+        n_query_datasets = query_and_candidate_data_positive.map(
+            lambda x: len(x[2])
+        ).reduce(
+            lambda x, y: x + y
+        )
+
+        # total number of positive examples
+        n_positive_examples = query_and_candidate_data_positive.map(
+            lambda x: len(x[2]) * len(x[3])
+        ).reduce(
+            lambda x, y: x + y
+        )
+
+        # generating query and candidate dataset pairs for negative examples
+        #   number of negative examples should be similar to the number of
+        #   positive examples
+        query_and_candidate_data_negative_tmp = list()
+        n_random_candidates_per_query = int(n_positive_examples / n_query_datasets)
+        query_data_by_id = dict(
+            query_and_candidate_data_positive.map(
+                lambda x: (x[0], [x[1], x[2], x[4]])
+            ).collect()
+        )
+        for identifier in query_data_by_id.keys():
+            # getting candidate datasets from different datasets
+            other_candidates = query_and_candidate_data_positive.filter(
+                lambda x: x[0] != identifier and x[4] != query_data_by_id[identifier][2]
+            ).flatMap(
+                lambda x: x[3]
+            ).collect()
+            target_variable = query_data_by_id[identifier][0]
+            query_datasets = query_data_by_id[identifier][1]
+            for query_dataset in query_datasets:
+                # randomly choosing candidates for the query dataset
+                random_candidates = np.random.choice(
+                    len(other_candidates),
+                    min(n_random_candidates_per_query, len(other_candidates)),
+                    replace=False
+                )
+                query_and_candidate_data_negative_tmp.append(
+                    (
+                        query_dataset,
+                        target_variable,
+                        [other_candidates[i] for i in random_candidates]
+                    )
+                )
+        query_and_candidate_data_negative_tmp = sc.parallelize(query_and_candidate_data_negative_tmp) # rdd
+
+        # total number of negative examples
+        n_negative_examples = query_and_candidate_data_negative_tmp.map(
+            lambda x: len(x[2])
+        ).reduce(
+            lambda x, y: x + y
+        )
+
+        # generating candidate datasets for negative examples
+        #   format is the following:
+        #   (target_variable, query_dataset_path, candidate_dataset_paths)
+        query_and_candidate_data_negative = query_and_candidate_data_negative_tmp.map(
+            lambda x: generate_candidate_datasets_negative_examples(x[1], x[0], x[2], params)
+        ).persist(StorageLevel.MEMORY_AND_DISK)
+
+        query_candidate_datasets = sc.union([
+            query_and_candidate_data_positive.flatMap(
+                lambda x: [(x[1], query, x[3]) for query in x[2]]
+            ),
+            query_and_candidate_data_negative
+        ]).persist(StorageLevel.MEMORY_AND_DISK)
+
+
     else:
-        # if executing locally, need to read from local file
-        for dataset in os.listdir(dir_):
-            data_path = os.path.join(
-                dir_,
-                dataset,
-                dataset + '_dataset',
-                'tables',
-                'learningData.csv')
-            dataset_doc = os.path.join(
-                dir_,
-                dataset,
-                dataset + '_dataset',
-                'datasetDoc.json')
-            problem_doc = os.path.join(
-                dir_,
-                dataset,
-                dataset + '_problem',
-                'problemDoc.json')
-            dataset_files.append(data_path)
-            dataset_files.append(dataset_doc)
-            dataset_files.append(problem_doc)
 
-    all_files = sc.parallelize(dataset_files)
+        # datasets previously generated
+        data_by_identifier = list()
+        for identifier in list_dir(os.path.join(output_dir, 'files'), cluster_execution, hdfs_address, hdfs_user):
+            target_variable = None
+            query_datasets = list()
+            candidate_datasets = list()
+            for f in list_dir(os.path.join(output_dir, 'files', identifier), cluster_execution, hdfs_address, hdfs_user):
+                file_path = os.path.join(output_dir, 'files', identifier, f)
+                if f.startswith('query_'):
+                    query_datasets.append(file_path)
+                elif f.startswith('candidate_'):
+                    candidate_datasets.append(file_path)
+                elif f == '.target':
+                    target_variable = read_file(file_path, cluster_execution, hdfs_address, hdfs_user)
+            data_by_identifier.append((target_variable, query_datasets, candidate_datasets))
 
-    # grouping files from same dataset
-    # (dataset_name, [('learningData.csv', path),
-    #                 ('datasetDoc.json', path),
-    #                 ('problemDoc.json', path)])
-    all_files = all_files.map(lambda x: organize_dataset_files(x, cluster_execution))
-    all_files = all_files.reduceByKey(lambda x1, x2: x1 + x2)
+        query_candidate_datasets = sc.parallelize(data_by_identifier).flatMap(
+            lambda x: [(x[0], query, x[2]) for query in x[1]]
+        ).persist(StorageLevel.MEMORY_AND_DISK)
 
-    # generating query and candidate datasets
-    query_and_candidate_data = all_files.flatMap(
-        lambda x: generate_query_and_candidate_datasets(x, params)
-    ).collect()
 
-    # # generating negative examples
+    # getting performance scores
+    performance_scores = query_candidate_datasets.flatMap(
+        lambda x: generate_performance_scores(x[1], x[0], x[2], params)
+    ).map(
+        lambda x: '%s,%s,%s,%.6f,%6f' % (
+            os.path.sep.join(x[0].split(os.path.sep)[-2:]),
+            x[1],
+            os.path.sep.join(x[2].split(os.path.sep)[-2:]),
+            x[3],
+            x[4]
+        )
+    )
 
-    # query_set = set()
-    # candidate_set = set()
+    # saving scores
+    algorithm_name = params['regression_algorithm']
+    if params['regression_algorithm'] == 'random forest':
+        algorithm_name = 'random-forest'
+    save_file(
+        os.path.join(output_dir, 'training-data-' + algorithm_name),
+        '\n'.join(performance_scores.collect()),
+        params['cluster'],
+        params['hdfs_address'],
+        params['hdfs_user']
+    )
 
-    # training_data = open(training_data_file, 'r')
-    # size_training_data = 0
-    # line = training_data.readline()
-    # while line != '':
-    #     size_training_data += 1
-    #     line_elems = line.split(",")
-    #     query_set.add(",".join(line_elems[:2] + [line_elems[3]]))
-    #     candidate_set.add(line_elems[2])
-    #     line = training_data.readline()
-    # training_data.close()
-
-    # for query_dataset in query_set:
-
-    #     generate_negative_training_data(
-    #         query_dataset,
-    #         candidate_set,
-    #         size_training_data/len(query_set),
-    #         params,
-    #         str(id_)
-    #     )
-
-    #     id_ += 1
-
-    # print("Duration: %.4f seconds" % (time.time() - start_time))
+    print("Duration: %.4f seconds" % (time.time() - start_time))
