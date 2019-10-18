@@ -48,11 +48,13 @@ def read_file(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     output = None
     if use_hdfs:
         hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
-        with hdfs_client.read(file_path) as reader:
-            output = reader.read()
+        if hdfs_client.status(file_path, strict=False):
+            with hdfs_client.read(file_path) as reader:
+                output = reader.read()
     else:
-        with open(file_path) as reader:
-            output = reader.read()
+        if os.path.exists(file_path):
+            with open(file_path) as reader:
+                output = reader.read()
     return output
 
 
@@ -136,10 +138,16 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
             data_file = read_file(d[1], cluster_execution, hdfs_address, hdfs_user)
             continue
         if d[0] == 'datasetDoc.json':
-            dataset_doc = json.loads(read_file(d[1], cluster_execution, hdfs_address, hdfs_user))
+            dataset_doc = read_file(d[1], cluster_execution, hdfs_address, hdfs_user)
             continue
         if d[0] == 'problemDoc.json':
-            problem_doc = json.loads(read_file(d[1], cluster_execution, hdfs_address, hdfs_user))
+            problem_doc = read_file(d[1], cluster_execution, hdfs_address, hdfs_user)
+
+    if not data_file or not dataset_doc or not problem_doc:
+        print('The following dataset does not have the appropriate files: %s ' % data_name)
+        return result
+    dataset_doc = json.loads(dataset_doc)
+    problem_doc = json.loads(problem_doc)
     
     # problem type
     if problem_doc.get('about') and problem_doc['about'].get('taskType'):
