@@ -22,7 +22,7 @@ class FeatureFactory:
     
     def _is_numerical(self, column_name):
         return self.data[column_name].dtype == np.int64 or self.data[column_name].dtype == np.int32 or self.data[column_name].dtype == np.float64 or self.data[column_name].dtype == np.float32
-    
+        
     def get_number_of_columns(self):
         return self.data.shape[1]
 
@@ -121,7 +121,7 @@ class FeatureFactory:
                 if column1 != column2 and index1 < index2:
                     correlations.append(((column1, column2), corrs[column1][column2]))
         return correlations
-
+    
     def get_spearman_correlations(self):
         corrs = self.data.corr(method='spearman')
         correlations = []
@@ -181,6 +181,13 @@ class FeatureFactory:
                 if not np.isnan(coefficient):
                     correlations[column] = coefficient
         return correlations
+
+    def get_max_pearson_wrt_target(self, target_column_name):
+        correlations = self.get_pearson_correlations_with_target(target_column_name)
+        return max_in_modulus(correlations.values())
+        
+    def compute_difference_in_pearsons_wrt_target(self, max_in_modulus_pearson, target_column_name):
+        return self.get_max_pearson_wrt_target(target_column_name) - max_in_modulus_pearson
 
     def get_spearman_correlations_with_target(self, target_column_name):
         correlations = {}
