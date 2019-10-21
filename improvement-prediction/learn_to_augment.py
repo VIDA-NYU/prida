@@ -13,5 +13,4 @@ if __name__ == '__main__':
     output_filename = params['output_filename']
     learning_task = LearningTask()
     learning_task.read_data(augmentation_learning_data_filename)
-    #feature_id 29 corresponds to maximum pearson of any column in the merged dataset with the target variable
-    learning_task.execute_linear_regression(n_splits, feature_ids=[29])
+    learning_task.execute_random_forest(n_splits, feature_ids=[4, 39, 8, 0, 3, 44, 16, 21, 34, 37, 7, 6, 29, 38, 40, 41, 43, 27])

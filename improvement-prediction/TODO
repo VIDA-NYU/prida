@@ -1,23 +1,11 @@
-- TODO
--- finish pipeline for random forest and linear regression
---- FEATURE SELECTION: implement recursive feature elimination and BORUTA
-
-selector.ranking_
---- Check if the best predicted gains correspond to the actual highest gains
---- get a test instance without the candidate, pick candidates based on similarity with instances in training data, and see if 
-    (i) the actual candidate is picked among the similar ones
-    (ii) the prediction is good 
-
--- Work with synthetic data in the format
+- Plot best regressors against target
+- Understand cases to which the errors are very high
+- Normalize metric: MSE is not very informative as of now
+- Work with synthetic data in the format 
      <initial column, candidate-for-augmentation column, target variable, initial r2 score, r2 score after augmentation>
---- This is important for technical reasons (every instance finally leads to the same number of features, which is not possible with datasets because they have a variable number of columns), and to have a finer understanding of which parts of the datasets help in the augmentation best
-
--- instead of using prediction of gains/losses in r2 squares, we could model the task as a binary classification: was the augmentation successful (final r2 score > initial r2 score) or not?
---- In this case, you'll need the notion of confidence in classification to rank stuff
-
--- how do random forests and linear regression compare in the generation of synthetic data sets (SD1 and SD2)? 
-
--- should we use other features? what about latent features (like those derived from PCA)?
---- neural networks  are interesting here because they naturally create new features (plus being "fashionable", and finding a good architecture would be a contribution as well)
-
--- does it help in practice? can we see if it's good for auctus?
+-- This is important for technical reasons (every instance finally leads to the same number of features, which is not possible with datasets because they have a variable number of columns), and to have a finer understanding of which parts of the datasets help in the augmentation best
+- instead of using prediction of gains/losses in r2 squares, we could model the task as a binary classification: was the augmentation successful (final r2 score > initial r2 score) or not?
+- how do random forests and linear regression compare in the generation of synthetic data sets (SD1 and SD2)? 
+- should we use other features? what about latent features (like those derived from PCA)?
+-- neural networks  are interesting here because they naturally create new features (plus being "fashionable", and finding a good architecture would be a contribution as well)
+- does it help in practice? can we see if it's good for auctus?
