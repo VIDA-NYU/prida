@@ -86,6 +86,6 @@ class LearningTask:
             #print(sorted(feature_importances, key= lambda i: i[1], reverse=True))
             predictions = rf.predict(X_test)
             print('fold', i, 'MSE', compute_MSE(predictions, y_test))
-            #plot_scatterplot(y_test, predictions, 'predicted_r2_score_gains_fold_' + str(i) + '_random_forest.png', 'Real values', 'Predicted values')
+            plot_scatterplot(y_test, predictions, 'predicted_r2_score_gains_fold_' + str(i) + '_random_forest.png', 'Real values', 'Predicted values')
             i += 1
 
