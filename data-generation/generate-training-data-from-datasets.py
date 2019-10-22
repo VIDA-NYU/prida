@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+from __future__ import print_function_function
 from hdfs import InsecureClient
 from io import StringIO
 from itertools import combinations
@@ -65,12 +65,12 @@ def save_file(file_path, content, use_hdfs=False, hdfs_address=None, hdfs_user=N
     if use_hdfs:
         hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
         if hdfs_client.status(file_path, strict=False):
-            print('File already exists: %s' % file_path)
+            print_function('File already exists: %s' % file_path)
         with hdfs_client.write(file_path) as writer:
             writer.write(content)
     else:
         if os.path.exists(file_path):
-            print('File already exists: %s' % file_path)
+            print_function('File already exists: %s' % file_path)
         with open(file_path, 'w') as writer:
             writer.write(content)
 
@@ -144,7 +144,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
             problem_doc = read_file(d[1], cluster_execution, hdfs_address, hdfs_user)
 
     if not data_file or not dataset_doc or not problem_doc:
-        print('The following dataset does not have the appropriate files: %s ' % data_name)
+        print_function('The following dataset does not have the appropriate files: %s ' % data_name)
         return result
     dataset_doc = json.loads(dataset_doc)
     problem_doc = json.loads(problem_doc)
@@ -171,11 +171,11 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
 
     # regression problems only
     if problem_type != 'regression':
-        print('The following dataset does not belong to a regression problem: %s (%s)' % (data_name, problem_type))
+        print_function('The following dataset does not belong to a regression problem: %s (%s)' % (data_name, problem_type))
         return result
     # single data tables only
     if multiple_data:
-        print('The following dataset is composed by multiple files: %s' % data_name)
+        print_function('The following dataset is composed by multiple files: %s' % data_name)
         return result
 
     # non-numeric attributes
@@ -189,7 +189,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
             non_numeric_att_list.append(col)
 
     if target_variable in non_numeric_att_list:
-        print('The following dataset has a non-numerical target variable: %s' % data_name)
+        print_function('The following dataset has a non-numerical target variable: %s' % data_name)
         return result
 
     # removing target variable, non-numeric attributes, and first attribute (if it is to be ignored)
@@ -199,7 +199,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
     # if there is only one column left, there is no way to
     # generate both query and candidate datasets
     if n_columns_left <= 1:
-        print('The following dataset does not have enough columns for the data generation process: %s' % data_name)
+        print_function('The following dataset does not have enough columns for the data generation process: %s' % data_name)
         return result
 
     # potential numbers of columns in a query dataset
@@ -236,12 +236,17 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
         n_columns_query_dataset = [n_columns_left - 1 for _ in all_combinations]
 
     # pandas dataset
-    original_data = pd.read_csv(StringIO(data_file))
+    original_data = None
+    try:
+        original_data = pd.read_csv(StringIO(data_file))
+    except Exception as e:
+        print_function('The following dataset had an exception while parsing into a dataframe: %s (%s)' % (data_name, str(e)))
+        return result
 
     # ignore very small datasets
     n_rows = original_data.shape[0]
     if n_rows < params['min_number_records']:
-        print('The following dataset does not have the minimum number of records: %s' % data_name)
+        print_function('The following dataset does not have the minimum number of records: %s' % data_name)
         return result
 
     # generating the key column for the data
@@ -761,4 +766,4 @@ if __name__ == '__main__':
         params['hdfs_user']
     )
 
-    print("Duration: %.4f seconds" % (time.time() - start_time))
+    print_function("Duration: %.4f seconds" % (time.time() - start_time))
