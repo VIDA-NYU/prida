@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import r2_score
 from sklearn.model_selection import KFold 
 from util.graphic_functions import *
 from util.debug import *
@@ -51,17 +52,14 @@ class LearningTask:
             X_train, X_test = np.array(data)[train_index], np.array(data)[test_index]
             y_train, y_test = np.array(self.learning_targets)[train_index], np.array(self.learning_targets)[test_index]
 
-            
             X_train, y_train = remove_outliers(X_train, y_train, zscore_threshold=1)
             X_test, y_test = remove_outliers(X_test, y_test, zscore_threshold=1)
-
             lm = LinearRegression()
             lm.fit(X_train, y_train)            
             predictions = lm.predict(X_test)
             mutual_information_univariate_selection(X_train, y_train)
-            #print('how good is this linear regression model:', lm.score(X_test, y_test))
+            print('how good is this linear regression model:', lm.score(X_test, y_test))
             print('fold', i, 'SMAPE', compute_SMAPE(predictions, y_test), 'MSE', compute_MSE(predictions, y_test))
-            #print('features', feature_ids, 'fold', i, 'SMAPE', compute_SMAPE(predictions, y_test), 'MSE', compute_MSE(predictions, y_test))
             plot_scatterplot(y_test, predictions, 'predicted_r2_score_gains_fold_' + str(i) + '_linear_regression.png', 'Real values', 'Predicted values')
             i += 1
 
@@ -77,14 +75,17 @@ class LearningTask:
             X_train, X_test = np.array(data)[train_index], np.array(data)[test_index]
             y_train, y_test = np.array(self.learning_targets)[train_index], np.array(self.learning_targets)[test_index]
 
-            X_train, y_train = remove_outliers(X_train, y_train, zscore_threshold=1)
-            X_test, y_test = remove_outliers(X_test, y_test, zscore_threshold=1)
+            #print('averages medians and stds before', np.mean(y_train), np.median(y_train), np.std(y_train), np.mean(y_test), np.median(y_test), np.std(y_test))
+            X_train, y_train = remove_outliers(X_train, y_train, zscore_threshold=0.5)
+            X_test, y_test = remove_outliers(X_test, y_test, zscore_threshold=0.5)
+            #print('averages medians and stds after', np.mean(y_train), np.median(y_train), np.std(y_train), np.mean(y_test), np.median(y_train), np.std(y_test))
             
             rf = RandomForestRegressor(n_estimators=100, random_state=42)
             rf.fit(X_train, y_train)
             feature_importances = [(index, value) for index, value in enumerate(rf.feature_importances_)]
-            #print(sorted(feature_importances, key= lambda i: i[1], reverse=True))
+            print([i[0] for i in sorted(feature_importances, key= lambda i: i[1], reverse=True)])
             predictions = rf.predict(X_test)
+            print('how good is this random forest model:', r2_score(y_test, predictions))
             print('fold', i, 'MSE', compute_MSE(predictions, y_test))
             plot_scatterplot(y_test, predictions, 'predicted_r2_score_gains_fold_' + str(i) + '_random_forest.png', 'Real values', 'Predicted values')
             i += 1

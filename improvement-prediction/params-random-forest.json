@@ -1,7 +1,7 @@
 {
-    "learning_data_filename": "/home/alibezz/dataset-ranking/data/d3m-datasets-random-forest/training-data-random-forest",
-		"augmentation_learning_data_filename": "/home/alibezz/dataset-ranking/improvement-prediction/data-for-learning_augmentation-random-forest.txt", 
+    "learning_data_filename": "/Users/alibezz/dataset-ranking/data/d3m-datasets-random-forest/training-data-random-forest",
+		"augmentation_learning_data_filename": "/Users/alibezz/dataset-ranking/improvement-prediction/data-for-learning_augmentation-random-forest.txt", 
 		"n_splits": 5,
-		"output_filename": "/home/alibezz/dataset-ranking/improvement-prediction/prediction-output-file-random-forest"
+		"output_filename": "/Users/alibezz/dataset-ranking/improvement-prediction/prediction-output-file-random-forest"
 }
 
