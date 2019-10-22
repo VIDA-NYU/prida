@@ -114,6 +114,16 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
 
     result = list()
 
+    # accumulators
+    global processed_datasets
+    global no_appropriate_files
+    global no_regression
+    global multiple_files
+    global no_numerical_target
+    global no_enough_columns
+    global no_enough_records
+    global dataframe_exception
+
     # params
     max_times_break_data_vertical = params['max_times_break_data_vertical']
     ignore_first_attribute = params['ignore_first_attribute']
@@ -144,6 +154,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
 
     if not data_file or not dataset_doc or not problem_doc:
         print('The following dataset does not have the appropriate files: %s ' % data_name)
+        no_appropriate_files += 1
         return result
     dataset_doc = json.loads(dataset_doc)
     problem_doc = json.loads(problem_doc)
@@ -171,10 +182,12 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
     # regression problems only
     if problem_type != 'regression':
         print('The following dataset does not belong to a regression problem: %s (%s)' % (data_name, problem_type))
+        no_regression += 1
         return result
     # single data tables only
     if multiple_data:
         print('The following dataset is composed by multiple files: %s' % data_name)
+        multiple_files += 1
         return result
 
     # non-numeric attributes
@@ -189,6 +202,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
 
     if target_variable in non_numeric_att_list:
         print('The following dataset has a non-numerical target variable: %s' % data_name)
+        no_numerical_target += 1
         return result
 
     # removing target variable, non-numeric attributes, and first attribute (if it is to be ignored)
@@ -199,6 +213,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
     # generate both query and candidate datasets
     if n_columns_left <= 1:
         print('The following dataset does not have enough columns for the data generation process: %s' % data_name)
+        no_enough_columns += 1
         return result
 
     # potential numbers of columns in a query dataset
@@ -240,13 +255,17 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
         original_data = pd.read_csv(StringIO(data_file))
     except Exception as e:
         print('The following dataset had an exception while parsing into a dataframe: %s (%s)' % (data_name, str(e)))
+        dataframe_exception += 1
         return result
 
     # ignore very small datasets
     n_rows = original_data.shape[0]
     if n_rows < params['min_number_records']:
         print('The following dataset does not have the minimum number of records: %s' % data_name)
+        no_enough_records += 1
         return result
+
+    processed_datasets += 1
 
     # generating the key column for the data
     key_column = [
@@ -580,6 +599,16 @@ if __name__ == '__main__':
     conf = SparkConf().setAppName("Data Generation")
     sc = SparkContext(conf=conf)
 
+    # accumulators
+    processed_datasets = sc.accumulator(0)
+    no_appropriate_files = sc.accumulator(0)
+    no_regression = sc.accumulator(0)
+    multiple_files = sc.accumulator(0)
+    no_numerical_target = sc.accumulator(0)
+    no_enough_columns = sc.accumulator(0)
+    no_enough_records = sc.accumulator(0)
+    dataframe_exception = sc.accumulator(0)
+
     # parameters
     params = json.load(open(".params.json"))
     output_dir = params['new_datasets_directory']
@@ -765,4 +794,12 @@ if __name__ == '__main__':
         params['hdfs_user']
     )
 
-    print("Duration: %.4f seconds" % (time.time() - start_time))
+    print('Duration: %.4f seconds' % (time.time() - start_time))
+    print(' -- Processed datasets: %d' %processed_datasets)
+    print(' -- Datasets w/o appropriate files: %d' %no_appropriate_files)
+    print(' -- Datasets w/ no regression problem: %d' %no_regression)
+    print(' -- Datasets w/ multiple data files: %d' %multiple_files)
+    print(' -- Datasets w/o numeric targets: %d' %no_numerical_target)
+    print(' -- Datasets w/o enough columns: %d' %no_enough_columns)
+    print(' -- Datasets w/o enough records: %d' %no_enough_records)
+    print(' -- Datasets w/ pandas.Dataframe exception: %d' %dataframe_exception)
