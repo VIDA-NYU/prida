@@ -47,16 +47,18 @@ You may need to set some parameters for `spark-submit` depending on your environ
 The easiest way to run the data generation in a cluster is by using [Anaconda](https://www.anaconda.com/) to package the python dependencies. First, install Anaconda and initialize it by using the `conda init` command. Then, run the following:
 
     $ conda create -y -n data-generation -c conda-forge python=3 numpy pandas scikit-learn python-hdfs conda-pack
-    $ zip -r data-generation-environment.zip ENV_DIR/data-generation
+    $ cd <env_dir>
+    $ zip -r <data-generation-dir>/data-generation-environment.zip data-generation/
 
-where `ENV_DIR` is the system location for Anaconda environments. The `data-generation-environment.zip` file will contain all the packages necessary to run the data generation script, making sure that all of the cluster nodes have access to the dependencies. To submit the data generation job, run the following:
+where `<env_dir>` is the location for Anaconda environments, and `<data-generation-dir>` is the location for this directory. The `data-generation-environment.zip` file will contain all the packages necessary to run the data generation script, making sure that all of the cluster nodes have access to the dependencies. To submit the data generation job, run the following:
 
+    $ cd <data-generation-dir>
     $ spark-submit \
     --deploy-mode cluster \
     --master yarn \
     --files .params.json \
     --conf spark.yarn.appMasterEnv.PYSPARK_PYTHON=./env/data-generation/bin/python \
-    --archives data-generation-environment.zip#env
+    --archives data-generation-environment.zip#env \
     generate-training-data-from-datasets.py
 
 You may need to set some parameters for `spark-submit` depending on the cluster environment. For an examples, you can inspect the script [`run-spark-cluster`](run-spark-cluster).
