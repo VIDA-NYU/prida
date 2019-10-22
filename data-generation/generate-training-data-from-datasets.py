@@ -620,7 +620,7 @@ if __name__ == '__main__':
     # all query and candidate datasets
     #   format is the following:
     #   (target_variable, query_dataset_path, candidate_dataset_paths)
-    query_candidate_datasets = None
+    query_candidate_datasets = sc.parallelize([])
 
     if not skip_dataset_creation:
 
@@ -675,75 +675,77 @@ if __name__ == '__main__':
             lambda x: generate_query_and_candidate_datasets_positive_examples(x, params)
         ).persist(StorageLevel.MEMORY_AND_DISK)
 
-        # total number of query datasets
-        n_query_datasets = query_and_candidate_data_positive.map(
-            lambda x: len(x[2])
-        ).reduce(
-            lambda x, y: x + y
-        )
+        if not query_and_candidate_data_positive.isEmpty():
 
-        # total number of positive examples
-        n_positive_examples = query_and_candidate_data_positive.map(
-            lambda x: len(x[2]) * len(x[3])
-        ).reduce(
-            lambda x, y: x + y
-        )
+            # total number of query datasets
+            n_query_datasets = query_and_candidate_data_positive.map(
+                lambda x: len(x[2])
+            ).reduce(
+                lambda x, y: x + y
+            )
 
-        # generating query and candidate dataset pairs for negative examples
-        #   number of negative examples should be similar to the number of
-        #   positive examples
-        query_and_candidate_data_negative_tmp = list()
-        n_random_candidates_per_query = int(n_positive_examples / n_query_datasets)
-        query_data_by_id = dict(
-            query_and_candidate_data_positive.map(
-                lambda x: (x[0], [x[1], x[2], x[4]])
-            ).collect()
-        )
-        for identifier in query_data_by_id.keys():
-            # getting candidate datasets from different datasets
-            other_candidates = query_and_candidate_data_positive.filter(
-                lambda x: x[0] != identifier and x[4] != query_data_by_id[identifier][2]
-            ).flatMap(
-                lambda x: x[3]
-            ).collect()
-            target_variable = query_data_by_id[identifier][0]
-            query_datasets = query_data_by_id[identifier][1]
-            for query_dataset in query_datasets:
-                # randomly choosing candidates for the query dataset
-                random_candidates = np.random.choice(
-                    len(other_candidates),
-                    min(n_random_candidates_per_query, len(other_candidates)),
-                    replace=False
-                )
-                query_and_candidate_data_negative_tmp.append(
-                    (
-                        query_dataset,
-                        target_variable,
-                        [other_candidates[i] for i in random_candidates]
+            # total number of positive examples
+            n_positive_examples = query_and_candidate_data_positive.map(
+                lambda x: len(x[2]) * len(x[3])
+            ).reduce(
+                lambda x, y: x + y
+            )
+
+            # generating query and candidate dataset pairs for negative examples
+            #   number of negative examples should be similar to the number of
+            #   positive examples
+            query_and_candidate_data_negative_tmp = list()
+            n_random_candidates_per_query = int(n_positive_examples / n_query_datasets)
+            query_data_by_id = dict(
+                query_and_candidate_data_positive.map(
+                    lambda x: (x[0], [x[1], x[2], x[4]])
+                ).collect()
+            )
+            for identifier in query_data_by_id.keys():
+                # getting candidate datasets from different datasets
+                other_candidates = query_and_candidate_data_positive.filter(
+                    lambda x: x[0] != identifier and x[4] != query_data_by_id[identifier][2]
+                ).flatMap(
+                    lambda x: x[3]
+                ).collect()
+                target_variable = query_data_by_id[identifier][0]
+                query_datasets = query_data_by_id[identifier][1]
+                for query_dataset in query_datasets:
+                    # randomly choosing candidates for the query dataset
+                    random_candidates = np.random.choice(
+                        len(other_candidates),
+                        min(n_random_candidates_per_query, len(other_candidates)),
+                        replace=False
                     )
-                )
-        query_and_candidate_data_negative_tmp = sc.parallelize(query_and_candidate_data_negative_tmp) # rdd
+                    query_and_candidate_data_negative_tmp.append(
+                        (
+                            query_dataset,
+                            target_variable,
+                            [other_candidates[i] for i in random_candidates]
+                        )
+                    )
+            query_and_candidate_data_negative_tmp = sc.parallelize(query_and_candidate_data_negative_tmp) # rdd
 
-        # total number of negative examples
-        n_negative_examples = query_and_candidate_data_negative_tmp.map(
-            lambda x: len(x[2])
-        ).reduce(
-            lambda x, y: x + y
-        )
+            # total number of negative examples
+            n_negative_examples = query_and_candidate_data_negative_tmp.map(
+                lambda x: len(x[2])
+            ).reduce(
+                lambda x, y: x + y
+            )
 
-        # generating candidate datasets for negative examples
-        #   format is the following:
-        #   (target_variable, query_dataset_path, candidate_dataset_paths)
-        query_and_candidate_data_negative = query_and_candidate_data_negative_tmp.map(
-            lambda x: generate_candidate_datasets_negative_examples(x[1], x[0], x[2], params)
-        ).persist(StorageLevel.MEMORY_AND_DISK)
+            # generating candidate datasets for negative examples
+            #   format is the following:
+            #   (target_variable, query_dataset_path, candidate_dataset_paths)
+            query_and_candidate_data_negative = query_and_candidate_data_negative_tmp.map(
+                lambda x: generate_candidate_datasets_negative_examples(x[1], x[0], x[2], params)
+            ).persist(StorageLevel.MEMORY_AND_DISK)
 
-        query_candidate_datasets = sc.union([
-            query_and_candidate_data_positive.flatMap(
-                lambda x: [(x[1], query, x[3]) for query in x[2]]
-            ),
-            query_and_candidate_data_negative
-        ]).persist(StorageLevel.MEMORY_AND_DISK)
+            query_candidate_datasets = sc.union([
+                query_and_candidate_data_positive.flatMap(
+                    lambda x: [(x[1], query, x[3]) for query in x[2]]
+                ),
+                query_and_candidate_data_negative
+            ]).persist(StorageLevel.MEMORY_AND_DISK)
 
 
     else:
@@ -769,30 +771,32 @@ if __name__ == '__main__':
         ).persist(StorageLevel.MEMORY_AND_DISK)
 
 
-    # getting performance scores
-    performance_scores = query_candidate_datasets.flatMap(
-        lambda x: generate_performance_scores(x[1], x[0], x[2], params)
-    ).map(
-        lambda x: '%s,%s,%s,%.6f,%6f' % (
-            os.path.sep.join(x[0].split(os.path.sep)[-2:]),
-            x[1],
-            os.path.sep.join(x[2].split(os.path.sep)[-2:]),
-            x[3],
-            x[4]
-        )
-    )
+    if not query_candidate_datasets.isEmpty():
 
-    # saving scores
-    algorithm_name = params['regression_algorithm']
-    if params['regression_algorithm'] == 'random forest':
-        algorithm_name = 'random-forest'
-    save_file(
-        os.path.join(output_dir, 'training-data-' + algorithm_name),
-        '\n'.join(performance_scores.collect()),
-        params['cluster'],
-        params['hdfs_address'],
-        params['hdfs_user']
-    )
+        # getting performance scores
+        performance_scores = query_candidate_datasets.flatMap(
+            lambda x: generate_performance_scores(x[1], x[0], x[2], params)
+        ).map(
+            lambda x: '%s,%s,%s,%.6f,%6f' % (
+                os.path.sep.join(x[0].split(os.path.sep)[-2:]),
+                x[1],
+                os.path.sep.join(x[2].split(os.path.sep)[-2:]),
+                x[3],
+                x[4]
+            )
+        )
+
+        # saving scores
+        algorithm_name = params['regression_algorithm']
+        if params['regression_algorithm'] == 'random forest':
+            algorithm_name = 'random-forest'
+        save_file(
+            os.path.join(output_dir, 'training-data-' + algorithm_name),
+            '\n'.join(performance_scores.collect()),
+            params['cluster'],
+            params['hdfs_address'],
+            params['hdfs_user']
+        )
 
     print('Duration: %.4f seconds' % (time.time() - start_time))
     print(' -- Processed datasets: %d' %processed_datasets)
