@@ -620,7 +620,7 @@ if __name__ == '__main__':
     # all query and candidate datasets
     #   format is the following:
     #   (target_variable, query_dataset_path, candidate_dataset_paths)
-    query_candidate_datasets = sc.parallelize([])
+    query_candidate_datasets = sc.emptyRDD()
 
     if not skip_dataset_creation:
 
@@ -799,11 +799,11 @@ if __name__ == '__main__':
         )
 
     print('Duration: %.4f seconds' % (time.time() - start_time))
-    print(' -- Processed datasets: %d' %processed_datasets)
-    print(' -- Datasets w/o appropriate files: %d' %no_appropriate_files)
-    print(' -- Datasets w/ no regression problem: %d' %no_regression)
-    print(' -- Datasets w/ multiple data files: %d' %multiple_files)
-    print(' -- Datasets w/o numeric targets: %d' %no_numerical_target)
-    print(' -- Datasets w/o enough columns: %d' %no_enough_columns)
-    print(' -- Datasets w/o enough records: %d' %no_enough_records)
-    print(' -- Datasets w/ pandas.Dataframe exception: %d' %dataframe_exception)
+    print(' -- Processed datasets: %d' %processed_datasets.value)
+    print(' -- Datasets w/o appropriate files: %d' %no_appropriate_files.value)
+    print(' -- Datasets w/ no regression problem: %d' %no_regression.value)
+    print(' -- Datasets w/ multiple data files: %d' %multiple_files.value)
+    print(' -- Datasets w/o numeric targets: %d' %no_numerical_target.value)
+    print(' -- Datasets w/o enough columns: %d' %no_enough_columns.value)
+    print(' -- Datasets w/o enough records: %d' %no_enough_records.value)
+    print(' -- Datasets w/ pandas.Dataframe exception: %d' %dataframe_exception.value)

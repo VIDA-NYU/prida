@@ -46,7 +46,7 @@ You may need to set some parameters for `spark-submit` depending on your environ
 
 The easiest way to run the data generation in a cluster is by using [Anaconda](https://www.anaconda.com/) to package the python dependencies. First, install Anaconda and initialize it by using the `conda init` command. Then, run the following:
 
-    $ conda create -y -n data-generation -c conda-forge python=3 numpy pandas scikit-learn python-hdfs
+    $ conda create -y -n data-generation -c conda-forge python=3.6.9 numpy pandas scikit-learn python-hdfs
     $ cd <env_dir>
     $ zip -r <data-generation-dir>/data-generation-environment.zip data-generation/
 
