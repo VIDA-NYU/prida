@@ -7,8 +7,8 @@ class AugmentationInstance:
         self.candidate_filename = instance_values['candidate_filename']
         self.candidate_dataset = Dataset(self.candidate_filename)
         self.target_name = instance_values['target_name']
-        self.initial_r2_score = instance_values['initial_r2_score']
-        self.final_r2_score = instance_values['final_r2_score']
+        self.r2_score_before = instance_values['r2_score_before']
+        self.r2_score_after = instance_values['r2_score_after']
         self.joined_dataset = self.join_query_and_candidate_datasets()
         
     def get_query_dataset(self):

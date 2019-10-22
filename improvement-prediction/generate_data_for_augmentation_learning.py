@@ -3,22 +3,8 @@ import json
 import sys
 from augmentation_instance import *
 from feature_factory import *
-from constants import *
+from util.file_parser import *
 from learning_task import *
-
-def parse_learning_data_filename(filename):
-    with open(filename, 'r') as f:
-        augmentation_instances = []
-        for line in f:
-            query_filename, target, candidate_filename, r2_score_before, r2_score_after = line.strip().split(SEPARATOR)
-            fields = {}
-            fields['query_filename'] = query_filename
-            fields['target_name'] = target
-            fields['candidate_filename'] = candidate_filename
-            fields['initial_r2_score'] = float(r2_score_before)
-            fields['final_r2_score'] = float(r2_score_after)
-            augmentation_instances.append(AugmentationInstance(fields))
-        return augmentation_instances
 
 if __name__ == '__main__':
 
@@ -28,7 +14,7 @@ if __name__ == '__main__':
         params = json.load(open(sys.argv[1]))
     learning_data_filename = params['learning_data_filename']
     augmentation_learning_data_filename = params['augmentation_learning_data_filename']
-    augmentation_instances = parse_learning_data_filename(learning_data_filename)
+    augmentation_instances = parse_augmentation_instances(learning_data_filename)
     print('Done parsing instances')
     learning_task = LearningTask()
     i = 0

@@ -70,23 +70,22 @@ class LearningTask:
         else:
             data = self.learning_data
         kf.get_n_splits(data)
-        i = 0
+        #i = 0
+        models = []
         for train_index, test_index in kf.split(data):
             X_train, X_test = np.array(data)[train_index], np.array(data)[test_index]
             y_train, y_test = np.array(self.learning_targets)[train_index], np.array(self.learning_targets)[test_index]
-
-            #print('averages medians and stds before', np.mean(y_train), np.median(y_train), np.std(y_train), np.mean(y_test), np.median(y_test), np.std(y_test))
             X_train, y_train = remove_outliers(X_train, y_train, zscore_threshold=0.5)
             X_test, y_test = remove_outliers(X_test, y_test, zscore_threshold=0.5)
-            #print('averages medians and stds after', np.mean(y_train), np.median(y_train), np.std(y_train), np.mean(y_test), np.median(y_train), np.std(y_test))
-            
             rf = RandomForestRegressor(n_estimators=100, random_state=42)
             rf.fit(X_train, y_train)
-            feature_importances = [(index, value) for index, value in enumerate(rf.feature_importances_)]
-            print([i[0] for i in sorted(feature_importances, key= lambda i: i[1], reverse=True)])
-            predictions = rf.predict(X_test)
-            print('how good is this random forest model:', r2_score(y_test, predictions))
-            print('fold', i, 'MSE', compute_MSE(predictions, y_test))
-            plot_scatterplot(y_test, predictions, 'predicted_r2_score_gains_fold_' + str(i) + '_random_forest.png', 'Real values', 'Predicted values')
-            i += 1
+            #feature_importances = [(index, value) for index, value in enumerate(rf.feature_importances_)]
+            #print([i[0] for i in sorted(feature_importances, key= lambda i: i[1], reverse=True)])
+            #predictions = rf.predict(X_test)
+            models.append({'model': rf, 'index_of_test_instances': test_index, 'true_relative_gain_for_test_instances': y_test})
+            #print('how good is this random forest model:', r2_score(y_test, predictions))
+            #print('fold', i, 'MSE', compute_MSE(predictions, y_test))
+            #plot_scatterplot(y_test, predictions, 'predicted_r2_score_gains_fold_' + str(i) + '_random_forest.png', 'Real values', 'Predicted values')
+            #i += 1
+        return models
 
