@@ -12,7 +12,6 @@ if __name__ == '__main__':
     recommender = Recommender()
     recommender.store_instances(params['learning_data_filename'])
     print('done storing instances')
-    models = recommender.generate_models(params['augmentation_learning_data_filename'], params['n_splits'])
-    # each model corresponds to the following tuple: rf, test_index, y_test
-    for model in models:
-        print(model['index_of_test_instances'])
+    models, test_data = recommender.generate_models_and_test_data(params['augmentation_learning_data_filename'], params['n_splits'])
+    for model, data in zip(models, test_data):
+        recommender.recommend_candidates(model, data)

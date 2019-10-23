@@ -72,6 +72,7 @@ class LearningTask:
         kf.get_n_splits(data)
         #i = 0
         models = []
+        test_data = []
         for train_index, test_index in kf.split(data):
             X_train, X_test = np.array(data)[train_index], np.array(data)[test_index]
             y_train, y_test = np.array(self.learning_targets)[train_index], np.array(self.learning_targets)[test_index]
@@ -79,13 +80,16 @@ class LearningTask:
             X_test, y_test = remove_outliers(X_test, y_test, zscore_threshold=0.5)
             rf = RandomForestRegressor(n_estimators=100, random_state=42)
             rf.fit(X_train, y_train)
+            models.append(rf)
+            test_data.append({'index_of_test_instances': test_index,
+                              'true_relative_gain_for_test_instances': y_test})
+            
             #feature_importances = [(index, value) for index, value in enumerate(rf.feature_importances_)]
             #print([i[0] for i in sorted(feature_importances, key= lambda i: i[1], reverse=True)])
             #predictions = rf.predict(X_test)
-            models.append({'model': rf, 'index_of_test_instances': test_index, 'true_relative_gain_for_test_instances': y_test})
             #print('how good is this random forest model:', r2_score(y_test, predictions))
             #print('fold', i, 'MSE', compute_MSE(predictions, y_test))
             #plot_scatterplot(y_test, predictions, 'predicted_r2_score_gains_fold_' + str(i) + '_random_forest.png', 'Real values', 'Predicted values')
             #i += 1
-        return models
+        return models, test_data
 
