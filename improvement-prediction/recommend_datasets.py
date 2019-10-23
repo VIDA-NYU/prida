@@ -15,3 +15,4 @@ if __name__ == '__main__':
     models, test_data = recommender.generate_models_and_test_data(params['augmentation_learning_data_filename'], params['n_splits'])
     for model, data in zip(models, test_data):
         recommender.recommend_candidates(model, data)
+        break
