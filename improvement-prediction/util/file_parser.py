@@ -10,7 +10,7 @@ def parse_augmentation_instances(filename):
             fields = {'query_filename': query_filename,
                       'target_name': target,
                       'candidate_filename': candidate_filename,
-                      'initial_r2_score': float(r2_score_before),
-                      'final_r2_score': float(r2_score_after)}
+                      'r2_score_before': float(r2_score_before),
+                      'r2_score_after': float(r2_score_after)}
             augmentation_instances.append(AugmentationInstance(fields))
         return augmentation_instances
