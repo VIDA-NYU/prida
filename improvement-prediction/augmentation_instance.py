@@ -75,7 +75,6 @@ class AugmentationInstance:
 
         return fd_metrics + metrics_with_target + query_metrics_with_target + candidate_metrics_with_target + [pearson_difference_wrt_target]
         
-
     def generate_features(self, query_individual_metrics=[], candidate_individual_metrics=[]):
         if not query_individual_metrics:
             feature_factory_query = FeatureFactory(self.get_joined_query_data())
@@ -85,61 +84,4 @@ class AugmentationInstance:
             candidate_individual_metrics = feature_factory_candidate.get_individual_metrics(func=max_in_modulus)
 
         pairwise_metrics = self.compute_pairwise_metrics()
-        return query_individual_metrics + candidate_individual_metrics + pairwise_metrics
-
-#         full_dataset_pairwise_metrics, pairwise_metrics_with_target, candidate_pairwise_metrics_with_target, query_pairwise_metrics_with_target, pearson_difference_wrt_target
-
-
-#                 # TODO encapsulate below
-#                 feature_factory_full_dataset = FeatureFactory(instance.get_joined_data())
-#                 full_dataset_pairwise_metrics = feature_factory_full_dataset.get_pairwise_metrics(func=max_in_modulus)
-#                 pairwise_metrics_with_target = feature_factory_full_dataset.get_pairwise_metrics_with_target(instance.get_target_column_name(),
-#                                                                                                              func=max_in_modulus)
-#                 feature_factory_candidate_with_target = FeatureFactory(instance.get_joined_candidate_data_and_target())
-#                 candidate_pairwise_metrics_with_target = feature_factory_candidate_with_target.get_pairwise_metrics_with_target(instance.get_target_column_name(),
-#                                                                                                                                 func=max_in_modulus)
-#                 feature_factory_query = FeatureFactory(instance.get_joined_query_data())
-#                 query_pairwise_metrics_with_target = feature_factory_query.get_pairwise_metrics_with_target(instance.get_target_column_name(),
-#                                                                                                             func=max_in_modulus)
-
-#                 pearson_difference_wrt_target = feature_factory_candidate_with_target.compute_difference_in_pearsons_wrt_target(
-#                     feature_factory_query.get_max_pearson_wrt_target(instance.get_target_column_name()), instance.get_target_column_name())
-
-#                 learning_features = self.query_individual_metrics[query_filename]
-#                 print('len(learning_features) =', len(learning_features))
-#                 learning_features += self.candidate_individual_metrics[candidate]
-#                 print('len(learning_features) =', len(learning_features))
-#                 learning_features += full_dataset_pairwise_metrics 
-#                 print('len(learning_features) =', len(learning_features))
-#                 learning_features += pairwise_metrics_with_target
-#                 print('len(learning_features) =', len(learning_features))
-#                 learning_features += query_pairwise_metrics_with_target
-#                 print('len(learning_features) =', len(learning_features))
-#                 learning_features += candidate_pairwise_metrics_with_target
-#                 print('len(learning_features) =', len(learning_features))
-#                 learning_features += [pearson_difference_wrt_target]
-#                 print('len(learning_features) =', len(learning_features))
-
-
-
-
-#         feature_factory_full_dataset = FeatureFactory(instance.get_joined_data())
-#         full_dataset_pairwise_metrics = feature_factory_full_dataset.get_pairwise_metrics(func=max_in_modulus)
-#         pairwise_metrics_with_target = feature_factory_full_dataset.get_pairwise_metrics_with_target(instance.get_target_column_name(),
-#                                                                                                      func=max_in_modulus)
-#         query_pairwise_metrics_with_target = feature_factory_query.get_pairwise_metrics_with_target(instance.get_target_column_name(),
-#                                                                                                     func=max_in_modulus)
-#         feature_factory_candidate_with_target = FeatureFactory(instance.get_joined_candidate_data_and_target())
-#         candidate_pairwise_metrics_with_target = feature_factory_candidate_with_target.get_pairwise_metrics_with_target(instance.get_target_column_name(),
-#                                                                                                                         func=max_in_modulus)
-#         max_in_modulus_pearson_difference = feature_factory_candidate_with_target.compute_difference_in_pearsons_wrt_target(feature_factory_query.get_max_pearson_wrt_target(instance.get_target_column_name()), instance.get_target_column_name())
-        
-#         r2_gain = instance.compute_r2_gain()
-
-#         learning_features = query_individual_metrics + \
-#                             candidate_individual_metrics + \
-#                             full_dataset_pairwise_metrics + \
-#                             pairwise_metrics_with_target + \
-#                             query_pairwise_metrics_with_target + \
-#                             candidate_pairwise_metrics_with_target + \
-#                             [max_in_modulus_pearson_difference]
+        return np.array(query_individual_metrics + candidate_individual_metrics + pairwise_metrics)
