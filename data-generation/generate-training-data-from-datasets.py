@@ -225,9 +225,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
 
     # maximum number of times that the original data will be vertically broken into
     #   multiple datasets
-    n_vertical_data = np.random.choice(
-        list(range(1, min(max_times_break_data_vertical, n_columns_left)))
-    )
+    n_vertical_data = min(max_times_break_data_vertical, n_columns_left)
 
     # number of columns for each time the data is vertically broken
     n_columns_query_dataset = np.random.choice(
@@ -457,7 +455,7 @@ def generate_data_from_columns(original_data, columns, column_metadata, key_colu
     paths.append(os.path.join(dataset_path, name))
 
     # number of times to randomly remove records
-    n_times_remove_records = random.randint(1, params['max_times_records_removed'])
+    n_times_remove_records = params['max_times_records_removed']
     for i in range(n_times_remove_records):
 
         # number of records to remove
