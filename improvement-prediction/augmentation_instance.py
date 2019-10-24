@@ -74,7 +74,8 @@ class AugmentationInstance:
         pearson_difference_wrt_target = feature_factory_candidate_with_target.compute_difference_in_pearsons_wrt_target(
             feature_factory_query.get_max_pearson_wrt_target(self.target_name), self.target_name)
 
-        return fd_metrics + metrics_with_target + query_metrics_with_target + candidate_metrics_with_target + [pearson_difference_wrt_target]
+        difference_in_numbers_of_rows = feature_factory_candidate_with_target.compute_percentual_difference_in_number_of_rows(self.query_dataset.get_data().shape[0])
+        return fd_metrics + metrics_with_target + query_metrics_with_target + candidate_metrics_with_target + [pearson_difference_wrt_target] + [difference_in_numbers_of_rows]
         
     def generate_features(self, query_individual_metrics=[], candidate_individual_metrics=[]):
         if not query_individual_metrics:
