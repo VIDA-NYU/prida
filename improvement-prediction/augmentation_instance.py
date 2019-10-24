@@ -1,6 +1,7 @@
 import numpy as np
 from dataset import *
 from feature_factory import *
+from util.metrics import *
 
 class AugmentationInstance:
     def __init__(self, instance_values):
@@ -54,8 +55,8 @@ class AugmentationInstance:
     def get_target_column_name(self):
         return self.target_name
 
-    def compute_r2_gain(self):
-        return (self.r2_score_after - self.r2_score_before)/np.fabs(self.r2_score_before)
+    def compute_gain_in_r2_score(self):
+        return compute_r2_gain(self.r2_score_before, self.r2_score_after)
 
     def compute_pairwise_metrics(self):
         feature_factory_full_dataset = FeatureFactory(self.get_joined_data())
