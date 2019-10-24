@@ -62,5 +62,4 @@ class Recommender:
             query_filename = self.learning_table.iloc[index]['query_filename']
             target_name = self.learning_table.iloc[index]['target_name']
             real_gains, predicted_gains = self.get_real_and_predicted_gains(query_filename, target_name, model)
-            compute_ndcg_at_k(real_gains, predicted_gains)
-            break
+            print(compute_ndcg_at_k(real_gains, predicted_gains))
