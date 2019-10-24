@@ -13,7 +13,6 @@ from sklearn.linear_model import LinearRegression, SGDRegressor
 from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-import string
 import sys
 import time
 import uuid
@@ -231,7 +230,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
     n_columns_query_dataset = np.random.choice(
         n_potential_columns_query_dataset,
         n_vertical_data,
-        replace=False
+        replace=True
     )
 
     # list of column indices
@@ -266,11 +265,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
     processed_datasets += 1
 
     # generating the key column for the data
-    key_column = [
-        ''.join(
-            [random.choice(string.ascii_letters + string.digits) for n in range(10)]
-        ) for _ in range(n_rows)
-    ]
+    key_column = [str(uuid.uuid4()) for _ in range(n_rows)]
 
     # creating and saving query and candidate datasets
     results = list()
@@ -375,9 +370,7 @@ def generate_candidate_datasets_negative_examples(target_variable, query_dataset
         extra_key_column = list()
         if query_data.shape[0] < candidate_data.shape[0]:
             extra_key_column = [
-                ''.join(
-                    [random.choice(string.ascii_letters + string.digits) for n in range(10)]
-                ) for _ in range(candidate_data.shape[0] - query_data.shape[0])
+                str(uuid.uuid4()) for _ in range(candidate_data.shape[0] - query_data.shape[0])
             ]
 
         # adding the key column to the candidate data
@@ -620,6 +613,8 @@ if __name__ == '__main__':
     #   (target_variable, query_dataset_path, candidate_dataset_paths)
     query_candidate_datasets = sc.emptyRDD()
 
+    n_positive_examples = 0
+    n_negative_examples = 0
     if not skip_dataset_creation:
 
         dir_ = params['original_datasets_directory']
@@ -797,11 +792,14 @@ if __name__ == '__main__':
         )
 
     print('Duration: %.4f seconds' % (time.time() - start_time))
-    print(' -- Processed datasets: %d' %processed_datasets.value)
-    print(' -- Datasets w/o appropriate files: %d' %no_appropriate_files.value)
-    print(' -- Datasets w/ no regression problem: %d' %no_regression.value)
-    print(' -- Datasets w/ multiple data files: %d' %multiple_files.value)
-    print(' -- Datasets w/o numeric targets: %d' %no_numerical_target.value)
-    print(' -- Datasets w/o enough columns: %d' %no_enough_columns.value)
-    print(' -- Datasets w/o enough records: %d' %no_enough_records.value)
-    print(' -- Datasets w/ pandas.Dataframe exception: %d' %dataframe_exception.value)
+    if not skip_dataset_creation:
+        print(' -- N. positive examples: %d' %n_positive_examples)
+        print(' -- N. negative examples: %d' %n_negative_examples)
+        print(' -- Processed datasets: %d' %processed_datasets.value)
+        print(' -- Datasets w/o appropriate files: %d' %no_appropriate_files.value)
+        print(' -- Datasets w/ no regression problem: %d' %no_regression.value)
+        print(' -- Datasets w/ multiple data files: %d' %multiple_files.value)
+        print(' -- Datasets w/o numeric targets: %d' %no_numerical_target.value)
+        print(' -- Datasets w/o enough columns: %d' %no_enough_columns.value)
+        print(' -- Datasets w/o enough records: %d' %no_enough_records.value)
+        print(' -- Datasets w/ pandas.Dataframe exception: %d' %dataframe_exception.value)
