@@ -48,7 +48,7 @@ def read_file(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
         hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
         if hdfs_client.status(file_path, strict=False):
             with hdfs_client.read(file_path) as reader:
-                output = reader.read()
+                output = reader.read().decode()
     else:
         if os.path.exists(file_path):
             with open(file_path) as reader:
@@ -65,7 +65,7 @@ def save_file(file_path, content, use_hdfs=False, hdfs_address=None, hdfs_user=N
         if hdfs_client.status(file_path, strict=False):
             print('File already exists: %s' % file_path)
         with hdfs_client.write(file_path) as writer:
-            writer.write(content)
+            writer.write(content.encode())
     else:
         if os.path.exists(file_path):
             print('File already exists: %s' % file_path)
