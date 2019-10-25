@@ -1,4 +1,5 @@
 from sklearn.metrics import mean_squared_error
+from scipy.stats import kendalltau
 import numpy as np
 
 def compute_MSE(predicted_values, real_values):
@@ -40,3 +41,21 @@ def compute_ndcg_at_k(real_gains, predicted_gains, k=5, use_gains_as_relevance_w
     sorted_real_relevances_of_predicted_items = sorted(real_relevances_of_predicted_items, reverse=True)
     denominator = np.sum(np.asfarray(sorted_real_relevances_of_predicted_items)/np.log2(np.arange(2, np.asfarray(sorted_real_relevances_of_predicted_items).size + 2)))
     return numerator/denominator 
+
+def compute_kendall_tau(real_gains, predicted_gains):
+    ranked_candidates = [i[0] for i in sorted(real_gains, key = lambda x:x[1], reverse=True)]
+    predicted_candidates = [i[0] for i in sorted(predicted_gains, key = lambda x:x[1], reverse=True)]
+    return kendalltau(ranked_candidates, predicted_candidates)
+
+def compute_mean_reciprocal_rank_for_single_sample(real_gains, predicted_gains):
+    real_ranking = sorted(real_gains, key = lambda x:x[1], reverse=True)
+    real_best_candidate = real_ranking[0][0]
+    predicted_ranking = sorted(predicted_gains, key = lambda x:x[1], reverse=True)
+    for index, elem in enumerate(predicted_ranking):
+        if real_best_candidate == elem[0]:
+            return 1/(index + 1)
+    return 0
+
+    
+
+
