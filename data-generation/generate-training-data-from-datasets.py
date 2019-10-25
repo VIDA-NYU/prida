@@ -513,7 +513,8 @@ def generate_performance_scores(query_dataset, target_variable, candidate_datase
     scores_before = get_performance_scores(
         query_data,
         target_variable,
-        algorithm
+        algorithm,
+        False
     )
 
     for candidate_dataset in candidate_datasets:
@@ -621,7 +622,6 @@ def train_and_test_model(data, target_variable_name, algorithm):
     return [
         mean_absolute_error(y_test, yfit),
         mean_squared_error(y_test, yfit),
-        mean_squared_log_error(y_test, yfit),
         median_absolute_error(y_test, yfit),
         r2_score(y_test, yfit),
     ]

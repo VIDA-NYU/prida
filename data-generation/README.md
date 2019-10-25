@@ -69,7 +69,7 @@ You may need to set some parameters for `spark-submit` depending on the cluster 
 
 The data generation process will create all the query and candidate datasets under `new_datasets_directory` (if `skip_dataset_creation=false`), as well as training data files that contain lines of the following format:
 
-    <query dataset, target variable name, candidate dataset, mean absolute error before augmentation, mean absolute error after augmentation, mean squared error before augmentation, mean squared error after augmentation, mean squared logarithmic error before augmentation, mean squared logarithmic error after augmentation, median absolute error before augmentation, median absolute error after augmentation, R^2 score before augmentation, R^2 score after augmentation>
+    <query dataset, target variable name, candidate dataset, mean absolute error before augmentation, mean absolute error after augmentation, mean squared error before augmentation, mean squared error after augmentation, median absolute error before augmentation, median absolute error after augmentation, R^2 score before augmentation, R^2 score after augmentation>
 
 ## OpenML Datasets
 
