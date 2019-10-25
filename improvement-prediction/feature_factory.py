@@ -240,3 +240,6 @@ class FeatureFactory:
         metrics.append(covariance) if not np.isnan(covariance) else metrics.append(0.0)
         metrics.append(mutual_info) if not np.isnan(mutual_info) else metrics.append(0.0)
         return metrics
+
+    def compute_percentual_difference_in_number_of_rows(self, number_of_rows_of_another_dataset):
+        return self.get_number_of_rows()/number_of_rows_of_another_dataset

@@ -18,7 +18,7 @@ if __name__ == '__main__':
     learning_task = LearningTask()
     i = 0
     for instance in augmentation_instances:
-        learning_task.add_learning_instance(instance.generate_features(), instance.compute_r2_gain())
+        learning_task.add_learning_instance(instance.generate_features(), instance.compute_gain_in_r2_score())
         i += 1
         if (i % 100 == 0):
             print(i)

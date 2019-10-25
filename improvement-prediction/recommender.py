@@ -3,6 +3,7 @@ from constants import *
 from augmentation_instance import *
 from feature_factory import *
 from learning_task import *
+from util.metrics import *
 
 class Recommender:
     
@@ -38,23 +39,27 @@ class Recommender:
         self.learning_task.read_data(augmentation_learning_data_filename)
         return self.learning_task.execute_random_forest(n_splits)
 
+    def get_real_and_predicted_gains(self, query_filename, target_name, model):
+        subtable = self.learning_table[(self.learning_table['query_filename'] == query_filename) & 
+                                       (self.learning_table['target_name'] == target_name)]
+
+        predicted_gains = []
+        real_gains = []
+        for index, row in subtable.iterrows():
+            candidate_filename = row['candidate_filename']
+            real_gains.append((candidate_filename, compute_r2_gain(row['r2_score_before'], row['r2_score_after'])))
+            instance = AugmentationInstance({'query_filename': query_filename,
+                                             'target_name': target_name,
+                                             'candidate_filename': candidate_filename})
+            test_features = instance.generate_features(self.query_individual_metrics[query_filename], 
+                                                       self.candidate_individual_metrics[candidate_filename])
+            predicted_gains.append((candidate_filename, model.predict(test_features.reshape(1, -1))[0]))
+        return real_gains, predicted_gains
+
+        
     def predict_gains_for_candidate_datasets(self, model, data):
-        #TODO change the encapsulation of this
         for index in data['index_of_test_instances']:
             query_filename = self.learning_table.iloc[index]['query_filename']
             target_name = self.learning_table.iloc[index]['target_name']
-            predictions_for_candidates = []
-            for candidate in self.candidate_filenames:
-                instance = AugmentationInstance({'query_filename': query_filename,
-                                                 'target_name': target_name,
-                                                 'candidate_filename': candidate})
-                test_features = instance.generate_features(self.query_individual_metrics[query_filename], 
-                                                           self.candidate_individual_metrics[candidate])
-                tuple_ = (candidate, model.predict(test_features.reshape(1, -1)))
-                predictions_for_candidates.append(tuple_)
-            #TODO check if the maximum gains are close to the actual gains for the gold data candidate datasets
-            #print(query_filename + '-' + target_name, sorted(predictions_for_candidates, key=lambda x: x[1], reverse=True))
-            #true_gains = self.
-            print(query_filename + '-' + target_name, self.learning_table[(self.learning_table['query_filename'] == query_filename) & 
-                                                                          (self.learning_table['target_name'] == target_name)])  
-            break
+            real_gains, predicted_gains = self.get_real_and_predicted_gains(query_filename, target_name, model)
+            print(compute_ndcg_at_k(real_gains, predicted_gains))
