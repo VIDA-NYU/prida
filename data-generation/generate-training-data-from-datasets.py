@@ -2,6 +2,7 @@ from hdfs import InsecureClient
 from io import StringIO
 from itertools import combinations
 import json
+import math
 import numpy as np
 import os
 import pandas as pd
@@ -9,13 +10,16 @@ from pyspark import SparkConf, SparkContext, StorageLevel
 import random
 import shutil
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LinearRegression, SGDRegressor
-from sklearn.metrics import r2_score
+from sklearn.metrics import mean_absolute_error, mean_squared_error, \
+    mean_squared_log_error, median_absolute_error, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import sys
 import time
 import uuid
+from xgboost import XGBRegressor
 
 
 def organize_dataset_files(file_path, cluster_execution):
@@ -494,6 +498,7 @@ def generate_performance_scores(query_dataset, target_variable, candidate_datase
     cluster_execution = params['cluster']
     hdfs_address = params['hdfs_address']
     hdfs_user = params['hdfs_user']
+    inner_join = params['inner_join']
 
     # reading query dataset
     query_data_str = read_file(query_dataset, cluster_execution, hdfs_address, hdfs_user)
@@ -505,10 +510,11 @@ def generate_performance_scores(query_dataset, target_variable, candidate_datase
     )
 
     # build model on query data only
-    score_before = get_performance_score(
+    scores_before = get_performance_scores(
         query_data,
         target_variable,
-        algorithm
+        algorithm,
+        False
     )
 
     for candidate_dataset in candidate_datasets:
@@ -528,25 +534,55 @@ def generate_performance_scores(query_dataset, target_variable, candidate_datase
             how='left',
             rsuffix='_r'
         )
-        join_.dropna(inplace=True)
+        if inner_join:
+            join_.dropna(inplace=True)
 
         # build model on joined data
-        score_after = get_performance_score(
+        scores_after = get_performance_scores(
             join_,
             target_variable,
-            algorithm
+            algorithm,
+            not(inner_join)
         )
 
         performance_scores.append(
-            (query_dataset, target_variable, candidate_dataset, score_before, score_after)
+            [query_dataset, target_variable, candidate_dataset] +
+            [val for pair in zip(scores_before, scores_after) for val in pair]
         )
 
     return performance_scores
 
 
-def get_performance_score(data, target_variable_name, algorithm):
+def get_performance_scores(data, target_variable_name, algorithm, missing_value_imputation):
     """Builds a model using data to predict the target variable,
-    return the corresponding r2 score.
+    returning different performance metrics.
+    """
+
+    if missing_value_imputation:
+        strategies = ['mean', 'median', 'most_frequent']
+        scores = list()
+        min_mean_absolute_error = math.inf
+        for strategy in strategies:
+            # imputation on data
+            fill_NaN = SimpleImputer(missing_values=np.nan, strategy=strategy)
+            new_data = pd.DataFrame(fill_NaN.fit_transform(data))
+            new_data.columns = data.columns
+            new_data.index = data.index
+
+            # training and testing model
+            strategy_scores = train_and_test_model(new_data, target_variable_name, algorithm)
+
+            # always choosing the one with smallest mean absolute error
+            if strategy_scores[0] < min_mean_absolute_error:
+                min_mean_absolute_error = strategy_scores[0]
+                scores = [score for score in strategy_scores]
+
+        return scores
+    else:
+        return train_and_test_model(data, target_variable_name, algorithm)
+
+def train_and_test_model(data, target_variable_name, algorithm):
+    """Builds a model using data to predict the target variable.
     """
 
     X_train, X_test, y_train, y_test = train_test_split(
@@ -578,8 +614,37 @@ def get_performance_score(data, target_variable_name, algorithm):
         sgd = SGDRegressor()
         sgd.fit(X_train, y_train.ravel())
         yfit = sgd.predict(X_test)
+    elif algorithm == 'xgboost':
+        xgboost_r = XGBRegressor(max_depth=5, objective='reg:squarederror', random_state=42)
+        xgboost_r.fit(X_train, y_train)
+        yfit = xgboost_r.predict(X_test)
 
-    return r2_score(y_test, yfit)
+    return [
+        mean_absolute_error(y_test, yfit),
+        mean_squared_error(y_test, yfit),
+        median_absolute_error(y_test, yfit),
+        r2_score(y_test, yfit),
+    ]
+
+
+def format_training_record(record):
+    """Format records for the training data file.
+    """
+
+    new_record =  '%s,%s,%s' % (
+        os.path.sep.join(record[0].split(os.path.sep)[-2:]),
+        record[1],
+        os.path.sep.join(record[2].split(os.path.sep)[-2:])
+    )
+
+    for i in range(3, len(record), 2):
+
+        new_record += ',%.6f,%6f' % (
+            record[i],
+            record[i+1]
+        )
+
+    return new_record
     
 
 if __name__ == '__main__':
@@ -770,13 +835,7 @@ if __name__ == '__main__':
         performance_scores = query_candidate_datasets.flatMap(
             lambda x: generate_performance_scores(x[1], x[0], x[2], params)
         ).map(
-            lambda x: '%s,%s,%s,%.6f,%6f' % (
-                os.path.sep.join(x[0].split(os.path.sep)[-2:]),
-                x[1],
-                os.path.sep.join(x[2].split(os.path.sep)[-2:]),
-                x[3],
-                x[4]
-            )
+            lambda x: format_training_record(x)
         )
 
         # saving scores

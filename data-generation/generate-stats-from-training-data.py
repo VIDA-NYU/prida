@@ -34,7 +34,11 @@ def generate_stats_from_record(record, load_dataframes, params):
     global query_size_lte_candidate_size
     global query_size_gt_candidate_size
 
-    query, target, candidate, score_before, score_after = record
+    query = record[0]
+    target = record[1]
+    candidate = record[2]
+    score_before = record[3]  # mean absolute error
+    score_after = record[4]  # mean absolute error
 
     # parameters
     output_dir = params['new_datasets_directory']
@@ -152,8 +156,8 @@ if __name__ == '__main__':
     for algorithm in algorithms:
         print('Statistics for %s:' % algorithm)
         print(' -- Number of records: %d' % algorithms[algorithm]['n_records'])
-        print(' -- Score before lte score after: %d' % algorithms[algorithm]['before_lte_after'])
-        print(' -- Score before gt score after: %d' % algorithms[algorithm]['before_gt_after'])
+        print(' -- MAE before lte MAE after: %d' % algorithms[algorithm]['before_lte_after'])
+        print(' -- MAE before gt MAE after: %d' % algorithms[algorithm]['before_gt_after'])
         print('')
 
     print('General statistics:')
