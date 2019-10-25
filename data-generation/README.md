@@ -7,6 +7,7 @@
 * NumPy
 * pandas
 * scikit-learn
+* xgboost
 * Apache Spark
 
 ## Generating Data
@@ -23,7 +24,7 @@ The data generation process is done using PySpark. Copy the file [`params.json`]
     "ignore_first_attribute": boolean that indicates whether the first attribute of every dataset should be ignored (e.g.: the d3mIndex attribute)
     "skip_dataset_creation": boolean that indicates whether the generation of query and candidate datasets should be skipped or not; if this step is skipped, only the scores before and after the augmentation are generated
     "candidate_single_column": boolean that indicates whether the candidate datasets should have a single column (in addition to the key column) or not
-    "regression_algorithm": the regression algorithm to be used; for now, the only available choices are "random forest", "linear", and "sgd"
+    "regression_algorithm": the regression algorithm to be used; the available options are "random forest", "linear", "sgd", and "xgboost"
     "inner_join": boolean that indicates whether the join applied between query and candidate datasets is of type inner or not; if false, a left join is applied and a series of univariate value imputation strategies are applied to take care of any missing values, with the one that generates the model with the smallest mean absolute error being chosen at last
     "min_number_records": the minimum number of records that a query or candidate dataset should have
     "max_times_break_data_vertical": the maximum number of times that a dataset will be broken (vertically) into multiple data
@@ -47,7 +48,7 @@ You may need to set some parameters for `spark-submit` depending on your environ
 
 The easiest way to run the data generation in a cluster is by using [Anaconda](https://www.anaconda.com/) to package the python dependencies. First, install Anaconda and initialize it by using the `conda init` command. Then, run the following:
 
-    $ conda create -y -n data-generation -c conda-forge python=3.6.9 numpy pandas scikit-learn python-hdfs
+    $ conda create -y -n data-generation -c conda-forge python=3.6.9 numpy pandas scikit-learn python-hdfs xgboost
     $ cd <env_dir>
     $ zip -r <data-generation-dir>/data-generation-environment.zip data-generation/
 
