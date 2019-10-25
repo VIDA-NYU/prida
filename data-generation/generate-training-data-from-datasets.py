@@ -10,7 +10,8 @@ import random
 import shutil
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression, SGDRegressor
-from sklearn.metrics import r2_score
+from sklearn.metrics import mean_absolute_error, mean_squared_error, \
+    mean_squared_log_error, median_absolute_error, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import sys
@@ -505,7 +506,7 @@ def generate_performance_scores(query_dataset, target_variable, candidate_datase
     )
 
     # build model on query data only
-    score_before = get_performance_score(
+    scores_before = get_performance_score(
         query_data,
         target_variable,
         algorithm
@@ -531,14 +532,15 @@ def generate_performance_scores(query_dataset, target_variable, candidate_datase
         join_.dropna(inplace=True)
 
         # build model on joined data
-        score_after = get_performance_score(
+        scores_after = get_performance_score(
             join_,
             target_variable,
             algorithm
         )
 
         performance_scores.append(
-            (query_dataset, target_variable, candidate_dataset, score_before, score_after)
+            [query_dataset, target_variable, candidate_dataset] +
+            [val for pair in zip(scores_before, scores_after) for val in pair]
         )
 
     return performance_scores
@@ -579,7 +581,33 @@ def get_performance_score(data, target_variable_name, algorithm):
         sgd.fit(X_train, y_train.ravel())
         yfit = sgd.predict(X_test)
 
-    return r2_score(y_test, yfit)
+    return [
+        mean_absolute_error(y_test, yfit),
+        mean_squared_error(y_test, yfit),
+        mean_squared_log_error(y_test, yfit),
+        median_absolute_error(y_test, yfit),
+        r2_score(y_test, yfit),
+    ]
+
+
+def format_training_record(record):
+    """Format records for the training data file.
+    """
+
+    new_record =  '%s,%s,%s' % (
+        os.path.sep.join(record[0].split(os.path.sep)[-2:]),
+        record[1],
+        os.path.sep.join(record[2].split(os.path.sep)[-2:])
+    )
+
+    for i in range(3, len(record), 2):
+
+        new_record += ',%.6f,%6f' % (
+            record[i],
+            record[i+1]
+        )
+
+    return new_record
     
 
 if __name__ == '__main__':
@@ -770,13 +798,7 @@ if __name__ == '__main__':
         performance_scores = query_candidate_datasets.flatMap(
             lambda x: generate_performance_scores(x[1], x[0], x[2], params)
         ).map(
-            lambda x: '%s,%s,%s,%.6f,%6f' % (
-                os.path.sep.join(x[0].split(os.path.sep)[-2:]),
-                x[1],
-                os.path.sep.join(x[2].split(os.path.sep)[-2:]),
-                x[3],
-                x[4]
-            )
+            lambda x: format_training_record(x)
         )
 
         # saving scores
