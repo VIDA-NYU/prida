@@ -2,13 +2,13 @@
 
 ## Requirements
 
-* Python 3
-* HdfsCLI
-* NumPy
-* pandas
-* scikit-learn
-* xgboost
-* Apache Spark
+* [Python 3](https://www.python.org/)
+* [HdfsCLI](https://hdfscli.readthedocs.io/en/latest/)
+* [NumPy](https://numpy.org/)
+* [pandas](https://pandas.pydata.org/)
+* [scikit-learn](https://scikit-learn.org/stable/)
+* [xgboost](https://xgboost.readthedocs.io/en/latest/python/python_intro.html)
+* [Apache Spark 2.3.0](https://spark.apache.org/)
 
 ## Generating Data
 
