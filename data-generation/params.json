@@ -8,6 +8,7 @@
     "skip_dataset_creation": false,
     "candidate_single_column": false,
     "regression_algorithm": "linear",
+    "inner_join": false,
     "min_number_records": 50,
     "max_times_break_data_vertical": 8,
     "max_times_records_removed": 10,

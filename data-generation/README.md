@@ -24,6 +24,7 @@ The data generation process is done using PySpark. Copy the file [`params.json`]
     "skip_dataset_creation": boolean that indicates whether the generation of query and candidate datasets should be skipped or not; if this step is skipped, only the scores before and after the augmentation are generated
     "candidate_single_column": boolean that indicates whether the candidate datasets should have a single column (in addition to the key column) or not
     "regression_algorithm": the regression algorithm to be used; for now, the only available choices are "random forest", "linear", and "sgd"
+    "inner_join": boolean that indicates whether the join applied between query and candidate datasets is of type inner or not; if false, a left join is applied and a series of univariate value imputation strategies are applied to take care of any missing values, with the one that generates the model with the smallest mean absolute error being chosen at last
     "min_number_records": the minimum number of records that a query or candidate dataset should have
     "max_times_break_data_vertical": the maximum number of times that a dataset will be broken (vertically) into multiple data
     "max_times_records_removed": the maximum number of times that records will be removed from a dataset to derive new data
