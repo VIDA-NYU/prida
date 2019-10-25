@@ -615,7 +615,7 @@ def train_and_test_model(data, target_variable_name, algorithm):
         sgd.fit(X_train, y_train.ravel())
         yfit = sgd.predict(X_test)
     elif algorithm == 'xgboost':
-        xgboost_r = XGBRegressor(max_depth=5, random_state=42)
+        xgboost_r = XGBRegressor(max_depth=5, objective='reg:squarederror', random_state=42)
         xgboost_r.fit(X_train, y_train)
         yfit = xgboost_r.predict(X_test)
 
