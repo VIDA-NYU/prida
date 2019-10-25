@@ -55,11 +55,13 @@ class Recommender:
                                                        self.candidate_individual_metrics[candidate_filename])
             predicted_gains.append((candidate_filename, model.predict(test_features.reshape(1, -1))[0]))
         return real_gains, predicted_gains
-
         
     def predict_gains_for_candidate_datasets(self, model, data):
         for index in data['index_of_test_instances']:
             query_filename = self.learning_table.iloc[index]['query_filename']
             target_name = self.learning_table.iloc[index]['target_name']
             real_gains, predicted_gains = self.get_real_and_predicted_gains(query_filename, target_name, model)
-            print(compute_ndcg_at_k(real_gains, predicted_gains))
+            #print(compute_ndcg_at_k(real_gains, predicted_gains, use_gains_as_relevance_weights=True))
+            #print(compute_kendall_tau(real_gains, predicted_gains))
+            #print(compute_mean_reciprocal_rank_for_single_sample(real_gains, predicted_gains))
+            #TODO compute average for all mean_reciprocal_ranks outside this loop. should i limit the mrr to k=5?
