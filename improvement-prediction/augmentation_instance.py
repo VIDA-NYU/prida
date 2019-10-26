@@ -4,11 +4,13 @@ from feature_factory import *
 from util.metrics import *
 
 class AugmentationInstance:
-    def __init__(self, instance_values):
+    def __init__(self, instance_values, use_hdfs=False, hdfs_address=None, hdfs_user=None):
         self.query_filename = instance_values['query_filename']
-        self.query_dataset = Dataset(self.query_filename)
+        self.query_dataset = Dataset()
+        self.query_dataset.initialize_from_filename(self.query_filename, use_hdfs, hdfs_address, hdfs_user)
         self.candidate_filename = instance_values['candidate_filename']
-        self.candidate_dataset = Dataset(self.candidate_filename)
+        self.candidate_dataset = Dataset()
+        self.candidate_dataset.initialize_from_filename(self.candidate_filename, use_hdfs, hdfs_address, hdfs_user)
         self.target_name = instance_values['target_name']
 
         if len(instance_values.keys()) == 5:
@@ -35,7 +37,9 @@ class AugmentationInstance:
 
     def join_query_and_candidate_datasets(self):
         result_data = self.query_dataset.join_with(self.candidate_dataset, key='key-for-ranking')
-        return Dataset(result_data, result_data.columns)
+        dataset = Dataset()
+        dataset.initialize_from_data_and_column_names(result_data, result_data.columns)
+        return dataset
 
     def get_joined_query_data(self):
         query_column_names = self.query_dataset.get_column_names()

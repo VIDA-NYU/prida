@@ -1,7 +1,10 @@
 {
     "learning_data_filename": "/home/alibezz/dataset-ranking/improvement-prediction/data-linear/training-data",
-		"augmentation_learning_data_filename": "/home/alibezz/dataset-ranking/improvement-prediction/data_for_learning_augmentation.txt", 
-		"n_splits": 5,
-		"output_filename": "/home/alibezz/dataset-ranking/improvement-prediction/prediction-output-file"
+	"augmentation_learning_data_filename": "/home/alibezz/dataset-ranking/improvement-prediction/data_for_learning_augmentation.txt", 
+	"n_splits": 5,
+	"output_filename": "/home/alibezz/dataset-ranking/improvement-prediction/prediction-output-file",
+    "cluster": false,
+    "hdfs_address": "http://gray01.poly.edu:50070",
+    "hdfs_user": "fsc234"
 }
 

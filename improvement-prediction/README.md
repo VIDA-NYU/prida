@@ -6,6 +6,8 @@
 * NumPy
 * pandas
 * scikit-learn
+* [HdfsCLI](https://hdfscli.readthedocs.io/en/latest/)
+* [Apache Spark 2.3.0](https://spark.apache.org/)
 
 ## Predicting Improvement
 
@@ -14,9 +16,9 @@ To predict performance improvement, first, configure the file [`params.json`](pa
 ```
 {
     "learning_data_filename": reference to file that stores information about the learning task
-		"augmentation_learning_data_filename": reference to file that stores all features, and relative `R^2` score improvement, derived from `learning_data_file` 
-		"n_splits": number of folds for cross-validation when evaluating the learning task
-		"output_filename": output filename where all predictions, along with original lines in learning_data_file, are saved
+	"augmentation_learning_data_filename": reference to file that stores all features, and relative `R^2` score improvement, derived from `learning_data_file` 
+	"n_splits": number of folds for cross-validation when evaluating the learning task
+	"output_filename": output filename where all predictions, along with original lines in learning_data_file, are saved
 }
 ```
 

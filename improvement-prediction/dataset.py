@@ -1,25 +1,20 @@
+#!/usr/bin/env python3
 import pandas as pd
+from io import StringIO
+from util.file import *
 
 class Dataset:
-    def __init__(self, *args):
-        if len(args) == 1:
-            filename = args[0]
-            self.initialize_from_filename(filename)
-        elif len(args) == 2:
-            data = args[0]
-            column_names = args[1]
-            self.initialize_from_data_and_column_names(data, column_names)
-
-    def initialize_from_filename(self, filename):
+    
+    def initialize_from_filename(self, filename, use_hdfs=False, hdfs_address=None, hdfs_user=None):
         self.filename = filename
-        self.read_dataset()
+        self.read_dataset(use_hdfs, hdfs_address, hdfs_user)
 
     def initialize_from_data_and_column_names(self, data, columns):
         self.data = data
         self.column_names = columns
         
-    def read_dataset(self):
-        self.data = pd.read_csv(self.filename)
+    def read_dataset(self, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+        self.data = pd.read_csv(StringIO(read_file(self.filename, use_hdfs, hdfs_address, hdfs_user)))
         self.column_names = self.data.columns
 
     def get_data(self):

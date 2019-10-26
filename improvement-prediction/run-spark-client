@@ -1,0 +1,5 @@
+if test -f dependencies.zip; then
+    rm dependencies.zip
+fi
+zip -r dependencies.zip *.py util/
+spark-submit --deploy-mode client --executor-memory 4G --archives dependencies.zip --files .params_feature_generation.json generate_data_for_augmentation_learning_spark.py
