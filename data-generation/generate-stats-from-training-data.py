@@ -1,6 +1,7 @@
 from hdfs import InsecureClient
 from io import StringIO
 import json
+import numpy as np
 import os
 import pandas as pd
 from pyspark import SparkConf, SparkContext, StorageLevel
@@ -79,19 +80,18 @@ def generate_stats_from_record(record, load_dataframes, params):
         else:
             query_size_gt_candidate_size += 1
 
-        # join
-        query_data.set_index(
-            'key-for-ranking',
-            drop=True,
-            inplace=True
-        )
-        candidate_data.set_index(
-            'key-for-ranking',
-            drop=True,
-            inplace=True
-        )
+        # keys
+        query_data_keys = set(query_data['key-for-ranking'])
+        candidate_data_keys = set(candidate_data['key-for-ranking'])
 
-    return None
+        # relative intersection size
+        intersection_size = len(query_data_keys & candidate_data_keys)
+        query_intersection_size = intersection_size / len(query_data_keys)
+        candidate_intersection_size = intersection_size / len(candidate_data_keys)
+
+        return [(query_intersection_size, candidate_intersection_size)]
+
+    return []
 
 
 def list_dir(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
@@ -110,9 +110,11 @@ if __name__ == '__main__':
     conf = SparkConf().setAppName("Data Generation Stats")
     sc = SparkContext(conf=conf)
 
-    # accumulators
+    # accumulators and global variables
     query_size_lte_candidate_size = sc.accumulator(0)
     query_size_gt_candidate_size = sc.accumulator(0)
+    query_intersection_sizes = list()
+    candidate_intersection_sizes = list()
 
     # parameters
     params = json.load(open(".params.json"))
@@ -142,9 +144,13 @@ if __name__ == '__main__':
         before_lte_after = sc.accumulator(0)
         before_gt_after = sc.accumulator(0)
 
-        training_data = sc.textFile(filename).map(
+        intersection_sizes = sc.textFile(filename).flatMap(
             lambda x: generate_stats_from_record(x.split(','), load_dataframes, params)
         ).collect()
+
+        if len(intersection_sizes) > 0:
+            query_intersection_sizes += [x for (x, y) in intersection_sizes]
+            candidate_intersection_sizes += [y for (x, y) in intersection_sizes]
 
         algorithms[algorithm_name]['n_records'] = n_records.value
         algorithms[algorithm_name]['before_lte_after'] = before_lte_after.value
@@ -156,11 +162,40 @@ if __name__ == '__main__':
     for algorithm in algorithms:
         print('Statistics for %s:' % algorithm)
         print(' -- Number of records: %d' % algorithms[algorithm]['n_records'])
-        print(' -- MAE before lte MAE after: %d' % algorithms[algorithm]['before_lte_after'])
-        print(' -- MAE before gt MAE after: %d' % algorithms[algorithm]['before_gt_after'])
+        print(' -- MAE before gt MAE after: %d (%.2f%%)' % (
+            algorithms[algorithm]['before_gt_after'],
+            (100 * algorithms[algorithm]['before_gt_after']) / algorithms[algorithm]['n_records']
+        ))
+        print(' -- MAE before lte MAE after: %d (%.2f%%)' % (
+            algorithms[algorithm]['before_lte_after'],
+            (100 * algorithms[algorithm]['before_lte_after']) / algorithms[algorithm]['n_records']
+        ))
         print('')
 
+    hist_query_intersection_size = np.histogram(query_intersection_sizes, bins=10)
+    hist_candidate_intersection_size = np.histogram(candidate_intersection_sizes, bins=10)
+
     print('General statistics:')
-    print(' -- Size query lte size candidate: %s' % query_size_lte_candidate_size.value)
-    print(' -- Size query gt size candidate: %s' % query_size_gt_candidate_size.value)
+    print(' -- Size query lte size candidate: %d (%.2f%%)' % (
+        query_size_lte_candidate_size.value,
+        (100 * query_size_lte_candidate_size.value) / (query_size_lte_candidate_size.value + query_size_gt_candidate_size.value)
+    ))
+    print(' -- Size query gt size candidate: %d (%.2f%%)' % (
+        query_size_gt_candidate_size.value,
+        (100 * query_size_gt_candidate_size.value) / (query_size_lte_candidate_size.value + query_size_gt_candidate_size.value)
+    ))
+    print(' -- Query intersection size: ')
+    for i in range(1, len(hist_query_intersection_size[1])):
+        print('    [%.4f, %4f]\t%d' % (
+            hist_query_intersection_size[1][i-1],
+            hist_query_intersection_size[1][i],
+            hist_query_intersection_size[0][i-1])
+        )
+    print(' -- Candidate intersection size: ')
+    for i in range(1, len(hist_candidate_intersection_size[1])):
+        print('    [%.4f, %4f]\t%d' % (
+            hist_candidate_intersection_size[1][i-1],
+            hist_candidate_intersection_size[1][i],
+            hist_candidate_intersection_size[0][i-1])
+        )
     print('')
