@@ -67,14 +67,15 @@ def save_file(file_path, content, use_hdfs=False, hdfs_address=None, hdfs_user=N
     if use_hdfs:
         hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
         if hdfs_client.status(file_path, strict=False):
-            print('File already exists: %s' % file_path)
+            print('[WARNING] File already exists: %s' % file_path)
         with hdfs_client.write(file_path) as writer:
             writer.write(content.encode())
     else:
         if os.path.exists(file_path):
-            print('File already exists: %s' % file_path)
+            print('[WARNING] File already exists: %s' % file_path)
         with open(file_path, 'w') as writer:
             writer.write(content)
+    print('[INFO] File %s saved!' % file_path)
 
 
 def create_dir(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
@@ -156,7 +157,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
             problem_doc = read_file(d[1], cluster_execution, hdfs_address, hdfs_user)
 
     if not data_file or not dataset_doc or not problem_doc:
-        print('The following dataset does not have the appropriate files: %s ' % data_name)
+        print('[WARNING] The following dataset does not have the appropriate files: %s ' % data_name)
         no_appropriate_files += 1
         return result
     dataset_doc = json.loads(dataset_doc)
@@ -184,12 +185,12 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
 
     # regression problems only
     if problem_type != 'regression':
-        print('The following dataset does not belong to a regression problem: %s (%s)' % (data_name, problem_type))
+        print('[WARNING] The following dataset does not belong to a regression problem: %s (%s)' % (data_name, problem_type))
         no_regression += 1
         return result
     # single data tables only
     if multiple_data:
-        print('The following dataset is composed by multiple files: %s' % data_name)
+        print('[WARNING] The following dataset is composed by multiple files: %s' % data_name)
         multiple_files += 1
         return result
 
@@ -204,7 +205,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
             non_numeric_att_list.append(col)
 
     if target_variable in non_numeric_att_list:
-        print('The following dataset has a non-numerical target variable: %s' % data_name)
+        print('[WARNING] The following dataset has a non-numerical target variable: %s' % data_name)
         no_numerical_target += 1
         return result
 
@@ -215,7 +216,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
     # if there is only one column left, there is no way to
     # generate both query and candidate datasets
     if n_columns_left <= 1:
-        print('The following dataset does not have enough columns for the data generation process: %s' % data_name)
+        print('[WARNING] The following dataset does not have enough columns for the data generation process: %s' % data_name)
         no_enough_columns += 1
         return result
 
@@ -255,14 +256,14 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
     try:
         original_data = pd.read_csv(StringIO(data_file))
     except Exception as e:
-        print('The following dataset had an exception while parsing into a dataframe: %s (%s)' % (data_name, str(e)))
+        print('[WARNING] The following dataset had an exception while parsing into a dataframe: %s (%s)' % (data_name, str(e)))
         dataframe_exception += 1
         return result
 
     # ignore very small datasets
     n_rows = original_data.shape[0]
     if n_rows < params['min_number_records']:
-        print('The following dataset does not have the minimum number of records: %s' % data_name)
+        print('[WARNING] The following dataset does not have the minimum number of records: %s' % data_name)
         no_enough_records += 1
         return result
 
@@ -272,6 +273,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
     key_column = [str(uuid.uuid4()) for _ in range(n_rows)]
 
     # creating and saving query and candidate datasets
+    print('[INFO] Creating query and candidate data for dataset %s ...' % data_name)
     results = list()
     id_ = 0
     for n in list(n_columns_query_dataset):
@@ -335,6 +337,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
 
         id_ += 1
 
+    print('[INFO] Query and candidate data for dataset %s have been created and saved!' % data_name)
     return results
 
 
@@ -343,6 +346,8 @@ def generate_candidate_datasets_negative_examples(target_variable, query_dataset
     This is necessary because query and candidate datasets must match for the join;
     therefore, we need to re-create the key column.
     """
+
+    print('[INFO] Creating negative examples with dataset %s ...' % query_dataset)
 
     new_candidate_datasets = list()
 
@@ -419,6 +424,7 @@ def generate_candidate_datasets_negative_examples(target_variable, query_dataset
         params['hdfs_user']
     )
 
+    print('[INFO] Negative examples with dataset %s have been created and saved!' % query_dataset)
     return (target_variable, query_dataset_path, new_candidate_datasets)
 
 
@@ -538,12 +544,14 @@ def generate_performance_scores(query_dataset, target_variable, candidate_datase
             join_.dropna(inplace=True)
 
         # build model on joined data
+        print('[INFO] Generating performance scores for query dataset %s and candidate dataset %s ...' % (query_dataset, candidate_dataset))
         scores_after = get_performance_scores(
             join_,
             target_variable,
             algorithm,
             not(inner_join)
         )
+        print('[INFO] Performance scores for query dataset %s and candidate dataset %s done!' % (query_dataset, candidate_dataset))
 
         performance_scores.append(
             [query_dataset, target_variable, candidate_dataset] +
