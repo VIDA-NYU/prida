@@ -677,6 +677,7 @@ if __name__ == '__main__':
     params = json.load(open(".params.json"))
     output_dir = params['new_datasets_directory']
     skip_dataset_creation = params['skip_dataset_creation']
+    skip_training_data = params['skip_training_data']
     cluster_execution = params['cluster']
     hdfs_address = params['hdfs_address']
     hdfs_user = params['hdfs_user']
@@ -837,26 +838,27 @@ if __name__ == '__main__':
         ).persist(StorageLevel.MEMORY_AND_DISK)
 
 
-    if not query_candidate_datasets.isEmpty():
+    if not skip_training_data:
+        if not query_candidate_datasets.isEmpty():
 
-        # getting performance scores
-        performance_scores = query_candidate_datasets.flatMap(
-            lambda x: generate_performance_scores(x[1], x[0], x[2], params)
-        ).map(
-            lambda x: format_training_record(x)
-        )
+            # getting performance scores
+            performance_scores = query_candidate_datasets.flatMap(
+                lambda x: generate_performance_scores(x[1], x[0], x[2], params)
+            ).map(
+                lambda x: format_training_record(x)
+            )
 
-        # saving scores
-        algorithm_name = params['regression_algorithm']
-        if params['regression_algorithm'] == 'random forest':
-            algorithm_name = 'random-forest'
-        save_file(
-            os.path.join(output_dir, 'training-data-' + algorithm_name),
-            '\n'.join(performance_scores.collect()),
-            params['cluster'],
-            params['hdfs_address'],
-            params['hdfs_user']
-        )
+            # saving scores
+            algorithm_name = params['regression_algorithm']
+            if params['regression_algorithm'] == 'random forest':
+                algorithm_name = 'random-forest'
+            save_file(
+                os.path.join(output_dir, 'training-data-' + algorithm_name),
+                '\n'.join(performance_scores.collect()),
+                params['cluster'],
+                params['hdfs_address'],
+                params['hdfs_user']
+            )
 
     print('Duration: %.4f seconds' % (time.time() - start_time))
     if not skip_dataset_creation:

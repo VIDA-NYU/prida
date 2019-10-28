@@ -22,7 +22,8 @@ The data generation process is done using PySpark. Copy the file [`params.json`]
     "hdfs_address": the address (host and port) for the distributed file system; only used if the data generation will be run in a cluster
     "hdfs_user": the username for the distributed file system; only used if the data generation will be run in a cluster
     "ignore_first_attribute": boolean that indicates whether the first attribute of every dataset should be ignored (e.g.: the d3mIndex attribute)
-    "skip_dataset_creation": boolean that indicates whether the generation of query and candidate datasets should be skipped or not; if this step is skipped, only the scores before and after the augmentation are generated
+    "skip_dataset_creation": boolean that indicates whether the generation of query and candidate datasets should be skipped or not
+    "skip_training_data": boolean that indicates whether the generation of the training data should be skipped or not
     "candidate_single_column": boolean that indicates whether the candidate datasets should have a single column (in addition to the key column) or not
     "regression_algorithm": the regression algorithm to be used; the available options are "random forest", "linear", "sgd", and "xgboost"
     "inner_join": boolean that indicates whether the join applied between query and candidate datasets is of type inner or not; if false, a left join is applied and a series of univariate value imputation strategies are applied to take care of any missing values, with the one that generates the model with the smallest mean absolute error being chosen at last

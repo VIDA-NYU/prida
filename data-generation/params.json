@@ -6,6 +6,7 @@
     "hdfs_user": "fsc234",
     "ignore_first_attribute": true,
     "skip_dataset_creation": false,
+    "skip_training_data": false,
     "candidate_single_column": false,
     "regression_algorithm": "linear",
     "inner_join": false,
