@@ -43,6 +43,27 @@ def compute_r2_gain(r2_score_before, r2_score_after):
     """
     return (r2_score_after - r2_score_before)/np.fabs(r2_score_before)
 
+def compute_mae_decrease(mae_before, mae_after):
+    """Given two mean absolute errors, corresponding to the prediction of 
+    a target column before and after data augmentation, computes 
+    their relative decrease
+    """
+    return (mae_after - mae_before)/mae_before
+
+def compute_mse_decrease(mse_before, mse_after):
+    """Given two mean squared errors, corresponding to the prediction of 
+    a target column before and after data augmentation, computes 
+    their relative decrease
+    """
+    return (mse_after - mse_before)/mse_before
+
+def compute_med_ae_decrease(med_ae_before, med_ae_after):
+    """Given two median absolute errors, corresponding to the prediction of 
+    a target column before and after data augmentation, computes 
+    their relative decrease
+    """
+    return (med_ae_after - med_ae_before)/med_ae_before
+    
 def compute_ndcg_at_k(real_gains, predicted_gains, k=5, use_gains_as_relevance_weights=False):
     """Given real gains and predicted gains, computes the ndcg between them for the first k positions of 
     the ranking. The relevance weights can be the real relative gains or numbers indicating their rank 

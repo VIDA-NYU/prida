@@ -2,6 +2,7 @@ import numpy as np
 from dataset import *
 from feature_factory import *
 from util.metrics import *
+from constants import *
 
 class AugmentationInstance:
     def __init__(self, instance_values, use_hdfs=False, hdfs_address=None, hdfs_user=None):
@@ -17,15 +18,27 @@ class AugmentationInstance:
         self.candidate_dataset.initialize_from_filename(self.candidate_filename, use_hdfs, hdfs_address, hdfs_user)
         self.target_name = instance_values['target_name']
 
-        # if the augmentation instance comes from the training data, the prediction metrics before and
+        # if the augmentation instance does not come from the test data, the prediction metrics before and
         # after augmentation are available
-        if len(instance_values.keys()) == 5:
+        if len(instance_values.keys()) > NUMBER_OF_FIELDS_IN_TEST_AUGMENTATION_INSTANCE:
+            self.mae_before = instance_values['mae_before']
+            self.mae_after = instance_values['mae_after']
+            self.mse_before = instance_values['mse_before']
+            self.mse_after = instance_values['mse_after']
+            self.med_ae_before = instance_values['med_ae_before']
+            self.med_ae_after = instance_values['med_ae_after']
             self.r2_score_before = instance_values['r2_score_before']
             self.r2_score_after = instance_values['r2_score_after']
 
         # if the augmentation instance needs to be composed with a candidate dataset, and the prediction metrics
         # need to be computed with a learning model, such metrics are not present
-        elif len(instance_values.keys()) == 3:
+        elif len(instance_values.keys()) == NUMBER_OF_FIELDS_IN_TEST_AUGMENTATION_INSTANCE:
+            self.mae_before = np.nan
+            self.mae_after = np.nan
+            self.mse_before = np.nan
+            self.mse_after = np.nan
+            self.med_ae_before = np.nan
+            self.med_ae_after = np.nan
             self.r2_score_before = np.nan
             self.r2_score_after = np.nan
         self.joined_dataset = self.join_query_and_candidate_datasets()
@@ -99,6 +112,30 @@ class AugmentationInstance:
         """
         return self.target_name
 
+    def compute_decrease_in_mean_absolute_error(self):
+        """Returns the relative decrease in mean_absolute_error if mae_before and
+        mae_after are defined
+        """
+        if self.mae_before and self.mae_after:
+            return compute_mae_decrease(self.mae_before, self.mae_after)
+        return np.nan
+
+    def compute_decrease_in_mean_squared_error(self):
+        """Returns the relative decrease in mean_squared_error if mse_before and
+        mse_after are defined
+        """
+        if self.mse_before and self.mse_after:
+            return compute_mse_decrease(self.mse_before, self.mse_after)
+        return np.nan
+
+    def compute_decrease_in_median_absolute_error(self):
+        """Returns the relative decrease in median_absolute_error if med_ae_before and
+        med_ae_after are defined
+        """
+        if self.med_ae_before and self.med_ae_after:
+            return compute_med_ae_decrease(self.med_ae_before, self.med_ae_after)
+        return np.nan    
+            
     def compute_gain_in_r2_score(self):
         """Returns the relative gain in the r2 score if r2_score_before and 
         r2_score_after are defined
@@ -142,7 +179,9 @@ class AugmentationInstance:
         # computing (6)
         difference_in_numbers_of_rows = feature_factory_candidate_with_target.compute_percentual_difference_in_number_of_rows(self.query_dataset.get_data().shape[0])
         
-        return fd_features + features_with_target + query_features_with_target + candidate_features_with_target + [pearson_difference_wrt_target] + [difference_in_numbers_of_rows]
+        return joined_dataset_features + joined_dataset_features_with_target + \
+            query_features_with_target + candidate_features_with_target + \
+            [pearson_difference_wrt_target] + [difference_in_numbers_of_rows]
         
     def generate_features(self, query_dataset_individual_features=[], candidate_dataset_individual_features=[]):
         """This method generates features derived from the datasets of the augmentation instance. 
@@ -150,12 +189,12 @@ class AugmentationInstance:
         avoid repeated computations, optimizing the process. This is why the parameters query_individual_dataset_features and 
         candidate_dataset_individual_features can be different from []
         """
-        if not query_individual_features:
+        if not query_dataset_individual_features:
             feature_factory_query = FeatureFactory(self.get_joined_query_data())
             query_dataset_individual_features = feature_factory_query.get_individual_features(func=max_in_modulus)
-        if not candidate_individual_features:
+        if not candidate_dataset_individual_features:
             feature_factory_candidate = FeatureFactory(self.get_joined_candidate_data())
             candidate_dataset_individual_features = feature_factory_candidate.get_individual_features(func=max_in_modulus)
 
         pairwise_features = self.compute_pairwise_features()
-        return np.array(query_individual_dataset_features + candidate_dataset_individual_features + pairwise_features)
+        return np.array(query_dataset_individual_features + candidate_dataset_individual_features + pairwise_features)

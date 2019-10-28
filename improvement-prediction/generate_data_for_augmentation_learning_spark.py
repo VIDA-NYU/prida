@@ -25,6 +25,9 @@ def generate_learning_instance(learning_data_record, params):
         hdfs_user=hdfs_user
     )
     features = augmentation_instance.generate_features()
+    target_mae_decrease = augmentation_instance.compute_decrease_in_mean_absolute_error()
+    target_mse_decrease = augmentation_instance.compute_decrease_in_mean_squared_error()
+    target_med_ae_decrease = augmentation_instance.compute_decrease_in_median_absolute_error()
     target_r2_gain = augmentation_instance.compute_gain_in_r2_score()
 
     # query and candidate information
@@ -32,7 +35,7 @@ def generate_learning_instance(learning_data_record, params):
     candidate_dataset = augmentation_instance.get_candidate_filename()
     target = augmentation_instance.get_target_name()
 
-    return [[query_dataset, target, candidate_dataset] + list(features) + [target_r2_gain]]
+    return [[query_dataset, target, candidate_dataset] + list(features) + [target_mae_decrease, target_mse_decrease, target_med_ae_decrease, target_r2_gain]]
 
 
 if __name__ == '__main__':
@@ -40,7 +43,7 @@ if __name__ == '__main__':
     start_time = time.time()
 
     # Spark context
-    conf = SparkConf().setAppName("Feature Generation")
+    conf = SparkConf().setAppName('Feature Generation')
     sc = SparkContext(conf=conf)
 
     # parameters
