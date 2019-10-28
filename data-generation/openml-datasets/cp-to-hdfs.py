@@ -21,7 +21,7 @@ if __name__ == '__main__':
     for dataset in datasets_:
         data_path = os.path.join(original_data_dir, dataset, dataset + '_dataset', 'tables', 'learningData.csv')
         data_size = os.stat(data_path).st_size/float(1073741824)
-        if data_size <= 2:
+        if data_size <= 0.2:
             datasets.append(dataset)
     
     count = 1
