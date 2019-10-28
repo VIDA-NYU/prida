@@ -43,7 +43,7 @@ To run the data generation process locally, run the following:
     --files .params.json \
     generate-training-data-from-datasets.py
 
-You may need to set some parameters for `spark-submit` depending on your environment. For an examples, you can inspect the script [`run-spark-client`](run-spark-client).
+You may need to set some parameters for `spark-submit` depending on your environment. For an example, you can inspect the script [`run-spark-client`](run-spark-client).
 
 ### Cluster Mode (Apache YARN)
 
@@ -64,7 +64,7 @@ where `<env_dir>` is the location for Anaconda environments, and `<data-generati
     --archives data-generation-environment.zip#env \
     generate-training-data-from-datasets.py
 
-You may need to set some parameters for `spark-submit` depending on the cluster environment. For an examples, you can inspect the script [`run-spark-cluster`](run-spark-cluster).
+You may need to set some parameters for `spark-submit` depending on the cluster environment. For examples, you can inspect scripts [`run-data-generation-spark-cluster`](run-data-generation-spark-cluster) and [`run-model-training-spark-cluster`](run-model-training-spark-cluster).
 
 ### Output
 
