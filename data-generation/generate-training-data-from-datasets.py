@@ -8,6 +8,7 @@ import os
 import pandas as pd
 from pyspark import SparkConf, SparkContext, StorageLevel
 import random
+import re
 import shutil
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
@@ -20,6 +21,9 @@ import sys
 import time
 import uuid
 from xgboost import XGBRegressor
+
+# regex to take care of XGBoost ValueError
+regex = re.compile(r"\[|\]|<", re.IGNORECASE)
 
 
 def organize_dataset_files(file_path, cluster_execution):
@@ -623,6 +627,10 @@ def train_and_test_model(data, target_variable_name, algorithm):
         sgd.fit(X_train, y_train.ravel())
         yfit = sgd.predict(X_test)
     elif algorithm == 'xgboost':
+        # taking care of 'ValueError: feature_names may not contain [, ] or <'
+        X_train = replace_invalid_characters(X_train)
+        X_test = replace_invalid_characters(X_test)
+
         xgboost_r = XGBRegressor(max_depth=5, objective='reg:squarederror', random_state=42)
         xgboost_r.fit(X_train, y_train)
         yfit = xgboost_r.predict(X_test)
@@ -633,6 +641,18 @@ def train_and_test_model(data, target_variable_name, algorithm):
         median_absolute_error(y_test, yfit),
         r2_score(y_test, yfit),
     ]
+
+
+def replace_invalid_characters(data):
+    """Takes care of the following error from XGBoost:
+      ValueError: feature_names may not contain [, ] or <
+    This function replaces these invalid characters with the string '_'
+
+    From: https://stackoverflow.com/questions/48645846/pythons-xgoost-valueerrorfeature-names-may-not-contain-or/50633571
+    """
+
+    data.columns = [regex.sub("_", col) if any(x in str(col) for x in set(('[', ']', '<'))) else col for col in data.columns]
+    return data
 
 
 def format_training_record(record):
