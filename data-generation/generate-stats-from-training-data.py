@@ -2,6 +2,7 @@ from hdfs import InsecureClient
 from io import StringIO
 import json
 import numpy as np
+from operator import add
 import os
 import pandas as pd
 from pyspark import SparkConf, SparkContext, StorageLevel
@@ -35,11 +36,12 @@ def generate_stats_from_record(record, load_dataframes, params):
     global query_size_lte_candidate_size
     global query_size_gt_candidate_size
 
-    query = record[0]
-    target = record[1]
-    candidate = record[2]
-    score_before = record[3]  # mean absolute error
-    score_after = record[4]  # mean absolute error
+    query = record['query_dataset']
+    target = record['target']
+    candidate = record['candidate_dataset']
+    imputation_strategy = record['imputation_strategy']
+    score_before = record['mean_absolute_error'][0]
+    score_after = record['mean_absolute_error'][1]
 
     # parameters
     output_dir = params['new_datasets_directory']
@@ -89,9 +91,9 @@ def generate_stats_from_record(record, load_dataframes, params):
         query_intersection_size = intersection_size / len(query_data_keys)
         candidate_intersection_size = intersection_size / len(candidate_data_keys)
 
-        return [(query_intersection_size, candidate_intersection_size)]
+        return (imputation_strategy, query_intersection_size, candidate_intersection_size)
 
-    return []
+    return (imputation_strategy, None, None)
 
 
 def list_dir(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
@@ -133,7 +135,8 @@ if __name__ == '__main__':
         algorithms[algorithm_name] = dict(
             n_records=0,
             before_lte_after=0,
-            before_gt_after=0
+            before_gt_after=0,
+            imputation_strategies=list()
         )
         filename = os.path.join(output_dir, file_)
         if not cluster_execution:
@@ -144,8 +147,18 @@ if __name__ == '__main__':
         before_lte_after = sc.accumulator(0)
         before_gt_after = sc.accumulator(0)
 
-        intersection_sizes = sc.textFile(filename).flatMap(
-            lambda x: generate_stats_from_record(x.split(','), load_dataframes, params)
+        stats = sc.textFile(filename).map(
+            lambda x: generate_stats_from_record(json.loads(x), load_dataframes, params)
+        ).persist(StorageLevel.MEMORY_AND_DISK)
+
+        imputation_strategies = sorted(stats.map(
+            lambda x: (x[0], 1)
+        ).reduceByKey(add).collect(), key=lambda x: x[1], reverse=True)
+
+        intersection_sizes = stats.filter(
+            lambda x: x[1] != None and x[2] != None
+        ).map(
+            lambda x: (x[1], x[2])
         ).collect()
 
         if len(intersection_sizes) > 0:
@@ -155,6 +168,7 @@ if __name__ == '__main__':
         algorithms[algorithm_name]['n_records'] = n_records.value
         algorithms[algorithm_name]['before_lte_after'] = before_lte_after.value
         algorithms[algorithm_name]['before_gt_after'] = before_gt_after.value
+        algorithms[algorithm_name]['imputation_strategies'] = imputation_strategies
 
         load_dataframes = False
 
@@ -170,6 +184,9 @@ if __name__ == '__main__':
             algorithms[algorithm]['before_lte_after'],
             (100 * algorithms[algorithm]['before_lte_after']) / algorithms[algorithm]['n_records']
         ))
+        print(' -- Missing value imputation strategies:')
+        for (strategy, count) in algorithms[algorithm]['imputation_strategies']:
+            print('    . %s\t%d' % (strategy, count))
         print('')
 
     hist_query_intersection_size = np.histogram(query_intersection_sizes, bins=10)

@@ -8,6 +8,7 @@ import os
 import pandas as pd
 from pyspark import SparkConf, SparkContext, StorageLevel
 import random
+import re
 import shutil
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
@@ -20,6 +21,9 @@ import sys
 import time
 import uuid
 from xgboost import XGBRegressor
+
+# regex to take care of XGBoost ValueError
+regex = re.compile(r"\[|\]|<", re.IGNORECASE)
 
 
 def organize_dataset_files(file_path, cluster_execution):
@@ -75,7 +79,7 @@ def save_file(file_path, content, use_hdfs=False, hdfs_address=None, hdfs_user=N
             print('[WARNING] File already exists: %s' % file_path)
         with open(file_path, 'w') as writer:
             writer.write(content)
-    print('[INFO] File %s saved!' % file_path)
+    # print('[INFO] File %s saved!' % file_path)
 
 
 def create_dir(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
@@ -273,7 +277,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
     key_column = [str(uuid.uuid4()) for _ in range(n_rows)]
 
     # creating and saving query and candidate datasets
-    print('[INFO] Creating query and candidate data for dataset %s ...' % data_name)
+    # print('[INFO] Creating query and candidate data for dataset %s ...' % data_name)
     results = list()
     id_ = 0
     for n in list(n_columns_query_dataset):
@@ -337,7 +341,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
 
         id_ += 1
 
-    print('[INFO] Query and candidate data for dataset %s have been created and saved!' % data_name)
+    # print('[INFO] Query and candidate data for dataset %s have been created and saved!' % data_name)
     return results
 
 
@@ -347,7 +351,7 @@ def generate_candidate_datasets_negative_examples(target_variable, query_dataset
     therefore, we need to re-create the key column.
     """
 
-    print('[INFO] Creating negative examples with dataset %s ...' % query_dataset)
+    # print('[INFO] Creating negative examples with dataset %s ...' % query_dataset)
 
     new_candidate_datasets = list()
 
@@ -424,7 +428,7 @@ def generate_candidate_datasets_negative_examples(target_variable, query_dataset
         params['hdfs_user']
     )
 
-    print('[INFO] Negative examples with dataset %s have been created and saved!' % query_dataset)
+    # print('[INFO] Negative examples with dataset %s have been created and saved!' % query_dataset)
     return (target_variable, query_dataset_path, new_candidate_datasets)
 
 
@@ -516,7 +520,7 @@ def generate_performance_scores(query_dataset, target_variable, candidate_datase
     )
 
     # build model on query data only
-    scores_before = get_performance_scores(
+    _, scores_before = get_performance_scores(
         query_data,
         target_variable,
         algorithm,
@@ -544,18 +548,24 @@ def generate_performance_scores(query_dataset, target_variable, candidate_datase
             join_.dropna(inplace=True)
 
         # build model on joined data
-        print('[INFO] Generating performance scores for query dataset %s and candidate dataset %s ...' % (query_dataset, candidate_dataset))
-        scores_after = get_performance_scores(
+        # print('[INFO] Generating performance scores for query dataset %s and candidate dataset %s ...' % (query_dataset, candidate_dataset))
+        imputation_strategy, scores_after = get_performance_scores(
             join_,
             target_variable,
             algorithm,
             not(inner_join)
         )
-        print('[INFO] Performance scores for query dataset %s and candidate dataset %s done!' % (query_dataset, candidate_dataset))
+        # print('[INFO] Performance scores for query dataset %s and candidate dataset %s done!' % (query_dataset, candidate_dataset))
 
         performance_scores.append(
-            [query_dataset, target_variable, candidate_dataset] +
-            [val for pair in zip(scores_before, scores_after) for val in pair]
+            generate_output_performance_data(
+                query_dataset=query_dataset,
+                target=target_variable,
+                candidate_dataset=candidate_dataset,
+                scores_before=scores_before,
+                scores_after=scores_after,
+                imputation_strategy=imputation_strategy
+            )
         )
 
     return performance_scores
@@ -570,6 +580,7 @@ def get_performance_scores(data, target_variable_name, algorithm, missing_value_
         strategies = ['mean', 'median', 'most_frequent']
         scores = list()
         min_mean_absolute_error = math.inf
+        min_strategy = ''
         for strategy in strategies:
             # imputation on data
             fill_NaN = SimpleImputer(missing_values=np.nan, strategy=strategy)
@@ -583,11 +594,13 @@ def get_performance_scores(data, target_variable_name, algorithm, missing_value_
             # always choosing the one with smallest mean absolute error
             if strategy_scores[0] < min_mean_absolute_error:
                 min_mean_absolute_error = strategy_scores[0]
+                min_strategy = strategy
                 scores = [score for score in strategy_scores]
 
-        return scores
+        return (min_strategy, scores)
     else:
-        return train_and_test_model(data, target_variable_name, algorithm)
+        return (None, train_and_test_model(data, target_variable_name, algorithm))
+
 
 def train_and_test_model(data, target_variable_name, algorithm):
     """Builds a model using data to predict the target variable.
@@ -623,6 +636,10 @@ def train_and_test_model(data, target_variable_name, algorithm):
         sgd.fit(X_train, y_train.ravel())
         yfit = sgd.predict(X_test)
     elif algorithm == 'xgboost':
+        # taking care of 'ValueError: feature_names may not contain [, ] or <'
+        X_train = replace_invalid_characters(X_train)
+        X_test = replace_invalid_characters(X_test)
+
         xgboost_r = XGBRegressor(max_depth=5, objective='reg:squarederror', random_state=42)
         xgboost_r.fit(X_train, y_train)
         yfit = xgboost_r.predict(X_test)
@@ -635,24 +652,33 @@ def train_and_test_model(data, target_variable_name, algorithm):
     ]
 
 
-def format_training_record(record):
-    """Format records for the training data file.
+def generate_output_performance_data(query_dataset, target, candidate_dataset,
+                                     scores_before, scores_after, imputation_strategy=None):
+    """Generates a training data record in JSON format.
     """
 
-    new_record =  '%s,%s,%s' % (
-        os.path.sep.join(record[0].split(os.path.sep)[-2:]),
-        record[1],
-        os.path.sep.join(record[2].split(os.path.sep)[-2:])
-    )
+    return json.dumps(dict(
+        query_dataset=os.path.sep.join(query_dataset.split(os.path.sep)[-2:]),
+        target=target,
+        candidate_dataset=os.path.sep.join(candidate_dataset.split(os.path.sep)[-2:]),
+        imputation_strategy=imputation_strategy,
+        mean_absolute_error=[scores_before[0], scores_after[0]],
+        mean_squared_error=[scores_before[1], scores_after[1]],
+        median_absolute_error=[scores_before[2], scores_after[2]],
+        r2_score=[scores_before[3], scores_after[3]]
+    ))
 
-    for i in range(3, len(record), 2):
 
-        new_record += ',%.6f,%6f' % (
-            record[i],
-            record[i+1]
-        )
+def replace_invalid_characters(data):
+    """Takes care of the following error from XGBoost:
+      ValueError: feature_names may not contain [, ] or <
+    This function replaces these invalid characters with the string '_'
 
-    return new_record
+    From: https://stackoverflow.com/questions/48645846/pythons-xgoost-valueerrorfeature-names-may-not-contain-or/50633571
+    """
+
+    data.columns = [regex.sub("_", col) if any(x in str(col) for x in set(('[', ']', '<'))) else col for col in data.columns]
+    return data
     
 
 if __name__ == '__main__':
@@ -677,6 +703,7 @@ if __name__ == '__main__':
     params = json.load(open(".params.json"))
     output_dir = params['new_datasets_directory']
     skip_dataset_creation = params['skip_dataset_creation']
+    skip_training_data = params['skip_training_data']
     cluster_execution = params['cluster']
     hdfs_address = params['hdfs_address']
     hdfs_user = params['hdfs_user']
@@ -837,26 +864,25 @@ if __name__ == '__main__':
         ).persist(StorageLevel.MEMORY_AND_DISK)
 
 
-    if not query_candidate_datasets.isEmpty():
+    if not skip_training_data:
+        if not query_candidate_datasets.isEmpty():
 
-        # getting performance scores
-        performance_scores = query_candidate_datasets.flatMap(
-            lambda x: generate_performance_scores(x[1], x[0], x[2], params)
-        ).map(
-            lambda x: format_training_record(x)
-        )
+            # getting performance scores
+            performance_scores = query_candidate_datasets.flatMap(
+                lambda x: generate_performance_scores(x[1], x[0], x[2], params)
+            )
 
-        # saving scores
-        algorithm_name = params['regression_algorithm']
-        if params['regression_algorithm'] == 'random forest':
-            algorithm_name = 'random-forest'
-        save_file(
-            os.path.join(output_dir, 'training-data-' + algorithm_name),
-            '\n'.join(performance_scores.collect()),
-            params['cluster'],
-            params['hdfs_address'],
-            params['hdfs_user']
-        )
+            # saving scores
+            algorithm_name = params['regression_algorithm']
+            if params['regression_algorithm'] == 'random forest':
+                algorithm_name = 'random-forest'
+            save_file(
+                os.path.join(output_dir, 'training-data-' + algorithm_name),
+                '\n'.join(performance_scores.collect()),
+                params['cluster'],
+                params['hdfs_address'],
+                params['hdfs_user']
+            )
 
     print('Duration: %.4f seconds' % (time.time() - start_time))
     if not skip_dataset_creation:

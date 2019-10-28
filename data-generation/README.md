@@ -22,7 +22,8 @@ The data generation process is done using PySpark. Copy the file [`params.json`]
     "hdfs_address": the address (host and port) for the distributed file system; only used if the data generation will be run in a cluster
     "hdfs_user": the username for the distributed file system; only used if the data generation will be run in a cluster
     "ignore_first_attribute": boolean that indicates whether the first attribute of every dataset should be ignored (e.g.: the d3mIndex attribute)
-    "skip_dataset_creation": boolean that indicates whether the generation of query and candidate datasets should be skipped or not; if this step is skipped, only the scores before and after the augmentation are generated
+    "skip_dataset_creation": boolean that indicates whether the generation of query and candidate datasets should be skipped or not
+    "skip_training_data": boolean that indicates whether the generation of the training data should be skipped or not
     "candidate_single_column": boolean that indicates whether the candidate datasets should have a single column (in addition to the key column) or not
     "regression_algorithm": the regression algorithm to be used; the available options are "random forest", "linear", "sgd", and "xgboost"
     "inner_join": boolean that indicates whether the join applied between query and candidate datasets is of type inner or not; if false, a left join is applied and a series of univariate value imputation strategies are applied to take care of any missing values, with the one that generates the model with the smallest mean absolute error being chosen at last
@@ -42,7 +43,7 @@ To run the data generation process locally, run the following:
     --files .params.json \
     generate-training-data-from-datasets.py
 
-You may need to set some parameters for `spark-submit` depending on your environment. For an examples, you can inspect the script [`run-spark-client`](run-spark-client).
+You may need to set some parameters for `spark-submit` depending on your environment. For an example, you can inspect the script [`run-spark-client`](run-spark-client).
 
 ### Cluster Mode (Apache YARN)
 
@@ -63,13 +64,42 @@ where `<env_dir>` is the location for Anaconda environments, and `<data-generati
     --archives data-generation-environment.zip#env \
     generate-training-data-from-datasets.py
 
-You may need to set some parameters for `spark-submit` depending on the cluster environment. For an examples, you can inspect the script [`run-spark-cluster`](run-spark-cluster).
+You may need to set some parameters for `spark-submit` depending on the cluster environment. For examples, you can inspect scripts [`run-data-generation-spark-cluster`](run-data-generation-spark-cluster) and [`run-model-training-spark-cluster`](run-model-training-spark-cluster).
 
 ### Output
 
-The data generation process will create all the query and candidate datasets under `new_datasets_directory` (if `skip_dataset_creation=false`), as well as training data files that contain lines of the following format:
+The data generation process will create all the query and candidate datasets under `new_datasets_directory` (if `skip_dataset_creation=false`), as well as a training data file (`training-data-*`) that contains multiple JSON objects of the following format:
 
-    <query dataset, target variable name, candidate dataset, mean absolute error before augmentation, mean absolute error after augmentation, mean squared error before augmentation, mean squared error after augmentation, median absolute error before augmentation, median absolute error after augmentation, R^2 score before augmentation, R^2 score after augmentation>
+```
+{
+    "query_dataset": the relative path for the query dataset
+    "target": the name of the target variable
+    "candidate_dataset": the relative path for the candidate dataset
+    "imputation_strategy": the missing value imputation strategy used after the join between the query and the candidate datasets, or "null" if inner join was applied instead
+    "mean_absolute_error": an array where the first and second values correspond to the mean absolute error before and after augmentation, respectively
+    "mean_squared_error": an array where the first and second values correspond to the mean squared error before and after augmentation, respectively
+    "median_absolute_error": an array where the first and second values correspond to the median absolute error before and after augmentation, respectively
+    "r2_score": an array where the first and second values correspond to the R^2 score before and after augmentation, respectively
+}
+```
+
+Note that one training data file is generated for each regression algorithm chosen.
+
+### Logs from Apache YARN
+
+If you redirect the `stdout` of the job submission to a file, you can run the following script to capture the job's application id:
+
+    $ python logs/capture-application-id.py <stdout file>
+
+Given this id, you can retrieve its corresponding logs by running `yarn logs`:
+
+    $ yarn logs -applicationId <application id>
+
+For your convenience, the script [`run-spark-job`](run-spark-job) automatically runs the data generation process on the cluster and retrieves the corresponding logs:
+
+    $ ./run-spark-job <run script> <output name>
+
+where `<run script>` is the `spark-submit` script (e.g.: [`run-data-generation-spark-cluster`](run-data-generation-spark-cluster) or [`run-model-training-spark-cluster`](run-model-training-spark-cluster)) and `<output name>` is the desired name for the logs. This creates two files: `logs/<output name>.out`, which contains the `stdout` of the job submission, and `logs/<output name>.log`, with contains the logs.
 
 ## OpenML Datasets
 
