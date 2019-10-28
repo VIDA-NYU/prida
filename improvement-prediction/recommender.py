@@ -36,7 +36,7 @@ class Recommender:
 
     def generate_models_and_test_data(self, augmentation_learning_data_filename, n_splits):
         self.learning_task = LearningTask()
-        self.learning_task.read_data(augmentation_learning_data_filename)
+        self.learning_task.read_features_and_targets(augmentation_learning_data_filename)
         return self.learning_task.execute_random_forest(n_splits)
 
     def get_real_and_predicted_gains(self, query_filename, target_name, model):

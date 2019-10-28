@@ -36,3 +36,12 @@ def save_file(file_path, content, use_hdfs=False, hdfs_address=None, hdfs_user=N
         with open(file_path, 'w') as writer:
             writer.write(content)
     print('[INFO] File %s saved!' % file_path)
+
+def dump_learning_instances(data_filename, features, targets):
+    """For each training instance, this method dumps their corresponding features and 
+    targets (relative gains in performance after augmentation) in a file
+    """
+    with open(data_filename, 'w') as f:
+        for features, target in zip(features, targets):
+            output_string = ','.join([str(i) for i in features]) + ',' + str(target) + '\n'
+            f.write(output_string)
