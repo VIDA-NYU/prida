@@ -30,7 +30,7 @@ def generate_learning_instance(learning_data_record, params):
     # query and candidate information
     query_dataset = augmentation_instance.get_query_filename()
     candidate_dataset = augmentation_instance.get_candidate_filename()
-    target = augmentation_instance.get_target_column_name()
+    target = augmentation_instance.get_target_name()
 
     return [[query_dataset, target, candidate_dataset] + list(features) + [target_r2_gain]]
 
