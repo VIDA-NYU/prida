@@ -2,8 +2,8 @@
 import json
 import sys
 from augmentation_instance import *
-from util.file_parser import *
-from util.file import *
+from util.instance_parser import *
+from util.file_manager import *
 from learning_task import *
 
 if __name__ == '__main__':

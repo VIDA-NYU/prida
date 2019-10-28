@@ -3,8 +3,8 @@ from augmentation_instance import *
 import json
 from pyspark import SparkConf, SparkContext
 import time
-from util.file import *
-from util.file_parser import *
+from util.file_manager import *
+from util.instance_parser import *
 
 
 def generate_learning_instance(learning_data_record, params):

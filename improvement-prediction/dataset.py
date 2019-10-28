@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import pandas as pd
 from io import StringIO
-from util.file import *
+from util.file_manager import *
 
 class Dataset:
     """This class stores and manages a certain dataset and performs join operations with other given 

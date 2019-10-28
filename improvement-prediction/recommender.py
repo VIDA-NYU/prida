@@ -3,7 +3,7 @@ from augmentation_instance import *
 from feature_factory import *
 from learning_task import *
 from util.metrics import *
-from util.file_parser import *
+from util.instance_parser import *
 
 class Recommender:
     """This class (1) generates features and relative gains to be predicted,
