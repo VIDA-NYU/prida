@@ -3,9 +3,15 @@ from scipy.stats import kendalltau
 import numpy as np
 
 def compute_MSE(predicted_values, real_values):
+    """Given aligned predicted and real values, computes
+    the mean squared error between them
+    """
     return mean_squared_error(predicted_values, real_values)
 
 def compute_squared_error_distribution(predicted_values, real_values, normalize=False):
+    """Given aligned predicted and real values, computes
+    the distribution of squared errors between them
+    """
     distribution = [(p - r)**2 for p, r in zip(predicted_values, real_values)]
     if not normalize:
         return distribution
@@ -14,9 +20,15 @@ def compute_squared_error_distribution(predicted_values, real_values, normalize=
     return [i/denominator for i in distribution]
 
 def compute_SMAPE(predicted_values, real_values):
+    """Given aligned predicted and real values, computes
+    the SMAPE (symmetric mean absolute percentage error) between them
+    """
     return 100/len(real_values) * np.sum(2 * np.fabs(predicted_values - real_values) / (np.fabs(real_values) + np.fabs(predicted_values)))
 
 def compute_symmetric_absolute_percentage_error_distribution(predicted_values, real_values, normalize=False):
+    """Given aligned predicted and real values, computes
+    the distribution of symmetric absolute percentage errors between them
+    """
     distribution = [2*np.fabs(p - r)/(np.fabs(r) + np.fabs(p)) for p, r in zip(predicted_values, real_values)]
     if not normalize:
         return distribution
@@ -25,9 +37,17 @@ def compute_symmetric_absolute_percentage_error_distribution(predicted_values, r
     return [i/denominator for i in distribution]
     
 def compute_r2_gain(r2_score_before, r2_score_after):
+    """Given two r2 scores, corresponding to the prediction of 
+    a target column before and after data augmentation, computes 
+    their relative gain
+    """
     return (r2_score_after - r2_score_before)/np.fabs(r2_score_before)
 
 def compute_ndcg_at_k(real_gains, predicted_gains, k=5, use_gains_as_relevance_weights=False):
+    """Given real gains and predicted gains, computes the ndcg between them for the first k positions of 
+    the ranking. The relevance weights can be the real relative gains or numbers indicating their rank 
+    positions
+    """
     real_ranking = sorted(real_gains, key = lambda x:x[1], reverse=True)[:k]
     if use_gains_as_relevance_weights:
         real_relevances = [(tuple[0], tuple[1]) if tuple[1] > 0 else (tuple[0],0.0) for index, tuple in enumerate(real_ranking)]
@@ -43,11 +63,18 @@ def compute_ndcg_at_k(real_gains, predicted_gains, k=5, use_gains_as_relevance_w
     return numerator/denominator 
 
 def compute_kendall_tau(real_gains, predicted_gains):
+    """Given real gains and predicted gains, computes the kendall-tau distance between them. 
+    The higher the real gain, the higher its position in the ranking
+    """
     ranked_candidates = [i[0] for i in sorted(real_gains, key = lambda x:x[1], reverse=True)]
     predicted_candidates = [i[0] for i in sorted(predicted_gains, key = lambda x:x[1], reverse=True)]
     return kendalltau(ranked_candidates, predicted_candidates)
 
 def compute_mean_reciprocal_rank_for_single_sample(real_gains, predicted_gains):
+    """Given real gains and predicted gains, computes the mean reciprocal rank (MRR) between them.
+    Ideally, this metric should be used over large lists (multiple samples) of real gains and 
+    predicted gains
+    """
     real_ranking = sorted(real_gains, key = lambda x:x[1], reverse=True)
     real_best_candidate = real_ranking[0][0]
     predicted_ranking = sorted(predicted_gains, key = lambda x:x[1], reverse=True)

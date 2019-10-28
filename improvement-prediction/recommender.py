@@ -1,45 +1,55 @@
 import pandas as pd
-from constants import *
 from augmentation_instance import *
 from feature_factory import *
 from learning_task import *
 from util.metrics import *
+from util.file_parser import *
 
 class Recommender:
-    
+    """This class (1) generates features and relative gains to be predicted,
+    given a training data filename, (2) creates machine learning models to predict the 
+    relative gain in performance for augmentation with different candidates, and 
+    (3) recommends such candidates sorted by their predicted relative gains 
+    """
     def store_instances(self, filename):
-
+        """Given a training data filename, this method derives their corresponding 
+        features and relative gains (targets), stores individual features for query and 
+        candidate datasets for efficiency, so they don't need to be recomputed, and 
+        stores the rows of the filename in a table
+        """
         with open(filename, 'r') as f:
             rows_list = []
             self.candidate_filenames = []
-            self.query_individual_metrics = {}
-            self.candidate_individual_metrics = {}
+            self.query_individual_features = {}
+            self.candidate_individual_features = {}
             for line in f:
-                query_filename, target_name, candidate_filename, r2_score_before, r2_score_after = line.strip().split(SEPARATOR)
-                self.candidate_filenames.append(candidate_filename)
-
-                fields = {'query_filename': query_filename,
-                            'target_name': target_name,
-                            'candidate_filename': candidate_filename,
-                            'r2_score_before': float(r2_score_before),
-                            'r2_score_after': float(r2_score_after)}
-                rows_list.append(fields)
-
-                instance = AugmentationInstance(fields)
-                self.query_individual_metrics[query_filename] = \
-                    FeatureFactory(instance.get_joined_query_data()).get_individual_metrics(func=max_in_modulus)
-                self.candidate_individual_metrics[candidate_filename] = \
-                    FeatureFactory(instance.get_joined_candidate_data()).get_individual_metrics(func=max_in_modulus)
+                instance = parse_augmentation_instance(line)
+                self.candidate_filenames.append(instance.get_candidate_filename())
+                rows_list.append(instance.get_formatted_fields())
+                
+                self.query_individual_features[query_filename] = \
+                    FeatureFactory(instance.get_joined_query_data()).get_individual_features(func=max_in_modulus)
+                self.candidate_individual_features[candidate_filename] = \
+                    FeatureFactory(instance.get_joined_candidate_data()).get_individual_features(func=max_in_modulus)
 
             self.learning_table = pd.DataFrame(rows_list) 
             self.learning_table.set_index(['query_filename', 'target_name', 'candidate_filename'])
 
     def generate_models_and_test_data(self, augmentation_learning_data_filename, n_splits):
+        """Given a filename with features and relative gains for every training instance, 
+        this method generates machine learning models and pointers to test data over which the 
+        models can be evaluated
+        """
         self.learning_task = LearningTask()
         self.learning_task.read_features_and_targets(augmentation_learning_data_filename)
         return self.learning_task.execute_random_forest(n_splits)
 
     def get_real_and_predicted_gains(self, query_filename, target_name, model):
+        """Given the names of a query dataset and a target (a column in the query dataset), 
+        this method predicts the relative gain obtained via data augmentation with a variety of 
+        candidate datasets, then returning these predicted gains and the corresponding real ones, 
+        which are stored in a table
+        """
         subtable = self.learning_table[(self.learning_table['query_filename'] == query_filename) & 
                                        (self.learning_table['target_name'] == target_name)]
 
@@ -51,12 +61,15 @@ class Recommender:
             instance = AugmentationInstance({'query_filename': query_filename,
                                              'target_name': target_name,
                                              'candidate_filename': candidate_filename})
-            test_features = instance.generate_features(self.query_individual_metrics[query_filename], 
-                                                       self.candidate_individual_metrics[candidate_filename])
+            test_features = instance.generate_features(self.query_individual_features[query_filename], 
+                                                       self.candidate_individual_features[candidate_filename])
             predicted_gains.append((candidate_filename, model.predict(test_features.reshape(1, -1))[0]))
         return real_gains, predicted_gains
         
     def predict_gains_for_candidate_datasets(self, model, data):
+        """This method encapsulates the prediction of relative gains via data augmentation using a given 
+        machine learning model and test data
+        """
         for index in data['index_of_test_instances']:
             query_filename = self.learning_table.iloc[index]['query_filename']
             target_name = self.learning_table.iloc[index]['target_name']

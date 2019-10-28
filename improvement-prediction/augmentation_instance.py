@@ -50,6 +50,16 @@ class AugmentationInstance:
         """
         return self.candidate_filename
 
+    def get_formatted_fields(self):
+        """Returns all instance values (fields) formatted as a dict
+        """
+        fields = {'query_filename': self.query_filename,
+                  'target_name': self.target_name,
+                  'candidate_filename': self.candidate_filename,
+                  'r2_score_before': self.r2_score_before,
+                  'r2_score_after': self.r2_score_after}
+        return fields
+             
     def join_query_and_candidate_datasets(self):
         """Creates a new dataset (Dataset class) by performing an inner join 
         between the query and candidate datasets. By default, the joining key is 
