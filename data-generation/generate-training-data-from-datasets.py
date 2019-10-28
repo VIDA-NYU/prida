@@ -593,6 +593,7 @@ def get_performance_scores(data, target_variable_name, algorithm, missing_value_
     else:
         return train_and_test_model(data, target_variable_name, algorithm)
 
+
 def train_and_test_model(data, target_variable_name, algorithm):
     """Builds a model using data to predict the target variable.
     """
