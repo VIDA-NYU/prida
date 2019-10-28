@@ -72,6 +72,22 @@ The data generation process will create all the query and candidate datasets und
 
     <query dataset, target variable name, candidate dataset, mean absolute error before augmentation, mean absolute error after augmentation, mean squared error before augmentation, mean squared error after augmentation, median absolute error before augmentation, median absolute error after augmentation, R^2 score before augmentation, R^2 score after augmentation>
 
+### Logs from Apache YARN
+
+If you redirect the `stdout` of the job submission to a file, you can run the following script to capture the job's application id:
+
+    $ python logs/capture-application-id.py <stdout file>
+
+Given this id, you can retrieve its corresponding logs by running `yarn logs`:
+
+    $ yarn logs -applicationId <application id>
+
+For your convenience, the script [`run-spark-job`](run-spark-job) automatically runs the data generation process on the cluster and retrieves the corresponding logs:
+
+    $ ./run-spark-job <run script> <output name>
+
+where `<run script>` is the `spark-submit` script (e.g.: [`run-data-generation-spark-cluster`](run-data-generation-spark-cluster) or [`run-model-training-spark-cluster`](run-model-training-spark-cluster)) and `<output name>` is the desired name for the logs. This creates two files: `logs/<output name>.out`, which contains the `stdout` of the job submission, and `logs/<output name>.log`, with contains the logs.
+
 ## OpenML Datasets
 
 If you want to download [OpenML](https://www.openml.org/) datasets to use them in the data generation process, check it [here](openml-datasets).

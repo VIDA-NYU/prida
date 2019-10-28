@@ -1,2 +1,2 @@
-#$1 &> logs/$2.out
+$1 &> logs/$2.out
 yarn logs -applicationId $(python logs/capture-application-id.py logs/$2.out) > logs/$2.log
