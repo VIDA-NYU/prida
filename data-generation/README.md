@@ -68,9 +68,22 @@ You may need to set some parameters for `spark-submit` depending on the cluster 
 
 ### Output
 
-The data generation process will create all the query and candidate datasets under `new_datasets_directory` (if `skip_dataset_creation=false`), as well as training data files that contain lines of the following format:
+The data generation process will create all the query and candidate datasets under `new_datasets_directory` (if `skip_dataset_creation=false`), as well as a training data file (`training-data-*`) that contains multiple JSON objects of the following format:
 
-    <query dataset, target variable name, candidate dataset, mean absolute error before augmentation, mean absolute error after augmentation, mean squared error before augmentation, mean squared error after augmentation, median absolute error before augmentation, median absolute error after augmentation, R^2 score before augmentation, R^2 score after augmentation>
+```
+{
+    "query_dataset": the relative path for the query dataset
+    "target": the name of the target variable
+    "candidate_dataset": the relative path for the candidate dataset
+    "imputation_strategy": the missing value imputation strategy used after the join between the query and the candidate datasets, or "null" if inner join was applied instead
+    "mean_absolute_error": an array where the first and second values correspond to the mean absolute error before and after augmentation, respectively
+    "mean_squared_error": an array where the first and second values correspond to the mean squared error before and after augmentation, respectively
+    "median_absolute_error": an array where the first and second values correspond to the median absolute error before and after augmentation, respectively
+    "r2_score": an array where the first and second values correspond to the R^2 score before and after augmentation, respectively
+}
+```
+
+Note that one training data file is generated for each regression algorithm chosen.
 
 ### Logs from Apache YARN
 
