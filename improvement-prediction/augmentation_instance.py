@@ -79,7 +79,7 @@ class AugmentationInstance:
         between the query and candidate datasets. By default, the joining key is 
         'key-for-ranking'
         """
-        result_data = self.query_dataset.join_with(self.candidate_dataset, key='key-for-ranking')
+        result_data = self.query_dataset.join_with(self.candidate_dataset, missing_value_imputation=self.imputation_strategy)
         dataset = Dataset()
         dataset.initialize_from_data_and_column_names(result_data, result_data.columns)
         return dataset
