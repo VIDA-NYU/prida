@@ -7,7 +7,7 @@ from util.file_manager import *
 from util.instance_parser import *
 
 
-def generate_learning_instance(learning_data_record, params):
+def generate_learning_instance(prefix, learning_data_record, params):
     """Generates features for each JSON record of the training data
     """
 
@@ -18,6 +18,7 @@ def generate_learning_instance(learning_data_record, params):
 
     # parsing instance and generating features and learning targets
     augmentation_instance = parse_augmentation_instance(
+        prefix, 
         learning_data_record,
         use_hdfs=cluster_execution,
         hdfs_address=hdfs_address,
@@ -54,13 +55,14 @@ if __name__ == '__main__':
     hdfs_user = params['hdfs_user']
 
     # opening training data file
+    learning_data_filename_for_spark = learning_data_filename
     if not cluster_execution:
-        learning_data_filename = 'file://' + learning_data_filename
-    learning_data = sc.textFile(learning_data_filename)
+        learning_data_filename_for_spark = 'file://' + learning_data_filename
+    learning_data = sc.textFile(learning_data_filename_for_spark)
 
     # generating learning instances
     learning_instances = learning_data.flatMap(
-        lambda x: generate_learning_instance(json.loads(x), params)
+        lambda x: generate_learning_instance(get_prefix_of_training_files(learning_data_filename), json.loads(x), params)
     ).map(
         lambda x: ','.join([str(item) for item in x])
     )

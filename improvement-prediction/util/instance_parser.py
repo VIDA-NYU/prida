@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 from augmentation_instance import *
 from constants import *
+import os
 
+def get_prefix_of_training_files(filename):
+    """Given a filename in the format of a path, e.g., /home/alibezz/foo, 
+    returns its prefix. In this example, it would be /home/alibezz
+    """
+    return os.path.join(os.path.split(filename)[0], 'files')
+    
 def parse_augmentation_instances(training_data_filename):
     """If spark is not being used, this method reads every line of 
     the training data (training_data_filename) and invokes their 
@@ -13,8 +20,7 @@ def parse_augmentation_instances(training_data_filename):
             augmentation_instances.append(parse_augmentation_instance(line))
         return augmentation_instances
 
-
-def parse_augmentation_instance(file_record, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+def parse_augmentation_instance(prefix, file_record, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """Parses file_record, a JSON instance of the training data in the format
     {'query_dataset': query_dataset,
      'target': target,
@@ -29,9 +35,9 @@ def parse_augmentation_instance(file_record, use_hdfs=False, hdfs_address=None, 
     """
     #TODO standardize the use of words dataset and filename
     
-    fields = {'query_filename': file_record['query_dataset'],
+    fields = {'query_filename': os.path.join(prefix, file_record['query_dataset']),
               'target_name': file_record['target'],
-              'candidate_filename': file_record['candidate_dataset'],
+              'candidate_filename': os.path.join(prefix, file_record['candidate_dataset']),
               'imputation_strategy': file_record['imputation_strategy'], 
               'mae_before': file_record['mean_absolute_error'][0],
               'mae_after': file_record['mean_absolute_error'][1],
@@ -41,4 +47,5 @@ def parse_augmentation_instance(file_record, use_hdfs=False, hdfs_address=None, 
               'med_ae_after': file_record['median_absolute_error'][1],
               'r2_score_before': file_record['r2_score'][0],
               'r2_score_after': file_record['r2_score'][1]}
+    print('FIELDSSSSSSSS', fields)
     return AugmentationInstance(fields, use_hdfs, hdfs_address, hdfs_user)
