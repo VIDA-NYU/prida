@@ -17,7 +17,8 @@ class AugmentationInstance:
         self.candidate_dataset = Dataset()
         self.candidate_dataset.initialize_from_filename(self.candidate_filename, use_hdfs, hdfs_address, hdfs_user)
         self.target_name = instance_values['target_name']
-
+        self.imputation_strategy = instance_values['imputation_strategy']
+        
         # if the augmentation instance does not come from the test data, the prediction metrics before and
         # after augmentation are available
         if len(instance_values.keys()) > NUMBER_OF_FIELDS_IN_TEST_AUGMENTATION_INSTANCE:

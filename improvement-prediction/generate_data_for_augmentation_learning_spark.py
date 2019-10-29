@@ -8,8 +8,7 @@ from util.instance_parser import *
 
 
 def generate_learning_instance(learning_data_record, params):
-    """Generates features for each line of the training data and
-    the respective learning targets (y).
+    """Generates features for each JSON record of the training data
     """
 
     # parameters
@@ -61,7 +60,7 @@ if __name__ == '__main__':
 
     # generating learning instances
     learning_instances = learning_data.flatMap(
-        lambda x: generate_learning_instance(x, params)
+        lambda x: generate_learning_instance(json.loads(x), params)
     ).map(
         lambda x: ','.join([str(item) for item in x])
     )
