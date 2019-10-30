@@ -17,7 +17,8 @@ class AugmentationInstance:
         self.candidate_dataset = Dataset()
         self.candidate_dataset.initialize_from_filename(self.candidate_filename, use_hdfs, hdfs_address, hdfs_user)
         self.target_name = instance_values['target_name']
-
+        self.imputation_strategy = instance_values['imputation_strategy']
+        
         # if the augmentation instance does not come from the test data, the prediction metrics before and
         # after augmentation are available
         if len(instance_values.keys()) > NUMBER_OF_FIELDS_IN_TEST_AUGMENTATION_INSTANCE:
@@ -78,7 +79,7 @@ class AugmentationInstance:
         between the query and candidate datasets. By default, the joining key is 
         'key-for-ranking'
         """
-        result_data = self.query_dataset.join_with(self.candidate_dataset, key='key-for-ranking')
+        result_data = self.query_dataset.join_with(self.candidate_dataset, missing_value_imputation=self.imputation_strategy)
         dataset = Dataset()
         dataset.initialize_from_data_and_column_names(result_data, result_data.columns)
         return dataset
