@@ -1,0 +1,6 @@
+if test -f dependencies.zip; then
+    rm dependencies.zip
+fi
+zip -r dependencies.zip *.py util/
+ 
+spark2-submit --deploy-mode cluster --master yarn --conf spark.yarn.appMasterEnv.PYSPARK_PYTHON=./env/feature-and-target-generation/bin/python --archives data/features-and-targets-environment.zip#env --py-files dependencies.zip --files .params_feature_generation.json --driver-memory 6GB --conf spark.dynamicAllocation.enabled=false --conf spark.driver.memoryOverhead=1G --conf spark.executor.memoryOverhead=1G --num-executors 150 --executor-cores 5 --executor-memory 10G --conf spark.network.timeout=12000s  generate_data_for_augmentation_learning_spark.py

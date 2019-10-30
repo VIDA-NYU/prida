@@ -1,9 +1,9 @@
 import pandas as pd
 from augmentation_instance import *
-from feature_factory import *
+from util.feature_factory import *
 from learning_task import *
-from metrics import *
-from instance_parser import *
+from util.metrics import *
+from util.instance_parser import *
 
 class Recommender:
     """This class (1) generates features and relative gains to be predicted,
