@@ -91,9 +91,10 @@ def generate_stats_from_record(record, load_dataframes, params):
         query_intersection_size = intersection_size / len(query_data_keys)
         candidate_intersection_size = intersection_size / len(candidate_data_keys)
 
-        return (imputation_strategy, query_intersection_size, candidate_intersection_size)
+        return (imputation_strategy, query_intersection_size, candidate_intersection_size,
+                query_data.shape[0], query_data.shape[1], candidate_data.shape[0], candidate_data.shape[1])
 
-    return (imputation_strategy, None, None)
+    return (imputation_strategy, None, None, None, None, None, None)
 
 
 def list_dir(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
@@ -117,6 +118,10 @@ if __name__ == '__main__':
     query_size_gt_candidate_size = sc.accumulator(0)
     query_intersection_sizes = list()
     candidate_intersection_sizes = list()
+    query_n_rows = list()
+    query_n_columns = list()
+    candidate_n_rows = list()
+    candidate_n_columns = list()
 
     # parameters
     params = json.load(open(".params.json"))
@@ -161,9 +166,21 @@ if __name__ == '__main__':
             lambda x: (x[1], x[2])
         ).collect()
 
+        n_rows_columns = stats.filter(
+            lambda x: x[1] != None and x[2] != None
+        ).map(
+            lambda x: (x[3], x[4], x[5], x[6])
+        ).collect()
+
         if len(intersection_sizes) > 0:
             query_intersection_sizes += [x for (x, y) in intersection_sizes]
             candidate_intersection_sizes += [y for (x, y) in intersection_sizes]
+
+        if len(n_rows_columns) > 0:
+            query_n_rows += [x for (x, y, w, z) in n_rows_columns]
+            query_n_columns += [y for (x, y, w, z) in n_rows_columns]
+            candidate_n_rows += [w for (x, y, w, z) in n_rows_columns]
+            candidate_n_columns += [z for (x, y, w, z) in n_rows_columns]
 
         algorithms[algorithm_name]['n_records'] = n_records.value
         algorithms[algorithm_name]['before_lte_after'] = before_lte_after.value
@@ -192,6 +209,11 @@ if __name__ == '__main__':
     hist_query_intersection_size = np.histogram(query_intersection_sizes, bins=10)
     hist_candidate_intersection_size = np.histogram(candidate_intersection_sizes, bins=10)
 
+    hist_query_n_rows = np.histogram(query_n_rows, bins=10)
+    hist_query_n_columns = np.histogram(query_n_columns, bins=10)
+    hist_candidate_n_rows = np.histogram(candidate_n_rows, bins=10)
+    hist_candidate_n_columns = np.histogram(candidate_n_columns, bins=10)
+
     print('General statistics:')
     print(' -- Size query lte size candidate: %d (%.2f%%)' % (
         query_size_lte_candidate_size.value,
@@ -214,5 +236,33 @@ if __name__ == '__main__':
             hist_candidate_intersection_size[1][i-1],
             hist_candidate_intersection_size[1][i],
             hist_candidate_intersection_size[0][i-1])
+        )
+    print(' -- Query number of records: ')
+    for i in range(1, len(hist_query_n_rows[1])):
+        print('    [%.4f, %4f]\t%d' % (
+            hist_query_n_rows[1][i-1],
+            hist_query_n_rows[1][i],
+            hist_query_n_rows[0][i-1])
+        )
+    print(' -- Query number of columns: ')
+    for i in range(1, len(hist_query_n_columns[1])):
+        print('    [%.4f, %4f]\t%d' % (
+            hist_query_n_columns[1][i-1],
+            hist_query_n_columns[1][i],
+            hist_query_n_columns[0][i-1])
+        )
+    print(' -- Candidate number of records: ')
+    for i in range(1, len(hist_candidate_n_rows[1])):
+        print('    [%.4f, %4f]\t%d' % (
+            hist_candidate_n_rows[1][i-1],
+            hist_candidate_n_rows[1][i],
+            hist_candidate_n_rows[0][i-1])
+        )
+    print(' -- Candidate number of columns: ')
+    for i in range(1, len(hist_candidate_n_columns[1])):
+        print('    [%.4f, %4f]\t%d' % (
+            hist_candidate_n_columns[1][i-1],
+            hist_candidate_n_columns[1][i],
+            hist_candidate_n_columns[0][i-1])
         )
     print('')
