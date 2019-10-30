@@ -1,6 +1,6 @@
 import pandas as pd
 from augmentation_instance import *
-from util.feature_factory import *
+from feature_factory import *
 from learning_task import *
 from util.metrics import *
 from util.instance_parser import *

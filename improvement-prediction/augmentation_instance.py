@@ -1,6 +1,6 @@
 import numpy as np
 from dataset import *
-from util.feature_factory import *
+from feature_factory import *
 from util.metrics import *
 from constants import *
 
