@@ -789,37 +789,25 @@ if __name__ == '__main__':
             # generating query and candidate dataset pairs for negative examples
             #   number of negative examples should be similar to the number of
             #   positive examples
-            query_and_candidate_data_negative_tmp = list()
             n_random_candidates_per_query = int(n_positive_examples / n_query_datasets)
-            query_data_by_id = dict(
-                query_and_candidate_data_positive.map(
-                    lambda x: (x[0], [x[1], x[2], x[4]])
-                ).collect()
-            )
-            for identifier in query_data_by_id.keys():
-                # getting candidate datasets from different datasets
-                other_candidates = query_and_candidate_data_positive.filter(
-                    lambda x: x[0] != identifier and x[4] != query_data_by_id[identifier][2]
-                ).flatMap(
-                    lambda x: x[3]
-                ).collect()
-                target_variable = query_data_by_id[identifier][0]
-                query_datasets = query_data_by_id[identifier][1]
-                for query_dataset in query_datasets:
-                    # randomly choosing candidates for the query dataset
-                    random_candidates = np.random.choice(
-                        len(other_candidates),
-                        min(n_random_candidates_per_query, len(other_candidates)),
-                        replace=False
-                    )
-                    query_and_candidate_data_negative_tmp.append(
-                        (
-                            query_dataset,
-                            target_variable,
-                            [other_candidates[i] for i in random_candidates]
-                        )
-                    )
-            query_and_candidate_data_negative_tmp = sc.parallelize(query_and_candidate_data_negative_tmp) # rdd
+            query_and_candidate_data_negative_tmp = query_and_candidate_data_positive.cartesian(
+                query_and_candidate_data_positive
+            ).filter(
+                # filtering same identifier / dataset
+                lambda x: x[0][0] != x[1][0] and x[0][4] != x[1][4]
+            ).flatMap(
+                # key => (target variable, query dataset)
+                # val => list of candidate datasets
+                lambda x: [((x[0][1], query_data), x[1][3]) for query_data in x[0][2]]
+            ).reduceByKey(
+                # concatenating lists of candidate datasets
+                lambda x, y: x + y
+            ).map(
+                # (target variable, query dataset, random sample of other candidate datasets)
+                lambda x: (x[0][0], x[0][1], list(np.random.choice(
+                    x[1], size=min(n_random_candidates_per_query, len(x[1])), replace=False
+                )))
+            ).persist(StorageLevel.MEMORY_AND_DISK)
 
             # total number of negative examples
             n_negative_examples = query_and_candidate_data_negative_tmp.map(
@@ -832,7 +820,7 @@ if __name__ == '__main__':
             #   format is the following:
             #   (target_variable, query_dataset_path, candidate_dataset_paths)
             query_and_candidate_data_negative = query_and_candidate_data_negative_tmp.map(
-                lambda x: generate_candidate_datasets_negative_examples(x[1], x[0], x[2], params)
+                lambda x: generate_candidate_datasets_negative_examples(x[0], x[1], x[2], params)
             ).persist(StorageLevel.MEMORY_AND_DISK)
 
             query_candidate_datasets = sc.union([
@@ -842,6 +830,9 @@ if __name__ == '__main__':
                 query_and_candidate_data_negative
             ]).persist(StorageLevel.MEMORY_AND_DISK)
 
+            # force Spark to save negative examples if training will be skipped
+            if skip_training_data:
+                n_datasets = query_candidate_datasets.count()
 
     else:
 
