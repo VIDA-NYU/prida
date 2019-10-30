@@ -4,10 +4,10 @@ from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import r2_score
 from sklearn.model_selection import KFold 
-from util.graphic_functions import *
-from util.debug import *
-from util.metrics import *
-from util.feature_selection import *
+from graphic_functions import *
+from debug import *
+from metrics import *
+from feature_selection import *
 from sklearn.preprocessing import MinMaxScaler
 
 SEPARATOR = ','

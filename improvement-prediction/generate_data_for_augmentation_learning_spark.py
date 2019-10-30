@@ -3,8 +3,8 @@ from augmentation_instance import *
 import json
 from pyspark import SparkConf, SparkContext
 import time
-from util.file_manager import *
-from util.instance_parser import *
+from file_manager import *
+from instance_parser import *
 
 
 def generate_learning_instance(prefix, learning_data_record, params):
@@ -58,7 +58,7 @@ if __name__ == '__main__':
     learning_data_filename_for_spark = learning_data_filename
     if not cluster_execution:
         learning_data_filename_for_spark = 'file://' + learning_data_filename
-    learning_data = sc.textFile(learning_data_filename_for_spark)
+    learning_data = sc.textFile(learning_data_filename_for_spark).repartition(200)
 
     # generating learning instances
     learning_instances = learning_data.flatMap(

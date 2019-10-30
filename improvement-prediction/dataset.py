@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from io import StringIO
 from sklearn.impute import SimpleImputer
-from util.file_manager import *
+from file_manager import *
 
 class Dataset:
     """This class stores and manages a certain dataset and performs join operations with other given 

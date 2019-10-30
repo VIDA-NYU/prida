@@ -1,7 +1,7 @@
 import numpy as np
 from dataset import *
 from feature_factory import *
-from util.metrics import *
+from metrics import *
 from constants import *
 
 class AugmentationInstance:
