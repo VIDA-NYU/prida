@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from hdfs import InsecureClient
 import os
-
+from constants import *
 
 def read_file(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """Opens a file for read and returns its corresponding content.
@@ -45,3 +45,24 @@ def dump_learning_instances(data_filename, features, targets):
         for features, target in zip(features, targets):
             output_string = ','.join([str(i) for i in features]) + ',' + str(target) + '\n'
             f.write(output_string)
+
+def read_augmentation_learning_filename(augmentation_learning_filename):
+    """Reads augmentation_learning_filename to extract metadata, features and targets 
+    (relative performance gains after augmentation)
+    """
+    learning_metadata = []
+    learning_features = []
+    learning_targets = []
+    with open(augmentation_learning_filename, 'r') as f:
+        for line in f:
+            fields = line.strip().split(SEPARATOR)
+            metadata = {'query_filename': fields[QUERY_FILENAME_ID], 'target_name': fields[TARGET_NAME_ID], 'candidate_filename': fields[CANDIDATE_FILENAME_ID]}
+            learning_metadata.append(metadata)
+            features = [float(i) for i in fields[CANDIDATE_FILENAME_ID+1:DECREASE_IN_MEAN_ABSOLUTE_ERROR_ID]]
+            learning_features.append(features)
+            targets = {'decrease_in_mae': float(fields[DECREASE_IN_MEAN_ABSOLUTE_ERROR_ID]),
+                       'decrease_in_mse': float(fields[DECREASE_IN_MEAN_SQUARED_ERROR_ID]),
+                       'decrease_in_med_ae': float(fields[DECREASE_IN_MEDIAN_ABSOLUTE_ERROR_ID]),
+                       'gain_in_r2_score': float(fields[GAIN_IN_R2_SCORE_ID])}
+            learning_targets.append(targets)
+    return learning_metadata, learning_features, learning_targets
