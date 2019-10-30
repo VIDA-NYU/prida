@@ -753,6 +753,8 @@ if __name__ == '__main__':
                 dataset_files.append(problem_doc)
 
         all_files = sc.parallelize(dataset_files)
+        if cluster_execution:
+            all_files = all_files.repartition(100)
 
         # grouping files from same dataset
         # (dataset_name, [('learningData.csv', path),
@@ -862,6 +864,9 @@ if __name__ == '__main__':
         query_candidate_datasets = sc.parallelize(data_by_identifier).flatMap(
             lambda x: [(x[0], query, x[2]) for query in x[1]]
         ).persist(StorageLevel.MEMORY_AND_DISK)
+
+        if cluster_execution:
+            query_candidate_datasets = query_candidate_datasets.repartition(200)
 
 
     if not skip_training_data:
