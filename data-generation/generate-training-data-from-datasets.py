@@ -53,7 +53,7 @@ def read_file(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
 
     output = None
     if use_hdfs:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user, timeout=(60, 60))
+        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user, timeout=(6000, 6000))
         if hdfs_client.status(file_path, strict=False):
             with hdfs_client.read(file_path) as reader:
                 output = reader.read().decode()
@@ -69,7 +69,7 @@ def save_file(file_path, content, use_hdfs=False, hdfs_address=None, hdfs_user=N
     """
 
     if use_hdfs:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user, timeout=(60, 60))
+        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user, timeout=(6000, 6000))
         if hdfs_client.status(file_path, strict=False):
             print('[WARNING] File already exists: %s' % file_path)
         with hdfs_client.write(file_path) as writer:
@@ -88,7 +88,7 @@ def create_dir(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """
 
     if use_hdfs:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user, timeout=(60, 60))
+        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user, timeout=(6000, 6000))
         if hdfs_client.status(file_path, strict=False):
             hdfs_client.delete(file_path, recursive=True)
         hdfs_client.makedirs(file_path)
@@ -104,7 +104,7 @@ def list_dir(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """
 
     if use_hdfs:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user, timeout=(60, 60))
+        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user, timeout=(6000, 6000))
         return hdfs_client.list(file_path)
     return os.listdir(file_path)
 
