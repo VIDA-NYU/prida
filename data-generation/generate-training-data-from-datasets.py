@@ -47,6 +47,19 @@ def organize_dataset_files(file_path, cluster_execution):
     return (dataset_name, [(file_name, file_path)])
 
 
+def file_exists(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+    """Returns True if file exists.
+    """
+
+    if use_hdfs:
+        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user, timeout=(6000, 6000))
+        if hdfs_client.status(file_path, strict=False):
+            return True
+    else:
+        return os.path.exists(file_path)
+    return False
+
+
 def read_file(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """Opens a file for read and returns its corresponding content.
     """
@@ -830,31 +843,48 @@ if __name__ == '__main__':
                 query_and_candidate_data_negative
             ]).persist(StorageLevel.MEMORY_AND_DISK)
 
-            # force Spark to save negative examples if training will be skipped
-            if skip_training_data:
-                n_datasets = query_candidate_datasets.count()
+            save_file(
+                os.path.join(output_dir, '.files-training-data'),
+                '\n'.join(query_candidate_datasets.flatMap(
+                    lambda x: [[x[0], x[1]] + x[2]]
+                ).map(
+                    lambda x: ','.join(x)
+                ).collect()),
+                params['cluster'],
+                params['hdfs_address'],
+                params['hdfs_user']
+            )
 
     else:
 
         # datasets previously generated
-        data_by_identifier = list()
-        for identifier in list_dir(os.path.join(output_dir, 'files'), cluster_execution, hdfs_address, hdfs_user):
-            target_variable = None
-            query_datasets = list()
-            candidate_datasets = list()
-            for f in list_dir(os.path.join(output_dir, 'files', identifier), cluster_execution, hdfs_address, hdfs_user):
-                file_path = os.path.join(output_dir, 'files', identifier, f)
-                if f.startswith('query_'):
-                    query_datasets.append(file_path)
-                elif f.startswith('candidate_'):
-                    candidate_datasets.append(file_path)
-                elif f == '.target':
-                    target_variable = read_file(file_path, cluster_execution, hdfs_address, hdfs_user)
-            data_by_identifier.append((target_variable, query_datasets, candidate_datasets))
+        if file_exists(os.path.join(output_dir, '.files-training-data'), cluster_execution, hdfs_address, hdfs_user):
+            query_candidate_datasets = sc.parallelize(
+                read_file(os.path.join(output_dir, '.files-training-data'), cluster_execution, hdfs_address, hdfs_user).split('\n')
+            ).map(
+                lambda x: x.strip().split(',')
+            ).map(
+                lambda x: (x[0], x[1], x[2:])
+            ).persist(StorageLevel.MEMORY_AND_DISK)
+        else:
+            data_by_identifier = list()
+            for identifier in list_dir(os.path.join(output_dir, 'files'), cluster_execution, hdfs_address, hdfs_user):
+                target_variable = None
+                query_datasets = list()
+                candidate_datasets = list()
+                for f in list_dir(os.path.join(output_dir, 'files', identifier), cluster_execution, hdfs_address, hdfs_user):
+                    file_path = os.path.join(output_dir, 'files', identifier, f)
+                    if f.startswith('query_'):
+                        query_datasets.append(file_path)
+                    elif f.startswith('candidate_'):
+                        candidate_datasets.append(file_path)
+                    elif f == '.target':
+                        target_variable = read_file(file_path, cluster_execution, hdfs_address, hdfs_user)
+                data_by_identifier.append((target_variable, query_datasets, candidate_datasets))
 
-        query_candidate_datasets = sc.parallelize(data_by_identifier).flatMap(
-            lambda x: [(x[0], query, x[2]) for query in x[1]]
-        ).persist(StorageLevel.MEMORY_AND_DISK)
+            query_candidate_datasets = sc.parallelize(data_by_identifier).flatMap(
+                lambda x: [(x[0], query, x[2]) for query in x[1]]
+            ).persist(StorageLevel.MEMORY_AND_DISK)
 
         if cluster_execution:
             query_candidate_datasets = query_candidate_datasets.repartition(300)
