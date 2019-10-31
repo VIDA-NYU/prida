@@ -58,7 +58,7 @@ if __name__ == '__main__':
     learning_data_filename_for_spark = learning_data_filename
     if not cluster_execution:
         learning_data_filename_for_spark = 'file://' + learning_data_filename
-    learning_data = sc.textFile(learning_data_filename_for_spark)
+    learning_data = sc.textFile(learning_data_filename_for_spark).repartition(NUMBER_OF_SPARK_REPARTITIONS)
 
     # generating learning instances
     learning_instances = learning_data.flatMap(
