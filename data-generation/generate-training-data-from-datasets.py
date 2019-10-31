@@ -857,10 +857,14 @@ if __name__ == '__main__':
         ).persist(StorageLevel.MEMORY_AND_DISK)
 
         if cluster_execution:
-            query_candidate_datasets = query_candidate_datasets.repartition(200)
+            query_candidate_datasets = query_candidate_datasets.repartition(300)
 
 
     if not skip_training_data:
+
+        if not skip_training_data and skip_dataset_creation:
+            start_time = time.time()
+
         if not query_candidate_datasets.isEmpty():
 
             # getting performance scores
