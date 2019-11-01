@@ -47,5 +47,4 @@ def parse_augmentation_instance(prefix, file_record, use_hdfs=False, hdfs_addres
               'med_ae_after': file_record['median_absolute_error'][1],
               'r2_score_before': file_record['r2_score'][0],
               'r2_score_after': file_record['r2_score'][1]}
-    print('FIELDSSSSSSSS', fields)
     return AugmentationInstance(fields, use_hdfs, hdfs_address, hdfs_user)

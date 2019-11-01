@@ -327,8 +327,9 @@ class FeatureFactory:
         features.append(mutual_info) if not np.isnan(mutual_info) else features.append(0.0)
         return features
 
-    def compute_percentual_difference_in_number_of_rows(self, number_of_rows_of_another_dataset):
+    def compute_percentual_difference_in_number_of_rows(self, keys_of_another_dataset):
         """Computes the ratio between the number of rows of the dataset and the number of rows of 
-        another dataset
+        another dataset, using keys and their intersections as a proxy
         """
-        return self.get_number_of_rows()/number_of_rows_of_another_dataset
+        final_number_of_rows = len(set(self.data.index.values) & set(keys_of_another_dataset))  
+        return final_number_of_rows/len(keys_of_another_dataset)

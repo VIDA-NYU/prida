@@ -15,22 +15,29 @@ class Dataset:
         self.filename = filename
         self.read_dataset(use_hdfs, hdfs_address, hdfs_user)
 
-    def initialize_from_data_and_column_names(self, data, columns):
+    def initialize_from_data_and_column_names(self, data, columns, keys):
         """Stores a pandas representation of a dataset that is passed in the parameters
         """
         self.data = data
         self.column_names = columns
+        self.keys = keys
         
     def read_dataset(self, use_hdfs=False, hdfs_address=None, hdfs_user=None):
         """Reads lines from self.filename, storing in a pandas dataframe
         """
         self.data = pd.read_csv(StringIO(read_file(self.filename, use_hdfs, hdfs_address, hdfs_user))).set_index(keys='key-for-ranking', drop=True)
         self.column_names = self.data.columns
+        self.keys = self.data.index.values
 
     def get_data(self):
         """Returns the dataset (a pandas dataframe)
         """
         return self.data
+
+    def get_keys(self):
+        """Returns all key values in the key column (key-for-ranking)
+        """
+        return self.keys
 
     def get_column_names(self):
         """Returns the names of the dataset columns

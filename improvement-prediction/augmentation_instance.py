@@ -81,7 +81,7 @@ class AugmentationInstance:
         """
         result_data = self.query_dataset.join_with(self.candidate_dataset, missing_value_imputation=self.imputation_strategy)
         dataset = Dataset()
-        dataset.initialize_from_data_and_column_names(result_data, result_data.columns)
+        dataset.initialize_from_data_and_column_names(result_data, result_data.columns, result_data.keys)
         return dataset
 
     def get_joined_query_data(self):
@@ -178,7 +178,7 @@ class AugmentationInstance:
                                                                                                                         self.target_name)
 
         # computing (6)
-        difference_in_numbers_of_rows = feature_factory_candidate_with_target.compute_percentual_difference_in_number_of_rows(self.query_dataset.get_data().shape[0])
+        difference_in_numbers_of_rows = feature_factory_candidate_with_target.compute_percentual_difference_in_number_of_rows(self.query_dataset.get_keys())
         
         return joined_dataset_features + joined_dataset_features_with_target + \
             query_features_with_target + candidate_features_with_target + \
