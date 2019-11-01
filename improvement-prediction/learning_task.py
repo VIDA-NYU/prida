@@ -11,6 +11,7 @@ from constants import *
 from util.feature_selection import *
 from util.file_manager import *
 from sklearn.preprocessing import MinMaxScaler
+import pickle
 
 class LearningTask:
     def __init__(self):
@@ -40,6 +41,62 @@ class LearningTask:
         """
         return self.learning_features[feature_ids]
 
+    def _generate_models(self, data_splits_spec,
+                         ml_algorithm_object,
+                         ml_algorithm_name,
+                         learning_target='gain_in_r2_score',
+                         feature_ids=None):
+        """Executes a specific machine learning algorithm (e.g., random forests or linear regression) to predict a certain 
+        learning_target. 
+
+        Parameter data_splits_spec indicates how to split the data into training and test instances for cross validation (e.g., KFold).
+
+        If feature_ids == None, all features are used to predict the targets; otherwise, only feature_ids are used.
+        """
+        print('LEARNING TARGET', learning_target)
+        
+        if feature_ids:
+            features = self.filter_learning_features(feature_ids)
+        else:
+            features = self.learning_features
+        data_splits_spec.get_n_splits(features)
+        targets = [item[learning_target] for item in self.learning_targets]
+        
+        i = 0
+        models = []
+        test_data_results = []
+        for train_index, test_index in data_splits_spec.split(features):
+            X_train, X_test = np.array(features)[train_index], np.array(features)[test_index]
+            y_train, y_test = np.array(targets)[train_index], np.array(targets)[test_index]
+            X_train, y_train = remove_outliers(X_train, y_train, zscore_threshold=0.5)
+            X_test, y_test = remove_outliers(X_test, y_test, zscore_threshold=0.5)
+            ml_algorithm_object.fit(X_train, y_train)
+            predictions = ml_algorithm_object.predict(X_test)
+            models.append(ml_algorithm_object)
+            test_data_results.append({'index_of_test_instances': test_index,
+                              'true_relative_gain_for_test_instances': y_test})
+            
+            # the lines below help inspect the models, and how good they are
+            ## performs feature selection in order to rank which features matter most for the model
+            if ml_algorithm_name == 'random_forest':
+                feature_importances = [(index, value) for index, value in enumerate(ml_algorithm_object.feature_importances_)]
+                print([i[0] for i in sorted(feature_importances, key= lambda i: i[1], reverse=True)])
+            elif ml_algorithm_name == 'linear_regression':
+                mutual_information_univariate_selection(X_train, y_train)
+            
+            ## inspects the r2 score of the model over the test data
+            print('how good this ' + ml_algorithm_name + ' is:', r2_score(y_test, predictions))
+            
+            ## computes error metrics between actual targets and predictions
+            print('fold', i, 'SMAPE', compute_SMAPE(predictions, y_test), 'MSE', compute_MSE(predictions, y_test))
+
+            ## contrasts actual targets (real values) and predictions (predicted values)
+            plot_scatterplot(y_test, predictions, 'predicted_r2_score_gains_fold_' + str(i) + '_' + ml_algorithm_name + '.png', 'Real values', 'Predicted values')
+
+            #############
+            i += 1
+        return models, test_data_results
+
     def execute_linear_regression(self, n_splits, learning_target='gain_in_r2_score', feature_ids=None):
         """Performs linear regression with k-fold cross validation 
         (k = n_splits). 
@@ -52,47 +109,8 @@ class LearningTask:
         predict the targets; otherwise, only feature_ids are used.
         """
         kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
-        if feature_ids:
-            features = self.filter_learning_features(feature_ids)
-        else:
-            features = self.learning_features
-        kf.get_n_splits(features)
-        targets = [item[learning_target] for item in self.learning_targets]
-        
-        i = 0
-        models = []
-        test_data_results = []
-        for train_index, test_index in kf.split(features):
-            X_train, X_test = np.array(features)[train_index], np.array(features)[test_index]
-            y_train, y_test = np.array(targets)[train_index], np.array(targets)[test_index]
-
-            X_train, y_train = remove_outliers(X_train, y_train, zscore_threshold=1)
-            X_test, y_test = remove_outliers(X_test, y_test, zscore_threshold=1)
-            lm = LinearRegression()
-            lm.fit(X_train, y_train)
-            models.append(rf)
-            test_data_results.append({'index_of_test_instances': test_index,
-                              'true_relative_gain_for_test_instances': y_test})
-            predictions = lm.predict(X_test)
-
-            # the lines below help inspect the models, and how good they are
-
-            ## performs feature selection in order to rank which features matter most for the model
-            mutual_information_univariate_selection(X_train, y_train)
-
-            ## inspects the r2 score of the linear regression model over the test data
-            print('how good is this linear regression model:', lm.score(X_test, y_test))
-
-            ## computes error metrics between actual targets and predictions
-            print('fold', i, 'SMAPE', compute_SMAPE(predictions, y_test), 'MSE', compute_MSE(predictions, y_test))
-
-            ## contrasts actual targets (real values) and predictions (predicted values)
-            plot_scatterplot(y_test, predictions, 'predicted_r2_score_gains_fold_' + str(i) + '_linear_regression.png', 'Real values', 'Predicted values')
-
-            #############
-            i += 1
-            
-        return models, test_data_results
+        lm = LinearRegression()
+        return self._generate_models(kf, lm, 'linear_regression', learning_target, feature_ids)
 
     def execute_random_forest(self, n_splits, learning_target='gain_in_r2_score', feature_ids=None):
         """Performs random forest with k-fold cross validation 
@@ -105,44 +123,6 @@ class LearningTask:
         predict the targets; otherwise, only feature_ids are used.
         """        
         kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
-        if feature_ids:
-            features = self.filter_learning_features(feature_ids)
-        else:
-            features = self.learning_features
-        kf.get_n_splits(features)
-        targets = [item[learning_target] for item in self.learning_targets]
-        
-        i = 0
-        models = []
-        test_data_results = []
-        for train_index, test_index in kf.split(features):
-            X_train, X_test = np.array(features)[train_index], np.array(features)[test_index]
-            y_train, y_test = np.array(targets)[train_index], np.array(targets)[test_index]
-            X_train, y_train = remove_outliers(X_train, y_train, zscore_threshold=0.5)
-            X_test, y_test = remove_outliers(X_test, y_test, zscore_threshold=0.5)
-            rf = RandomForestRegressor(n_estimators=100, random_state=42)
-            rf.fit(X_train, y_train)
-            predictions = rf.predict(X_test)
-            models.append(rf)
-            test_data_results.append({'index_of_test_instances': test_index,
-                              'true_relative_gain_for_test_instances': y_test})
-            
-            # the lines below help inspect the models, and how good they are
-
-            ## performs feature selection in order to rank which features matter most for the model
-            feature_importances = [(index, value) for index, value in enumerate(rf.feature_importances_)]
-            print([i[0] for i in sorted(feature_importances, key= lambda i: i[1], reverse=True)])
-
-            ## inspects the r2 score of the random forest model over the test data
-            print('how good is this random forest model:', r2_score(y_test, predictions))
-            
-            ## computes error metrics between actual targets and predictions
-            print('fold', i, 'SMAPE', compute_SMAPE(predictions, y_test), 'MSE', compute_MSE(predictions, y_test))
-
-            ## contrasts actual targets (real values) and predictions (predicted values)
-            plot_scatterplot(y_test, predictions, 'predicted_r2_score_gains_fold_' + str(i) + '_random_forest.png', 'Real values', 'Predicted values')
-
-            #############
-            i += 1
-        return models, test_data_results
+        rf = RandomForestRegressor(n_estimators=100, random_state=42)
+        return self._generate_models(kf, rf, 'random_forest', learning_target, feature_ids)
 

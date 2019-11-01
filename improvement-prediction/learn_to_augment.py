@@ -28,5 +28,5 @@ if __name__ == '__main__':
     # performance gain, so we can adequately evaluate the models over them
     learning_task = LearningTask()
     learning_task.read_features_and_targets(augmentation_learning_data_filename)
-    models, test_data = learning_task.execute_random_forest(n_splits, learning_target='decrease_in_mae')
+    models, test_data = learning_task.execute_linear_regression(n_splits)
     

@@ -103,7 +103,3 @@ def compute_mean_reciprocal_rank_for_single_sample(real_gains, predicted_gains):
         if real_best_candidate == elem[0]:
             return 1/(index + 1)
     return 0
-
-    
-
-
