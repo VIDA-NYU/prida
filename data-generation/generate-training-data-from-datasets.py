@@ -897,7 +897,7 @@ if __name__ == '__main__':
         if not cluster_execution:
             filename = 'file://' + filename
         query_candidate_datasets = sc.textFile(filename).map(
-            lambda x: x.strip().split(',')
+            lambda x: x.split(',')
         ).map(
             lambda x: (x[0], x[1], x[2:])
         ).persist(StorageLevel.MEMORY_AND_DISK)
