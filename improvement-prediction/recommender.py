@@ -1,4 +1,5 @@
 import pandas as pd
+import json
 from augmentation_instance import *
 from feature_factory import *
 from learning_task import *
@@ -6,24 +7,29 @@ from util.metrics import *
 from util.instance_parser import *
 
 class Recommender:
-    """This class (1) generates features and relative gains to be predicted,
-    given a training data filename, (2) creates machine learning models to predict the 
-    relative gain in performance for augmentation with different candidates, and 
-    (3) recommends such candidates sorted by their predicted relative gains 
-    """
-    def store_instances(self, filename):
+    def __init__(self, learning_data_filename):
+        """This class (1) generates features and relative gains to be predicted,
+        given a training data filename, (2) creates machine learning models to predict the 
+        relative gain in performance for augmentation with different candidates, and 
+        (3) recommends such candidates sorted by their predicted relative gains 
+        """
+        self.learning_data_filename = learning_data_filename
+        self._store_instances()
+        
+    def _store_instances(self):
         """Given a training data filename, this method derives their corresponding 
         features and relative gains (targets), stores individual features for query and 
         candidate datasets for efficiency, so they don't need to be recomputed, and 
         stores the rows of the filename in a table
         """
-        with open(filename, 'r') as f:
+        with open(self.learning_data_filename, 'r') as f:
             rows_list = []
             self.candidate_filenames = []
             self.query_individual_features = {}
             self.candidate_individual_features = {}
             for line in f:
-                instance = parse_augmentation_instance(line)
+                #parse_augmentation_instance(prefix, file_record, hdfs_client, use_hdfs=False, hdfs_address=None, hdfs_user=None)
+                instance = parse_augmentation_instance(json.loads(line))
                 self.candidate_filenames.append(instance.get_candidate_filename())
                 rows_list.append(instance.get_formatted_fields())
                 

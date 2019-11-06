@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import sys
+import pickle
 from recommender import *
 
 if __name__ == '__main__':
@@ -16,11 +17,21 @@ if __name__ == '__main__':
         params = json.load(open('params.json'))
     else:
         params = json.load(open(sys.argv[1]))
-
-    recommender = Recommender()
+    recommender = Recommender(params['learning_data_filename'])
 
     # Reads machine learning models to predict relative gains and test data
-    models, test_data = recommender.generate_models_and_test_data(params['augmentation_learning_data_filename'], params['n_splits'])
+    if params['augmentation_models_and_test_filenames']:
+        model_filenames, test_data_filenames = params['augmentation_models_and_test_filenames']
+        models = []
+        for fname in model_filenames:
+            models.append(pickle.load(fname))
+        test_data = []
+        for fname in test_data_filenames:
+            test_data.append(json.load(fname))
+    else:
+        print('no augmentation models available')
+        models, test_data = recommender.generate_models_and_test_data(params['augmentation_learning_data_filename'],
+                                                                      params['n_splits'])
     print('done creating models and corresponding test_data')
     for model, data in zip(models, test_data):
         recommender.predict_gains_for_candidate_datasets(model, data)
