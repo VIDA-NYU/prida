@@ -5,17 +5,17 @@ from util.metrics import *
 from constants import *
 
 class AugmentationInstance:
-    def __init__(self, instance_values, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+    def __init__(self, instance_values, hdfs_client, use_hdfs=False, hdfs_address=None, hdfs_user=None):
         """This class concerns augmentation instances --- each composed of a query dataset,
         a target variable/column, a candidate dataset for augmentation, and optional metrics regarding 
         the quality of the target prediction before and after augmentation
         """
         self.query_filename = instance_values['query_filename']
         self.query_dataset = Dataset()
-        self.query_dataset.initialize_from_filename(self.query_filename, use_hdfs, hdfs_address, hdfs_user)
+        self.query_dataset.initialize_from_filename(self.query_filename, hdfs_client, use_hdfs, hdfs_address, hdfs_user)
         self.candidate_filename = instance_values['candidate_filename']
         self.candidate_dataset = Dataset()
-        self.candidate_dataset.initialize_from_filename(self.candidate_filename, use_hdfs, hdfs_address, hdfs_user)
+        self.candidate_dataset.initialize_from_filename(self.candidate_filename, hdfs_client, use_hdfs, hdfs_address, hdfs_user)
         self.target_name = instance_values['target_name']
         self.imputation_strategy = instance_values['imputation_strategy']
         
@@ -165,6 +165,7 @@ class AugmentationInstance:
 
         # computing (3)
         feature_factory_candidate_with_target = FeatureFactory(self.get_joined_candidate_data_and_target())
+        print('COLUMNS', self.get_joined_candidate_data_and_target().columns)
         candidate_features_with_target = feature_factory_candidate_with_target.get_pairwise_features_with_target(self.target_name,
                                                                                                                func=max_in_modulus)
         

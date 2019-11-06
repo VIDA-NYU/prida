@@ -20,7 +20,7 @@ def parse_augmentation_instances(training_data_filename):
             augmentation_instances.append(parse_augmentation_instance(line))
         return augmentation_instances
 
-def parse_augmentation_instance(prefix, file_record, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+def parse_augmentation_instance(prefix, file_record, hdfs_client, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """Parses file_record, a JSON instance of the training data in the format
     {'query_dataset': query_dataset,
      'target': target,
@@ -47,4 +47,4 @@ def parse_augmentation_instance(prefix, file_record, use_hdfs=False, hdfs_addres
               'med_ae_after': file_record['median_absolute_error'][1],
               'r2_score_before': file_record['r2_score'][0],
               'r2_score_after': file_record['r2_score'][1]}
-    return AugmentationInstance(fields, use_hdfs, hdfs_address, hdfs_user)
+    return AugmentationInstance(fields, hdfs_client, use_hdfs, hdfs_address, hdfs_user)

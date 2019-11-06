@@ -9,11 +9,11 @@ class Dataset:
     """This class stores and manages a certain dataset and performs join operations with other given 
     datasets
     """    
-    def initialize_from_filename(self, filename, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+    def initialize_from_filename(self, filename, hdfs_client, use_hdfs=False, hdfs_address=None, hdfs_user=None):
         """Generates a pandas representation of a dataset read from a given filename
         """
         self.filename = filename
-        self.read_dataset(use_hdfs, hdfs_address, hdfs_user)
+        self.read_dataset(hdfs_client, use_hdfs, hdfs_address, hdfs_user)
 
     def initialize_from_data_and_column_names(self, data, columns, keys):
         """Stores a pandas representation of a dataset that is passed in the parameters
@@ -22,10 +22,10 @@ class Dataset:
         self.column_names = columns
         self.keys = keys
         
-    def read_dataset(self, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+    def read_dataset(self, hdfs_client, use_hdfs=False, hdfs_address=None, hdfs_user=None):
         """Reads lines from self.filename, storing in a pandas dataframe
         """
-        self.data = pd.read_csv(StringIO(read_file(self.filename, use_hdfs, hdfs_address, hdfs_user))).set_index(keys='key-for-ranking', drop=True)
+        self.data = pd.read_csv(StringIO(read_file(self.filename, hdfs_client, use_hdfs, hdfs_address, hdfs_user))).set_index(keys='key-for-ranking', drop=True)
         self.column_names = self.data.columns
         self.keys = self.data.index.values
 

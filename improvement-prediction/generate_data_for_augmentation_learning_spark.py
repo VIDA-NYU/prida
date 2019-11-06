@@ -16,10 +16,14 @@ def generate_learning_instance(prefix, learning_data_record, params):
     hdfs_address = params['hdfs_address']
     hdfs_user = params['hdfs_user']
 
+    # creating a global hdfs client for reading purposes
+    hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
+    
     # parsing instance and generating features and learning targets
     augmentation_instance = parse_augmentation_instance(
         prefix, 
         learning_data_record,
+        hdfs_client,
         use_hdfs=cluster_execution,
         hdfs_address=hdfs_address,
         hdfs_user=hdfs_user
@@ -67,9 +71,15 @@ if __name__ == '__main__':
         lambda x: ','.join([str(item) for item in x])
     )
 
+    #learning_instances.saveAsTextFile(augmentation_learning_data_filename)
+
+    # creating a global hdfs client for reading purposes
+    hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
+    
     save_file(
         augmentation_learning_data_filename,
         '\n'.join(learning_instances.collect()),
+        hdfs_client, 
         cluster_execution,
         hdfs_address,
         hdfs_user
