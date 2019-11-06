@@ -923,9 +923,9 @@ if __name__ == '__main__':
             if params['regression_algorithm'] == 'random forest':
                 algorithm_name = 'random-forest'
             filename = os.path.join(output_dir, 'training-data-' + algorithm_name)
+            delete_dir(filename, hdfs_client, cluster_execution, hdfs_address, hdfs_user)
             if not cluster_execution:
                 filename = 'file://' + filename
-            delete_dir(filename, hdfs_client, cluster_execution, hdfs_address, hdfs_user)
             performance_scores.saveAsTextFile(filename)
 
     print('Duration: %.4f seconds' % (time.time() - start_time))
