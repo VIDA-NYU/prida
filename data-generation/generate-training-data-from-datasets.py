@@ -47,12 +47,11 @@ def organize_dataset_files(file_path, cluster_execution):
     return (dataset_name, [(file_name, file_path)])
 
 
-def file_exists(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+def file_exists(file_path, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """Returns True if file exists.
     """
 
     if use_hdfs:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
         if hdfs_client.status(file_path, strict=False):
             return True
     else:
@@ -60,13 +59,12 @@ def file_exists(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     return False
 
 
-def read_file(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+def read_file(file_path, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """Opens a file for read and returns its corresponding content.
     """
 
     output = None
     if use_hdfs:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
         if hdfs_client.status(file_path, strict=False):
             with hdfs_client.read(file_path) as reader:
                 output = reader.read().decode()
@@ -77,12 +75,11 @@ def read_file(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     return output
 
 
-def save_file(file_path, content, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+def save_file(file_path, content, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """Opens a file for write and returns its corresponding file object.
     """
 
     if use_hdfs:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
         if hdfs_client.status(file_path, strict=False):
             print('[WARNING] File already exists: %s' % file_path)
         with hdfs_client.write(file_path) as writer:
@@ -95,13 +92,12 @@ def save_file(file_path, content, use_hdfs=False, hdfs_address=None, hdfs_user=N
     # print('[INFO] File %s saved!' % file_path)
 
 
-def create_dir(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+def create_dir(file_path, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """Creates a new directory specified by file_path.
     Returns True on success.
     """
 
     if use_hdfs:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
         if hdfs_client.status(file_path, strict=False):
             hdfs_client.delete(file_path, recursive=True)
         hdfs_client.makedirs(file_path)
@@ -112,12 +108,11 @@ def create_dir(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     return True
 
 
-def list_dir(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+def list_dir(file_path, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """Lists all the files inside the directory specified by file_path.
     """
 
     if use_hdfs:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
         return hdfs_client.list(file_path)
     return os.listdir(file_path)
 
@@ -154,6 +149,11 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
     hdfs_address = params['hdfs_address']
     hdfs_user = params['hdfs_user']
 
+    # HDFS Client
+    hdfs_client = None
+    if cluster_execution:
+        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
+
     problem_type = None
     target_variable = None
     multiple_data = False
@@ -165,13 +165,13 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
     problem_doc = None
     for d in input_dataset[1]:
         if d[0] == 'learningData.csv':
-            data_file = read_file(d[1], cluster_execution, hdfs_address, hdfs_user)
+            data_file = read_file(d[1], hdfs_client, cluster_execution, hdfs_address, hdfs_user)
             continue
         if d[0] == 'datasetDoc.json':
-            dataset_doc = read_file(d[1], cluster_execution, hdfs_address, hdfs_user)
+            dataset_doc = read_file(d[1], hdfs_client, cluster_execution, hdfs_address, hdfs_user)
             continue
         if d[0] == 'problemDoc.json':
-            problem_doc = read_file(d[1], cluster_execution, hdfs_address, hdfs_user)
+            problem_doc = read_file(d[1], hdfs_client, cluster_execution, hdfs_address, hdfs_user)
 
     if not data_file or not dataset_doc or not problem_doc:
         print('[WARNING] The following dataset does not have the appropriate files: %s ' % data_name)
@@ -298,7 +298,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
         # information for saving datasets
         identifier = str(uuid.uuid4())
         identifier_dir = os.path.join(output_dir, 'files', identifier)
-        create_dir(identifier_dir, cluster_execution, hdfs_address, hdfs_user)
+        create_dir(identifier_dir, hdfs_client, cluster_execution, hdfs_address, hdfs_user)
 
         if not candidate_single_column:
             # randomly choose the columns
@@ -318,6 +318,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
             column_metadata=column_metadata,
             key_column=key_column,
             params=params,
+            hdfs_client=hdfs_client,
             dataset_path=identifier_dir,
             dataset_name=data_name,
             query=True
@@ -330,6 +331,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
             column_metadata=column_metadata,
             key_column=key_column,
             params=params,
+            hdfs_client=hdfs_client,
             dataset_path=identifier_dir,
             dataset_name=data_name,
             query=False
@@ -339,9 +341,10 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
         save_file(
             os.path.join(identifier_dir, '.target'),
             original_data.columns[target_variable],
-            params['cluster'],
-            params['hdfs_address'],
-            params['hdfs_user']
+            hdfs_client,
+            cluster_execution,
+            hdfs_address,
+            hdfs_user
         )
 
         results.append((
@@ -374,13 +377,18 @@ def generate_candidate_datasets_negative_examples(target_variable, query_dataset
     hdfs_address = params['hdfs_address']
     hdfs_user = params['hdfs_user']
 
+    # HDFS Client
+    hdfs_client = None
+    if cluster_execution:
+        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
+
     # information for saving datasets
     identifier = str(uuid.uuid4())
     identifier_dir = os.path.join(output_dir, 'files', identifier)
-    create_dir(identifier_dir, cluster_execution, hdfs_address, hdfs_user)
+    create_dir(identifier_dir, hdfs_client, cluster_execution, hdfs_address, hdfs_user)
 
     # reading query dataset
-    query_data_str = read_file(query_dataset, cluster_execution, hdfs_address, hdfs_user)
+    query_data_str = read_file(query_dataset, hdfs_client, cluster_execution, hdfs_address, hdfs_user)
     query_data = pd.read_csv(StringIO(query_data_str))
     query_data_key_column = list(query_data['key-for-ranking'])
 
@@ -388,7 +396,7 @@ def generate_candidate_datasets_negative_examples(target_variable, query_dataset
     for candidate_dataset in candidate_datasets:
 
         # reading candidate dataset
-        candidate_data_str = read_file(candidate_dataset, cluster_execution, hdfs_address, hdfs_user)
+        candidate_data_str = read_file(candidate_dataset, hdfs_client, cluster_execution, hdfs_address, hdfs_user)
         candidate_data = pd.read_csv(StringIO(candidate_data_str))
         candidate_data.drop(columns=['key-for-ranking'], inplace=True)
 
@@ -413,9 +421,10 @@ def generate_candidate_datasets_negative_examples(target_variable, query_dataset
         save_file(
             file_path,
             candidate_data.to_csv(index=False),
-            params['cluster'],
-            params['hdfs_address'],
-            params['hdfs_user']
+            hdfs_client,
+            cluster_execution,
+            hdfs_address,
+            hdfs_user
         )
 
         new_candidate_datasets.append(file_path)
@@ -427,18 +436,20 @@ def generate_candidate_datasets_negative_examples(target_variable, query_dataset
     save_file(
         query_dataset_path,
         query_data.to_csv(index=False),
-        params['cluster'],
-        params['hdfs_address'],
-        params['hdfs_user']
+        hdfs_client,
+        cluster_execution,
+        hdfs_address,
+        hdfs_user
     )
 
     # saving target information
     save_file(
         os.path.join(identifier_dir, '.target'),
         target_variable,
-        params['cluster'],
-        params['hdfs_address'],
-        params['hdfs_user']
+        hdfs_client,
+        cluster_execution,
+        hdfs_address,
+        hdfs_user
     )
 
     # print('[INFO] Negative examples with dataset %s have been created and saved!' % query_dataset)
@@ -446,7 +457,7 @@ def generate_candidate_datasets_negative_examples(target_variable, query_dataset
 
 
 def generate_data_from_columns(original_data, columns, column_metadata, key_column,
-                               params, dataset_path, dataset_name, query=True):
+                               params, hdfs_client, dataset_path, dataset_name, query=True):
     """Generates datasets from the original data using only the columns specified
     in 'columns'. It also saves the datasets to disk.
     """
@@ -468,6 +479,7 @@ def generate_data_from_columns(original_data, columns, column_metadata, key_colu
     save_file(
         os.path.join(dataset_path, name),
         new_data.to_csv(index=False),
+        hdfs_client,
         params['cluster'],
         params['hdfs_address'],
         params['hdfs_user']
@@ -496,6 +508,7 @@ def generate_data_from_columns(original_data, columns, column_metadata, key_colu
         save_file(
             os.path.join(dataset_path, name),
             new_data.drop(drop_indices).to_csv(index=False),
+            hdfs_client,
             params['cluster'],
             params['hdfs_address'],
             params['hdfs_user']
@@ -523,8 +536,13 @@ def generate_performance_scores(query_dataset, target_variable, candidate_datase
     hdfs_user = params['hdfs_user']
     inner_join = params['inner_join']
 
+    # HDFS Client
+    hdfs_client = None
+    if cluster_execution:
+        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
+
     # reading query dataset
-    query_data_str = read_file(query_dataset, cluster_execution, hdfs_address, hdfs_user)
+    query_data_str = read_file(query_dataset, hdfs_client, cluster_execution, hdfs_address, hdfs_user)
     query_data = pd.read_csv(StringIO(query_data_str))
     query_data.set_index(
         'key-for-ranking',
@@ -543,7 +561,7 @@ def generate_performance_scores(query_dataset, target_variable, candidate_datase
     for candidate_dataset in candidate_datasets:
 
         # reading candidate dataset
-        candidate_data_str = read_file(candidate_dataset, cluster_execution, hdfs_address, hdfs_user)
+        candidate_data_str = read_file(candidate_dataset, hdfs_client, cluster_execution, hdfs_address, hdfs_user)
         candidate_data = pd.read_csv(StringIO(candidate_data_str))
         candidate_data.set_index(
             'key-for-ranking',
@@ -721,6 +739,11 @@ if __name__ == '__main__':
     hdfs_address = params['hdfs_address']
     hdfs_user = params['hdfs_user']
 
+    # HDFS Client
+    hdfs_client = None
+    if cluster_execution:
+        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
+
     # all query and candidate datasets
     #   format is the following:
     #   (target_variable, query_dataset_path, candidate_dataset_paths)
@@ -731,17 +754,17 @@ if __name__ == '__main__':
     if not skip_dataset_creation:
 
         dir_ = params['original_datasets_directory']
-        create_dir(output_dir, cluster_execution, hdfs_address, hdfs_user)
-        create_dir(os.path.join(output_dir, 'files'), cluster_execution, hdfs_address, hdfs_user)
+        create_dir(output_dir, hdfs_client, cluster_execution, hdfs_address, hdfs_user)
+        create_dir(os.path.join(output_dir, 'files'), hdfs_client, cluster_execution, hdfs_address, hdfs_user)
 
         # dataset files
         dataset_files = list()
         if cluster_execution:
-            for dataset_path in list_dir(dir_, cluster_execution, hdfs_address, hdfs_user):
-                for f in list_dir(os.path.join(dir_, dataset_path), cluster_execution, hdfs_address, hdfs_user):
+            for dataset_path in list_dir(dir_, hdfs_client, cluster_execution, hdfs_address, hdfs_user):
+                for f in list_dir(os.path.join(dir_, dataset_path), hdfs_client, cluster_execution, hdfs_address, hdfs_user):
                     dataset_files.append(os.path.join(dir_, dataset_path, f))
         else:
-            for dataset in list_dir(dir_, cluster_execution, hdfs_address, hdfs_user):
+            for dataset in list_dir(dir_, hdfs_client, cluster_execution, hdfs_address, hdfs_user):
                 if dataset == '.DS_Store':
                     # ignoring .DS_Store on Mac
                     continue
