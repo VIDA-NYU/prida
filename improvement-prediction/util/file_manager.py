@@ -3,13 +3,13 @@ from hdfs import InsecureClient
 import os
 from constants import *
 
-def read_file(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+def read_file(file_path, hdfs_client, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """Opens a file for read and returns its corresponding content.
     """
 
     output = None
     if use_hdfs:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
+        #hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
         if hdfs_client.status(file_path, strict=False):
             with hdfs_client.read(file_path) as reader:
                 output = reader.read().decode()
@@ -20,12 +20,12 @@ def read_file(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     return output
 
 
-def save_file(file_path, content, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+def save_file(file_path, content, hdfs_client, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """Opens a file for write and returns its corresponding file object.
     """
 
     if use_hdfs:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
+        #hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
         if hdfs_client.status(file_path, strict=False):
             print('[WARNING] File already exists: %s' % file_path)
         with hdfs_client.write(file_path) as writer:

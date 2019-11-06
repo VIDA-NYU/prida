@@ -16,10 +16,13 @@ def generate_learning_instance(prefix, learning_data_record, params):
     hdfs_address = params['hdfs_address']
     hdfs_user = params['hdfs_user']
 
+    # creating a global hdfs client for reading and writing purposed
+    hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
     # parsing instance and generating features and learning targets
     augmentation_instance = parse_augmentation_instance(
         prefix, 
         learning_data_record,
+        hdfs_client,
         use_hdfs=cluster_execution,
         hdfs_address=hdfs_address,
         hdfs_user=hdfs_user
