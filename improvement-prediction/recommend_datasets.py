@@ -19,11 +19,7 @@ if __name__ == '__main__':
 
     recommender = Recommender()
 
-    # Reads training file and generates features and relative gains
-    recommender.store_instances(params['learning_data_filename'])
-    print('done storing instances')
-
-    # Generates machine learning models that predict relative gains given features
+    # Reads machine learning models to predict relative gains and test data
     models, test_data = recommender.generate_models_and_test_data(params['augmentation_learning_data_filename'], params['n_splits'])
     print('done creating models and corresponding test_data')
     for model, data in zip(models, test_data):
