@@ -52,7 +52,7 @@ def file_exists(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """
 
     if use_hdfs:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user, timeout=(6000, 6000))
+        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
         if hdfs_client.status(file_path, strict=False):
             return True
     else:
@@ -66,7 +66,7 @@ def read_file(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
 
     output = None
     if use_hdfs:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user, timeout=(6000, 6000))
+        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
         if hdfs_client.status(file_path, strict=False):
             with hdfs_client.read(file_path) as reader:
                 output = reader.read().decode()
@@ -82,7 +82,7 @@ def save_file(file_path, content, use_hdfs=False, hdfs_address=None, hdfs_user=N
     """
 
     if use_hdfs:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user, timeout=(6000, 6000))
+        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
         if hdfs_client.status(file_path, strict=False):
             print('[WARNING] File already exists: %s' % file_path)
         with hdfs_client.write(file_path) as writer:
@@ -101,7 +101,7 @@ def create_dir(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """
 
     if use_hdfs:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user, timeout=(6000, 6000))
+        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
         if hdfs_client.status(file_path, strict=False):
             hdfs_client.delete(file_path, recursive=True)
         hdfs_client.makedirs(file_path)
@@ -117,7 +117,7 @@ def list_dir(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """
 
     if use_hdfs:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user, timeout=(6000, 6000))
+        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
         return hdfs_client.list(file_path)
     return os.listdir(file_path)
 
@@ -843,48 +843,28 @@ if __name__ == '__main__':
                 query_and_candidate_data_negative
             ]).persist(StorageLevel.MEMORY_AND_DISK)
 
-            save_file(
-                os.path.join(output_dir, '.files-training-data'),
-                '\n'.join(query_candidate_datasets.flatMap(
-                    lambda x: [[x[0], x[1]] + x[2]]
-                ).map(
-                    lambda x: ','.join(x)
-                ).collect()),
-                params['cluster'],
-                params['hdfs_address'],
-                params['hdfs_user']
-            )
+            
+            # saving filenames
+            filename = os.path.join(output_dir, '.files-training-data')
+            if not cluster_execution:
+                filename = 'file://' + filename
+            query_candidate_datasets.flatMap(
+                lambda x: [[x[0], x[1]] + x[2]]
+            ).map(
+                lambda x: ','.join(x)
+            ).saveAsTextFile(filename)
 
     else:
 
         # datasets previously generated
-        if file_exists(os.path.join(output_dir, '.files-training-data'), cluster_execution, hdfs_address, hdfs_user):
-            query_candidate_datasets = sc.parallelize(
-                read_file(os.path.join(output_dir, '.files-training-data'), cluster_execution, hdfs_address, hdfs_user).split('\n')
-            ).map(
-                lambda x: x.strip().split(',')
-            ).map(
-                lambda x: (x[0], x[1], x[2:])
-            ).persist(StorageLevel.MEMORY_AND_DISK)
-        else:
-            data_by_identifier = list()
-            for identifier in list_dir(os.path.join(output_dir, 'files'), cluster_execution, hdfs_address, hdfs_user):
-                target_variable = None
-                query_datasets = list()
-                candidate_datasets = list()
-                for f in list_dir(os.path.join(output_dir, 'files', identifier), cluster_execution, hdfs_address, hdfs_user):
-                    file_path = os.path.join(output_dir, 'files', identifier, f)
-                    if f.startswith('query_'):
-                        query_datasets.append(file_path)
-                    elif f.startswith('candidate_'):
-                        candidate_datasets.append(file_path)
-                    elif f == '.target':
-                        target_variable = read_file(file_path, cluster_execution, hdfs_address, hdfs_user)
-                data_by_identifier.append((target_variable, query_datasets, candidate_datasets))
-
-            query_candidate_datasets = sc.parallelize(data_by_identifier).flatMap(
-                lambda x: [(x[0], query, x[2]) for query in x[1]]
-            ).persist(StorageLevel.MEMORY_AND_DISK)
+        filename = os.path.join(output_dir, '.files-training-data/*')
+        if not cluster_execution:
+            filename = 'file://' + filename
+        query_candidate_datasets = sc.textFile(filename).map(
+            lambda x: x.strip().split(',')
+        ).map(
+            lambda x: (x[0], x[1], x[2:])
+        ).persist(StorageLevel.MEMORY_AND_DISK)
 
         if cluster_execution:
             query_candidate_datasets = query_candidate_datasets.repartition(300)
@@ -906,13 +886,10 @@ if __name__ == '__main__':
             algorithm_name = params['regression_algorithm']
             if params['regression_algorithm'] == 'random forest':
                 algorithm_name = 'random-forest'
-            save_file(
-                os.path.join(output_dir, 'training-data-' + algorithm_name),
-                '\n'.join(performance_scores.collect()),
-                params['cluster'],
-                params['hdfs_address'],
-                params['hdfs_user']
-            )
+            filename = os.path.join(output_dir, 'training-data-' + algorithm_name)
+            if not cluster_execution:
+                filename = 'file://' + filename
+            performance_scores.saveAsTextFile(filename)
 
     print('Duration: %.4f seconds' % (time.time() - start_time))
     if not skip_dataset_creation:

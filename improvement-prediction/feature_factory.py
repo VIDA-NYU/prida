@@ -243,7 +243,10 @@ class FeatureFactory:
                 coefficient, pvalue = stats.pearsonr(self.data[column], self.data[target_name])
                 #for now, i am ignoring the pvalues
                 if not np.isnan(coefficient):
+                    #if 'nan', either the column or the target_name is constant. using zero in this case
                     correlations[column] = coefficient
+                else:
+                    correlations[column] = 0.0
         return correlations
 
     def get_max_pearson_wrt_target(self, target_name):
@@ -271,6 +274,8 @@ class FeatureFactory:
                 #for now, i am ignoring the pvalues
                 if not np.isnan(coefficient):
                     correlations[column] = coefficient
+                else:
+                    correlations[column] = 0.0
         return correlations
 
     def get_kendall_tau_correlations_with_target(self, target_name):
@@ -283,7 +288,10 @@ class FeatureFactory:
                 coefficient, pvalue = stats.kendalltau(self.data[column], self.data[target_name])
                 #for now, i am ignoring the pvalues
                 if not np.isnan(coefficient):
+                    #if 'nan', either the column or the target_name is constant. using zero in this case
                     correlations[column] = coefficient
+                else:
+                    correlations[column] = 0.0
         return correlations
 
     def get_covariances_with_target(self, target_name):
