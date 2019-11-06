@@ -92,6 +92,19 @@ def save_file(file_path, content, hdfs_client=None, use_hdfs=False, hdfs_address
     # print('[INFO] File %s saved!' % file_path)
 
 
+def delete_dir(file_path, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+    """Deletes a directory.
+    """
+
+    if use_hdfs:
+        if hdfs_client.status(file_path, strict=False):
+            hdfs_client.delete(file_path, recursive=True, skip_trash=True)
+    else:
+        if os.path.exists(file_path):
+            shutil.rmtree(file_path)
+    # print('[INFO] File %s saved!' % file_path)
+
+
 def create_dir(file_path, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """Creates a new directory specified by file_path.
     Returns True on success.
@@ -99,7 +112,7 @@ def create_dir(file_path, hdfs_client=None, use_hdfs=False, hdfs_address=None, h
 
     if use_hdfs:
         if hdfs_client.status(file_path, strict=False):
-            hdfs_client.delete(file_path, recursive=True)
+            hdfs_client.delete(file_path, recursive=True, skip_trash=True)
         hdfs_client.makedirs(file_path)
     else:
         if os.path.exists(file_path):
@@ -912,6 +925,7 @@ if __name__ == '__main__':
             filename = os.path.join(output_dir, 'training-data-' + algorithm_name)
             if not cluster_execution:
                 filename = 'file://' + filename
+            delete_dir(filename, hdfs_client, cluster_execution, hdfs_address, hdfs_user)
             performance_scores.saveAsTextFile(filename)
 
     print('Duration: %.4f seconds' % (time.time() - start_time))
