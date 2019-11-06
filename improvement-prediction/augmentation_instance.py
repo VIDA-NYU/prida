@@ -165,6 +165,7 @@ class AugmentationInstance:
 
         # computing (3)
         feature_factory_candidate_with_target = FeatureFactory(self.get_joined_candidate_data_and_target())
+        print('COLUMNS', self.get_joined_candidate_data_and_target().columns)
         candidate_features_with_target = feature_factory_candidate_with_target.get_pairwise_features_with_target(self.target_name,
                                                                                                                func=max_in_modulus)
         

@@ -67,12 +67,15 @@ if __name__ == '__main__':
         lambda x: ','.join([str(item) for item in x])
     )
 
-    save_file(
-        augmentation_learning_data_filename,
-        '\n'.join(learning_instances.collect()),
-        cluster_execution,
-        hdfs_address,
-        hdfs_user
-    )
+    learning_instances.saveAsTextFile(augmentation_learning_data_filename)
+
+   
+    #save_file(
+    #    augmentation_learning_data_filename,
+    #    '\n'.join(learning_instances.collect()),
+    #    cluster_execution,
+    #    hdfs_address,
+    #    hdfs_user
+    #)
 
     print('Duration: %.4f seconds' % (time.time() - start_time))
