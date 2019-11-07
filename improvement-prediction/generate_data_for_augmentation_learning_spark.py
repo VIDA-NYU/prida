@@ -16,7 +16,7 @@ def generate_learning_instance(prefix, learning_data_record, params):
     hdfs_address = params['hdfs_address']
     hdfs_user = params['hdfs_user']
 
-    # creating a global hdfs client for reading purposes
+    # creating a hdfs client for reading purposes
     hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
     
     # parsing instance and generating features and learning targets
@@ -73,7 +73,7 @@ if __name__ == '__main__':
 
     #learning_instances.saveAsTextFile(augmentation_learning_data_filename)
 
-    # creating a global hdfs client for reading purposes
+    # creating a hdfs client for reading purposes
     hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
     
     save_file(
