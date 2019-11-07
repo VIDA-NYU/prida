@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.tree import DecisionTreeRegressor
 from sklearn.metrics import r2_score
 from sklearn.model_selection import KFold 
 from util.graphic_functions import *
@@ -53,8 +54,6 @@ class LearningTask:
 
         If feature_ids == None, all features are used to predict the targets; otherwise, only feature_ids are used.
         """
-        print('LEARNING TARGET', learning_target)
-        
         if feature_ids:
             features = self.filter_learning_features(feature_ids)
         else:
@@ -78,9 +77,11 @@ class LearningTask:
             
             # the lines below help inspect the models, and how good they are
             ## performs feature selection in order to rank which features matter most for the model
-            if ml_algorithm_name == 'random_forest':
-                feature_importances = [(index, value) for index, value in enumerate(ml_algorithm_object.feature_importances_)]
-                print([i[0] for i in sorted(feature_importances, key= lambda i: i[1], reverse=True)])
+            if ml_algorithm_name == 'random_forest' or ml_algorithm_name == 'decision_tree':
+                feature_importances = sorted([(index, value) for index, value in enumerate(ml_algorithm_object.feature_importances_)], 
+                                             key= lambda i: i[1], 
+                                             reverse=True)
+                print([(FEATURE_NAMES[i[0]], i[1]) for i in feature_importances])
             elif ml_algorithm_name == 'linear_regression':
                 mutual_information_univariate_selection(X_train, y_train)
             
@@ -126,3 +127,16 @@ class LearningTask:
         rf = RandomForestRegressor(n_estimators=100, random_state=42)
         return self._generate_models(kf, rf, 'random_forest', learning_target, feature_ids)
 
+    def execute_decision_trees(self, n_splits, learning_target='gain_in_r2_score', feature_ids=None):
+        """Performs decision trees with k-fold cross validation 
+        (k = n_splits). 
+
+        The learning target (parameter learning_target) needs to be specified, and it can be one of the following values:
+        'decrease_in_mae', 'decrease_in_mse', 'decrease_in_med_ae', or 'gain_in_r2_score' (default).
+
+        If feature_ids == None, all features are used to 
+        predict the targets; otherwise, only feature_ids are used.
+        """        
+        kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+        dt = DecisionTreeRegressor(random_state=42)
+        return self._generate_models(kf, dt, 'decision_tree', learning_target, feature_ids)
