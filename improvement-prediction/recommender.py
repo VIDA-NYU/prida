@@ -70,9 +70,18 @@ class Recommender:
         """
         subtable = self.learning_table[(self.learning_table['query_filename'] == query_filename) & 
                                        (self.learning_table['target_name'] == target_name)]
+        try:
+            subtable = subtable.sample(n=20, random_state=42)
+        except:
+            print('For given query and target_name, there are fewer than 20 candidate datasets')
+        
         predicted_gains = []
         real_gains = []
 
+        # baseline gains correspond to the maximum key intersection between query and candidate
+        # after performing a join TODO encapsulate this baseline
+        baseline_gains = []
+        
         for index, row in subtable.iterrows():
             candidate_filename = row['candidate_filename']
             if metric == 'r2_score':
@@ -112,20 +121,42 @@ class Recommender:
 
             # we keep the best predicted gain we find with different imputation strategies
             predicted_gains.append((candidate_filename, max([gain_mean, gain_median, gain_most_frequent])))
-        return real_gains, predicted_gains
-        
+            
+            # the last feature (id -1) in test_features_mean etc is number_of_keys_after_join/number_of_keys_before_join
+            # which is exactly what we use as baseline here
+            baseline_gains.append((candidate_filename, max([test_features_mean[-1], test_features_median[-1], test_features_most_frequent[-1]])))
+        return real_gains, predicted_gains, baseline_gains
+                   
     def predict_gains_for_candidate_datasets(self, model, data):
         """This method encapsulates the prediction of relative gains via data augmentation using a given 
         machine learning model and test data
         """
+        i = 0
+        kendall_tau = []
+        precision_at_1 = []
+        precision_at_5 = []
+        #precision_at_50 = []
+        kendall_tau_baseline = []
+        precision_at_1_baseline = []
+        precision_at_5_baseline = []
+        #precision_at_50_baseline = []
         for index in data['index_of_test_instances']:
             query_filename = self.learning_table.iloc[index]['query_filename']
             target_name = self.learning_table.iloc[index]['target_name']
-            real_gains, predicted_gains = self.get_real_and_predicted_gains(query_filename, target_name, model)
-            print('REAL GAINS', real_gains)
-            print('PREDICTED GAINS', predicted_gains)
-            print(compute_ndcg_at_k(real_gains, predicted_gains, use_gains_as_relevance_weights=True))
-            print(compute_kendall_tau(real_gains, predicted_gains))
-            print(compute_mean_reciprocal_rank_for_single_sample(real_gains, predicted_gains))
-            #TODO compute average for all mean_reciprocal_ranks outside this loop. should i limit the mrr to k=5?
-            break
+            real_gains, predicted_gains, baseline_gains = self.get_real_and_predicted_gains(query_filename, target_name, model)
+            kendall_tau.append(compute_kendall_tau(real_gains, predicted_gains)[0])
+            precision_at_1.append(compute_precision_at_k(real_gains, predicted_gains, k=1))
+            precision_at_5.append(compute_precision_at_k(real_gains, predicted_gains))
+            #precision_at_50.append(compute_precision_at_k(real_gains, predicted_gains, k=50))
+            kendall_tau_baseline.append(compute_kendall_tau(real_gains, baseline_gains)[0])
+            precision_at_1_baseline.append(compute_precision_at_k(real_gains, baseline_gains, k=1))
+            precision_at_5_baseline.append(compute_precision_at_k(real_gains, baseline_gains))
+            #precision_at_50_baseline.append(compute_precision_at_k(real_gains, baseline_gains, k=50))
+            i += 1
+            if i == 100:
+                break
+        print('average kendall tau:', np.mean(kendall_tau), 'average kendall tau - baseline:', np.mean(kendall_tau_baseline))
+        print('average precision at 1:', np.mean(precision_at_1), 'average precision at 1 - baseline:', np.mean(precision_at_1_baseline))
+        print('average precision at 5:', np.mean(precision_at_5), 'average precision at 5 - baseline:', np.mean(precision_at_5_baseline))
+        #print('average precision at 50:', np.mean(precision_at_50), 'average precision at 50 - baseline:', np.mean(precision_at_50_baseline))
+            

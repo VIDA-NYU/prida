@@ -103,3 +103,19 @@ def compute_mean_reciprocal_rank_for_single_sample(real_gains, predicted_gains):
         if real_best_candidate == elem[0]:
             return 1/(index + 1)
     return 0
+
+def compute_precision_at_k(real_gains, predicted_gains, k=5):
+    """This function computes precision@k, mathematically defined
+    as (# of recommended items @k that are relevant) /k
+
+    Given a certain k in this implementation, we assume that an item is 
+    relevant if it is one of the top k in real_gains
+    """
+    real_ranking = dict(sorted(real_gains, key = lambda x:x[1], reverse=True)[:k])
+    predicted_ranking = sorted(predicted_gains, key = lambda x:x[1], reverse=True)[:k]
+    num = 0.
+    den = k
+    for item in predicted_ranking:
+        if item[0] in real_ranking: 
+            num += 1.
+    return num/den
