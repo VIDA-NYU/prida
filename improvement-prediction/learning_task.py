@@ -104,7 +104,7 @@ class LearningTask:
             print('fold', i, 'SMAPE', compute_SMAPE(predictions, y_test), 'MSE', compute_MSE(predictions, y_test))
 
             ## contrasts actual targets (real values) and predictions (predicted values)
-            plot_scatterplot(y_test, predictions, 'predicted_r2_score_gains_fold_' + str(i) + '_' + ml_algorithm_name + '.png', 'Real values', 'Predicted values')
+            #plot_scatterplot(y_test, predictions, 'predicted_r2_score_gains_fold_' + str(i) + '_' + ml_algorithm_name + '.png', 'Real values', 'Predicted values')
 
             #############
             i += 1

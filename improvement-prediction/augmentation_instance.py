@@ -5,7 +5,7 @@ from util.metrics import *
 from constants import *
 
 class AugmentationInstance:
-    def __init__(self, instance_values, hdfs_client, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+    def __init__(self, instance_values, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
         """This class concerns augmentation instances --- each composed of a query dataset,
         a target variable/column, a candidate dataset for augmentation, and optional metrics regarding 
         the quality of the target prediction before and after augmentation

@@ -1,10 +1,12 @@
 import pandas as pd
 import json
+import pickle
 from augmentation_instance import *
 from feature_factory import *
 from learning_task import *
 from util.metrics import *
 from util.instance_parser import *
+from constants import *
 
 class Recommender:
     def __init__(self, learning_data_filename):
@@ -14,6 +16,7 @@ class Recommender:
         (3) recommends such candidates sorted by their predicted relative gains 
         """
         self.learning_data_filename = learning_data_filename
+        self.prefix = get_prefix_of_training_files(self.learning_data_filename)
         self._store_instances()
         
     def _store_instances(self):
@@ -29,13 +32,13 @@ class Recommender:
             self.candidate_individual_features = {}
             for line in f:
                 #parse_augmentation_instance(prefix, file_record, hdfs_client, use_hdfs=False, hdfs_address=None, hdfs_user=None)
-                instance = parse_augmentation_instance(json.loads(line))
+                instance = parse_augmentation_instance(self.prefix, json.loads(line))
                 self.candidate_filenames.append(instance.get_candidate_filename())
                 rows_list.append(instance.get_formatted_fields())
                 
-                self.query_individual_features[query_filename] = \
+                self.query_individual_features[instance.get_query_filename()] = \
                     FeatureFactory(instance.get_joined_query_data()).get_individual_features(func=max_in_modulus)
-                self.candidate_individual_features[candidate_filename] = \
+                self.candidate_individual_features[instance.get_candidate_filename()] = \
                     FeatureFactory(instance.get_joined_candidate_data()).get_individual_features(func=max_in_modulus)
 
             self.learning_table = pd.DataFrame(rows_list) 
@@ -49,7 +52,20 @@ class Recommender:
         self.learning_task = LearningTask()
         self.learning_task.read_features_and_targets(augmentation_learning_data_filename)
         return self.learning_task.execute_random_forest(n_splits)
-
+    
+    def read_models_and_test_data(self, augmentation_models_and_tests_filename):
+        """Given a filename where each line lists a file with a model (.sav format) and test 
+        instances for it (.json format), this method loads both models and test instances
+        """
+        models = []
+        test_data = []
+        with open(augmentation_models_and_tests_filename, 'r') as f:
+            for line in f:
+                model_filename, test_filename = line.strip().split(SEPARATOR)
+                models.append(pickle.load(open(model_filename, 'rb')))
+                test_data.append(json.load(open(test_filename, 'r')))
+        return models, test_data
+    
     def get_real_and_predicted_gains(self, query_filename, target_name, model):
         """Given the names of a query dataset and a target (a column in the query dataset), 
         this method predicts the relative gain obtained via data augmentation with a variety of 
