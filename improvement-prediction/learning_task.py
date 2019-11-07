@@ -13,6 +13,7 @@ from util.feature_selection import *
 from util.file_manager import *
 from sklearn.preprocessing import MinMaxScaler
 import pickle
+import json
 
 class LearningTask:
     def __init__(self):
@@ -46,14 +47,18 @@ class LearningTask:
                          ml_algorithm_object,
                          ml_algorithm_name,
                          learning_target='gain_in_r2_score',
-                         feature_ids=None):
+                         feature_ids=None,
+                         save_model=True):
         """Executes a specific machine learning algorithm (e.g., random forests or linear regression) to predict a certain 
         learning_target. 
 
         Parameter data_splits_spec indicates how to split the data into training and test instances for cross validation (e.g., KFold).
 
         If feature_ids == None, all features are used to predict the targets; otherwise, only feature_ids are used.
+
+        If save_model == True, save it with pickle.
         """
+
         if feature_ids:
             features = self.filter_learning_features(feature_ids)
         else:
@@ -69,12 +74,22 @@ class LearningTask:
             y_train, y_test = np.array(targets)[train_index], np.array(targets)[test_index]
             X_train, y_train = remove_outliers(X_train, y_train, zscore_threshold=0.5)
             X_test, y_test = remove_outliers(X_test, y_test, zscore_threshold=0.5)
-            ml_algorithm_object.fit(X_train, y_train)
+            ml_algorithm_object.fit(X_train, y_train)            
+                
+            # generate predictions for test data
             predictions = ml_algorithm_object.predict(X_test)
             models.append(ml_algorithm_object)
-            test_data_results.append({'index_of_test_instances': test_index,
-                              'true_relative_gain_for_test_instances': y_test})
-            
+            test_results = {'index_of_test_instances': test_index.tolist(),
+                       'true_relative_gain_for_test_instances': y_test.tolist()}
+            test_data_results.append(test_results)
+
+            # save model (fitted ml_algorithm_object) and correspondint test data to disk
+            if save_model:
+                model_filename = 'finalized_model_' + ml_algorithm_name + '_for_test_fold_' + str(i) + '_predicting_' + learning_target + '.sav'
+                pickle.dump(ml_algorithm_object, open(model_filename, 'wb'))
+                test_data_filename = 'test_data_for_' + ml_algorithm_name + '_fold_' + str(i) + '_predicting_' + learning_target + '.json'
+                json.dump(test_results, open(test_data_filename, 'w'))
+
             # the lines below help inspect the models, and how good they are
             ## performs feature selection in order to rank which features matter most for the model
             if ml_algorithm_name == 'random_forest' or ml_algorithm_name == 'decision_tree':
@@ -92,13 +107,13 @@ class LearningTask:
             print('fold', i, 'SMAPE', compute_SMAPE(predictions, y_test), 'MSE', compute_MSE(predictions, y_test))
 
             ## contrasts actual targets (real values) and predictions (predicted values)
-            plot_scatterplot(y_test, predictions, 'predicted_r2_score_gains_fold_' + str(i) + '_' + ml_algorithm_name + '.png', 'Real values', 'Predicted values')
+            #plot_scatterplot(y_test, predictions, 'predicted_r2_score_gains_fold_' + str(i) + '_' + ml_algorithm_name + '.png', 'Real values', 'Predicted values')
 
             #############
             i += 1
         return models, test_data_results
 
-    def execute_linear_regression(self, n_splits, learning_target='gain_in_r2_score', feature_ids=None):
+    def execute_linear_regression(self, n_splits, learning_target='gain_in_r2_score', feature_ids=None, save_model=True):
         """Performs linear regression with k-fold cross validation 
         (k = n_splits). 
 
@@ -108,12 +123,15 @@ class LearningTask:
 
         If feature_ids == None, all features are used to 
         predict the targets; otherwise, only feature_ids are used.
+
+        If save_model == True, save it with pickle.
         """
+        
         kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
         lm = LinearRegression()
-        return self._generate_models(kf, lm, 'linear_regression', learning_target, feature_ids)
+        return self._generate_models(kf, lm, 'linear_regression', learning_target, feature_ids, save_model)
 
-    def execute_random_forest(self, n_splits, learning_target='gain_in_r2_score', feature_ids=None):
+    def execute_random_forest(self, n_splits, learning_target='gain_in_r2_score', feature_ids=None, save_model=True):
         """Performs random forest with k-fold cross validation 
         (k = n_splits). 
 
@@ -122,10 +140,13 @@ class LearningTask:
 
         If feature_ids == None, all features are used to 
         predict the targets; otherwise, only feature_ids are used.
-        """        
+
+        If save_model == True, save it with pickle.
+        """
+        
         kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
         rf = RandomForestRegressor(n_estimators=100, random_state=42)
-        return self._generate_models(kf, rf, 'random_forest', learning_target, feature_ids)
+        return self._generate_models(kf, rf, 'random_forest', learning_target, feature_ids, save_model)
 
     def execute_decision_trees(self, n_splits, learning_target='gain_in_r2_score', feature_ids=None):
         """Performs decision trees with k-fold cross validation 
