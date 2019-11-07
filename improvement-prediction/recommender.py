@@ -27,15 +27,11 @@ class Recommender:
         """
         with open(self.learning_data_filename, 'r') as f:
             rows_list = []
-            self.candidate_filenames = []
             self.query_individual_features = {}
             self.candidate_individual_features = {}
             for line in f:
-                #parse_augmentation_instance(prefix, file_record, hdfs_client, use_hdfs=False, hdfs_address=None, hdfs_user=None)
                 instance = parse_augmentation_instance(self.prefix, json.loads(line))
-                self.candidate_filenames.append(instance.get_candidate_filename())
-                rows_list.append(instance.get_formatted_fields())
-                
+                rows_list.append(instance.get_formatted_fields())               
                 self.query_individual_features[instance.get_query_filename()] = \
                     FeatureFactory(instance.get_joined_query_data()).get_individual_features(func=max_in_modulus)
                 self.candidate_individual_features[instance.get_candidate_filename()] = \
@@ -65,8 +61,8 @@ class Recommender:
                 models.append(pickle.load(open(model_filename, 'rb')))
                 test_data.append(json.load(open(test_filename, 'r')))
         return models, test_data
-    
-    def get_real_and_predicted_gains(self, query_filename, target_name, model):
+
+    def get_real_and_predicted_gains(self, query_filename, target_name, model, metric='r2_score'):
         """Given the names of a query dataset and a target (a column in the query dataset), 
         this method predicts the relative gain obtained via data augmentation with a variety of 
         candidate datasets, then returning these predicted gains and the corresponding real ones, 
@@ -74,18 +70,48 @@ class Recommender:
         """
         subtable = self.learning_table[(self.learning_table['query_filename'] == query_filename) & 
                                        (self.learning_table['target_name'] == target_name)]
-
         predicted_gains = []
         real_gains = []
+
         for index, row in subtable.iterrows():
             candidate_filename = row['candidate_filename']
-            real_gains.append((candidate_filename, compute_r2_gain(row['r2_score_before'], row['r2_score_after'])))
-            instance = AugmentationInstance({'query_filename': query_filename,
-                                             'target_name': target_name,
-                                             'candidate_filename': candidate_filename})
-            test_features = instance.generate_features(self.query_individual_features[query_filename], 
-                                                       self.candidate_individual_features[candidate_filename])
-            predicted_gains.append((candidate_filename, model.predict(test_features.reshape(1, -1))[0]))
+            if metric == 'r2_score':
+                real_gains.append((candidate_filename, compute_r2_gain(row['r2_score_before'], row['r2_score_after'])))
+            elif metric == 'mean_absolute_error':
+                real_gains.append((candidate_filename, compute_mae_decrease(row['mae_before'], row['mae_after'])))
+            elif metric == 'mean_squared_error':
+                real_gains.append((candidate_filename, compute_mse_decrease(row['mse_before'], row['mse_after'])))
+            else:
+                real_gains.append((candidate_filename, compute_med_ae_decrease(row['med_ae_before'], row['med_ae_after'])))
+
+            # we test joining query and candidate datasets with different types
+            # of imputation, as they are hidden in test time
+            test_instance_mean = AugmentationInstance({'query_filename': query_filename,
+                                                       'target_name': target_name,
+                                                       'candidate_filename': candidate_filename,
+                                                       'imputation_strategy': 'mean'})
+            test_features_mean = test_instance_mean.generate_features(self.query_individual_features[query_filename], 
+                                                                      self.candidate_individual_features[candidate_filename])
+            gain_mean = model.predict(test_features_mean.reshape(1, -1))[0]
+            
+            test_instance_median = AugmentationInstance({'query_filename': query_filename,
+                                                         'target_name': target_name,
+                                                         'candidate_filename': candidate_filename,
+                                                         'imputation_strategy': 'median'})
+            test_features_median = test_instance_median.generate_features(self.query_individual_features[query_filename], 
+                                                                          self.candidate_individual_features[candidate_filename])
+            gain_median = model.predict(test_features_median.reshape(1, -1))[0]
+          
+            test_instance_most_frequent = AugmentationInstance({'query_filename': query_filename,
+                                                                'target_name': target_name,
+                                                                'candidate_filename': candidate_filename,
+                                                                'imputation_strategy': 'most_frequent'})
+            test_features_most_frequent = test_instance_most_frequent.generate_features(self.query_individual_features[query_filename], 
+                                                                                        self.candidate_individual_features[candidate_filename])
+            gain_most_frequent = model.predict(test_features_most_frequent.reshape(1, -1))[0]
+
+            # we keep the best predicted gain we find with different imputation strategies
+            predicted_gains.append((candidate_filename, max([gain_mean, gain_median, gain_most_frequent])))
         return real_gains, predicted_gains
         
     def predict_gains_for_candidate_datasets(self, model, data):
@@ -96,7 +122,10 @@ class Recommender:
             query_filename = self.learning_table.iloc[index]['query_filename']
             target_name = self.learning_table.iloc[index]['target_name']
             real_gains, predicted_gains = self.get_real_and_predicted_gains(query_filename, target_name, model)
-            #print(compute_ndcg_at_k(real_gains, predicted_gains, use_gains_as_relevance_weights=True))
-            #print(compute_kendall_tau(real_gains, predicted_gains))
-            #print(compute_mean_reciprocal_rank_for_single_sample(real_gains, predicted_gains))
+            print('REAL GAINS', real_gains)
+            print('PREDICTED GAINS', predicted_gains)
+            print(compute_ndcg_at_k(real_gains, predicted_gains, use_gains_as_relevance_weights=True))
+            print(compute_kendall_tau(real_gains, predicted_gains))
+            print(compute_mean_reciprocal_rank_for_single_sample(real_gains, predicted_gains))
             #TODO compute average for all mean_reciprocal_ranks outside this loop. should i limit the mrr to k=5?
+            break
