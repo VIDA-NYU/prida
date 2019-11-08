@@ -902,8 +902,8 @@ if __name__ == '__main__':
             lambda x: (x[0], x[1], x[2:])
         ).persist(StorageLevel.MEMORY_AND_DISK)
 
-        if cluster_execution:
-            query_candidate_datasets = query_candidate_datasets.repartition(300)
+        # if cluster_execution:
+        #     query_candidate_datasets = query_candidate_datasets.repartition(300)
 
 
     if not skip_training_data:
