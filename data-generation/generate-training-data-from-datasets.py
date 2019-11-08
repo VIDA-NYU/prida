@@ -429,8 +429,16 @@ def generate_candidate_datasets_negative_examples(target_variable, query_dataset
     query_data = pd.read_csv(StringIO(query_data_str))
     query_data_key_column = list(query_data['key-for-ranking'])
 
+    # ratios of removed records
+    max_ratio_records_removed = 1.0
+    ratio_remove_record = list(np.arange(
+        0, max_ratio_records_removed, max_ratio_records_removed/(len(candidate_datasets) + 1))
+    )[1:]
+
     id_ = 0
-    for candidate_dataset in candidate_datasets:
+    for i in range(len(candidate_datasets)):
+
+        candidate_dataset = candidate_datasets[i]
 
         # reading candidate dataset
         candidate_data_str = read_file(candidate_dataset, hdfs_client, cluster_execution, hdfs_address, hdfs_user)
@@ -451,7 +459,13 @@ def generate_candidate_datasets_negative_examples(target_variable, query_dataset
             'key-for-ranking',
             query_data_key_column[:min_size] + extra_key_column
         )
-        
+
+        # randomly removing records from candidate dataset
+        n_records_remove = int(ratio_remove_record[i] * min_size)
+        drop_indices = np.random.choice(candidate_data.index, n_records_remove, replace=False)
+        if (candidate_data.shape[0] - len(drop_indices)) >= params['min_number_records']:
+            candidate_data = candidate_data.drop(drop_indices)
+
         # saving candidate dataset
         dataset_name = "%s_%d.csv" % (os.path.splitext(os.path.basename(candidate_dataset))[0], id_)
         file_path = os.path.join(identifier_dir, dataset_name)
