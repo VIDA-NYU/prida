@@ -9,7 +9,7 @@ class Dataset:
     """This class stores and manages a certain dataset and performs join operations with other given 
     datasets
     """    
-    def initialize_from_filename(self, filename, hdfs_client, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+    def initialize_from_filename(self, filename, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
         """Generates a pandas representation of a dataset read from a given filename
         """
         self.filename = filename
@@ -22,7 +22,7 @@ class Dataset:
         self.column_names = columns
         self.keys = keys
         
-    def read_dataset(self, hdfs_client, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+    def read_dataset(self, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
         """Reads lines from self.filename, storing in a pandas dataframe
         """
         self.data = pd.read_csv(StringIO(read_file(self.filename, hdfs_client, use_hdfs, hdfs_address, hdfs_user))).set_index(keys='key-for-ranking', drop=True)

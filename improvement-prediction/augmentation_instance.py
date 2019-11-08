@@ -5,31 +5,32 @@ from util.metrics import *
 from constants import *
 
 class AugmentationInstance:
-    def __init__(self, instance_values, hdfs_client, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+    def __init__(self, instance_values, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
         """This class concerns augmentation instances --- each composed of a query dataset,
         a target variable/column, a candidate dataset for augmentation, and optional metrics regarding 
         the quality of the target prediction before and after augmentation
         """
-        self.query_filename = instance_values['query_filename']
+        self.instance_values_dict = instance_values
+        self.query_filename = self.instance_values_dict['query_filename']
         self.query_dataset = Dataset()
         self.query_dataset.initialize_from_filename(self.query_filename, hdfs_client, use_hdfs, hdfs_address, hdfs_user)
-        self.candidate_filename = instance_values['candidate_filename']
+        self.candidate_filename = self.instance_values_dict['candidate_filename']
         self.candidate_dataset = Dataset()
         self.candidate_dataset.initialize_from_filename(self.candidate_filename, hdfs_client, use_hdfs, hdfs_address, hdfs_user)
-        self.target_name = instance_values['target_name']
-        self.imputation_strategy = instance_values['imputation_strategy']
-        
+        self.target_name = self.instance_values_dict['target_name']
+        self.imputation_strategy = self.instance_values_dict['imputation_strategy']
+            
         # if the augmentation instance does not come from the test data, the prediction metrics before and
         # after augmentation are available
         if len(instance_values.keys()) > NUMBER_OF_FIELDS_IN_TEST_AUGMENTATION_INSTANCE:
-            self.mae_before = instance_values['mae_before']
-            self.mae_after = instance_values['mae_after']
-            self.mse_before = instance_values['mse_before']
-            self.mse_after = instance_values['mse_after']
-            self.med_ae_before = instance_values['med_ae_before']
-            self.med_ae_after = instance_values['med_ae_after']
-            self.r2_score_before = instance_values['r2_score_before']
-            self.r2_score_after = instance_values['r2_score_after']
+            self.mae_before = self.instance_values_dict['mae_before']
+            self.mae_after = self.instance_values_dict['mae_after']
+            self.mse_before = self.instance_values_dict['mse_before']
+            self.mse_after = self.instance_values_dict['mse_after']
+            self.med_ae_before = self.instance_values_dict['med_ae_before']
+            self.med_ae_after = self.instance_values_dict['med_ae_after']
+            self.r2_score_before = self.instance_values_dict['r2_score_before']
+            self.r2_score_after = self.instance_values_dict['r2_score_after']
 
         # if the augmentation instance needs to be composed with a candidate dataset, and the prediction metrics
         # need to be computed with a learning model, such metrics are not present
@@ -67,12 +68,7 @@ class AugmentationInstance:
     def get_formatted_fields(self):
         """Returns all instance values (fields) formatted as a dict
         """
-        fields = {'query_filename': self.query_filename,
-                  'target_name': self.target_name,
-                  'candidate_filename': self.candidate_filename,
-                  'r2_score_before': self.r2_score_before,
-                  'r2_score_after': self.r2_score_after}
-        return fields
+        return self.instance_values_dict
              
     def join_query_and_candidate_datasets(self):
         """Creates a new dataset (Dataset class) by performing an inner join 
@@ -165,7 +161,6 @@ class AugmentationInstance:
 
         # computing (3)
         feature_factory_candidate_with_target = FeatureFactory(self.get_joined_candidate_data_and_target())
-        print('COLUMNS', self.get_joined_candidate_data_and_target().columns)
         candidate_features_with_target = feature_factory_candidate_with_target.get_pairwise_features_with_target(self.target_name,
                                                                                                                func=max_in_modulus)
         

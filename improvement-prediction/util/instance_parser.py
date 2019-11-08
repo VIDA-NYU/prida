@@ -20,7 +20,7 @@ def parse_augmentation_instances(training_data_filename):
             augmentation_instances.append(parse_augmentation_instance(line))
         return augmentation_instances
 
-def parse_augmentation_instance(prefix, file_record, hdfs_client, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+def parse_augmentation_instance(prefix, file_record, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """Parses file_record, a JSON instance of the training data in the format
     {'query_dataset': query_dataset,
      'target': target,

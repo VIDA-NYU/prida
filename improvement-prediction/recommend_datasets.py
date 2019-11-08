@@ -16,16 +16,15 @@ if __name__ == '__main__':
         params = json.load(open('params.json'))
     else:
         params = json.load(open(sys.argv[1]))
+    recommender = Recommender(params['learning_data_filename'])
 
-    recommender = Recommender()
-
-    # Reads training file and generates features and relative gains
-    recommender.store_instances(params['learning_data_filename'])
-    print('done storing instances')
-
-    # Generates machine learning models that predict relative gains given features
-    models, test_data = recommender.generate_models_and_test_data(params['augmentation_learning_data_filename'], params['n_splits'])
+    # Reads machine learning models to predict relative gains and test data
+    if params['augmentation_models_and_tests_filename']:
+        models, test_data = recommender.read_models_and_test_data(params['augmentation_models_and_tests_filename'])
+    else:
+        models, test_data = recommender.generate_models_and_test_data(params['augmentation_learning_data_filename'],
+                                                                      params['n_splits'])
     print('done creating models and corresponding test_data')
     for model, data in zip(models, test_data):
         recommender.predict_gains_for_candidate_datasets(model, data)
-        #break
+        break
