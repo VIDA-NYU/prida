@@ -649,7 +649,8 @@ def get_performance_scores(data, target_variable_name, algorithm, missing_value_
     """
 
     if missing_value_imputation:
-        strategies = ['mean', 'median', 'most_frequent']
+        # strategies = ['mean', 'median', 'most_frequent']
+        strategies = ['mean']  # using only mean for now
         scores = list()
         min_mean_absolute_error = math.inf
         min_strategy = ''
