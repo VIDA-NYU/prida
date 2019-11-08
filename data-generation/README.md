@@ -7,6 +7,7 @@
 * [NumPy](https://numpy.org/)
 * [pandas](https://pandas.pydata.org/)
 * [scikit-learn](https://scikit-learn.org/stable/)
+* [SciPy](https://www.scipy.org/)
 * [XGBoost](https://xgboost.readthedocs.io/en/latest/python/python_intro.html)
 * [Apache Spark 2.3.0](https://spark.apache.org/)
 
@@ -30,7 +31,6 @@ The data generation process is done using PySpark. Copy the file [`params.json`]
     "min_number_records": the minimum number of records that a query or candidate dataset should have
     "max_times_break_data_vertical": the maximum number of times that a dataset will be broken (vertically) into multiple data
     "max_times_records_removed": the maximum number of times that records will be removed from a dataset to derive new data
-    "max_ratio_records_removed": the maximum ratio of records to be removed from a dataset to derive new data
 }
 ```
 
@@ -49,7 +49,7 @@ You may need to set some parameters for `spark-submit` depending on your environ
 
 The easiest way to run the data generation in a cluster is by using [Anaconda](https://www.anaconda.com/) to package the python dependencies. First, install Anaconda and initialize it by using the `conda init` command. Then, run the following:
 
-    $ conda create -y -n data-generation -c conda-forge python=3.6.9 numpy pandas scikit-learn python-hdfs xgboost
+    $ conda create -y -n data-generation -c conda-forge python=3.6.9 numpy pandas scikit-learn scipy python-hdfs xgboost
     $ cd <env_dir>
     $ zip -r <data-generation-dir>/data-generation-environment.zip data-generation/
 

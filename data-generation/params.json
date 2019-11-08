@@ -12,6 +12,5 @@
     "inner_join": false,
     "min_number_records": 50,
     "max_times_break_data_vertical": 8,
-    "max_times_records_removed": 10,
-    "max_ratio_records_removed": 0.7
+    "max_times_records_removed": 10
 }
