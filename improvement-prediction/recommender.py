@@ -103,30 +103,31 @@ class Recommender:
                                                                       self.candidate_individual_features[candidate_filename])
             gain_mean = model.predict(test_features_mean.reshape(1, -1))[0]
             
-            test_instance_median = AugmentationInstance({'query_filename': query_filename,
-                                                         'target_name': target_name,
-                                                         'candidate_filename': candidate_filename,
-                                                         'imputation_strategy': 'median'})
-            test_features_median = test_instance_median.generate_features(self.query_individual_features[query_filename], 
-                                                                          self.candidate_individual_features[candidate_filename])
-            gain_median = model.predict(test_features_median.reshape(1, -1))[0]
+            # test_instance_median = AugmentationInstance({'query_filename': query_filename,
+            #                                              'target_name': target_name,
+            #                                              'candidate_filename': candidate_filename,
+            #                                              'imputation_strategy': 'median'})
+            # test_features_median = test_instance_median.generate_features(self.query_individual_features[query_filename], 
+            #                                                               self.candidate_individual_features[candidate_filename])
+            # gain_median = model.predict(test_features_median.reshape(1, -1))[0]
           
-            test_instance_most_frequent = AugmentationInstance({'query_filename': query_filename,
-                                                                'target_name': target_name,
-                                                                'candidate_filename': candidate_filename,
-                                                                'imputation_strategy': 'most_frequent'})
-            test_features_most_frequent = test_instance_most_frequent.generate_features(self.query_individual_features[query_filename], 
-                                                                                        self.candidate_individual_features[candidate_filename])
-            gain_most_frequent = model.predict(test_features_most_frequent.reshape(1, -1))[0]
+            # test_instance_most_frequent = AugmentationInstance({'query_filename': query_filename,
+            #                                                     'target_name': target_name,
+            #                                                     'candidate_filename': candidate_filename,
+            #                                                     'imputation_strategy': 'most_frequent'})
+            # test_features_most_frequent = test_instance_most_frequent.generate_features(self.query_individual_features[query_filename], 
+            #                                                                             self.candidate_individual_features[candidate_filename])
+            # gain_most_frequent = model.predict(test_features_most_frequent.reshape(1, -1))[0]
 
             # we keep the best predicted gain we find with different imputation strategies
-            predicted_gains.append((candidate_filename, max([gain_mean, gain_median, gain_most_frequent])))
-            
+            #predicted_gains.append((candidate_filename, max([gain_mean, gain_median, gain_most_frequent])))
+            predicted_gains.append((candidate_filename, gain_mean))            
             # the last feature (id -1) in test_features_mean etc is number_of_keys_after_join/number_of_keys_before_join
             # which is exactly what we use as baseline here
-            baseline_gains.append((candidate_filename, max([test_features_mean[-1], test_features_median[-1], test_features_most_frequent[-1]])))
+            #baseline_gains.append((candidate_filename, max([test_features_mean[-1], test_features_median[-1], test_features_most_frequent[-1]])))
+            baseline_gains.append((candidate_filename, test_features_mean[-1]))
         return real_gains, predicted_gains, baseline_gains
-                   
+
     def predict_gains_for_candidate_datasets(self, model, data):
         """This method encapsulates the prediction of relative gains via data augmentation using a given 
         machine learning model and test data
@@ -153,7 +154,7 @@ class Recommender:
             precision_at_5_baseline.append(compute_precision_at_k(real_gains, baseline_gains))
             #precision_at_50_baseline.append(compute_precision_at_k(real_gains, baseline_gains, k=50))
             i += 1
-            if i == 100:
+            if i == 10:
                 break
         print('average kendall tau:', np.mean(kendall_tau), 'average kendall tau - baseline:', np.mean(kendall_tau_baseline))
         print('average precision at 1:', np.mean(precision_at_1), 'average precision at 1 - baseline:', np.mean(precision_at_1_baseline))

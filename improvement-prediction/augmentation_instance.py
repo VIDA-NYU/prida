@@ -179,7 +179,7 @@ class AugmentationInstance:
         return joined_dataset_features + joined_dataset_features_with_target + \
             query_features_with_target + candidate_features_with_target + \
             [pearson_difference_wrt_target] + [difference_in_numbers_of_rows]
-        
+    
     def generate_features(self, query_dataset_individual_features=[], candidate_dataset_individual_features=[]):
         """This method generates features derived from the datasets of the augmentation instance. 
         The recommendation module computes individual features for the query and candidate datasets in order to 
