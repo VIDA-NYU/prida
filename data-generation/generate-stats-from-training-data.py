@@ -9,13 +9,12 @@ from pyspark import SparkConf, SparkContext, StorageLevel
 import sys
 
 
-def read_file(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+def read_file(file_path, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """Opens a file for read and returns its corresponding content.
     """
 
     output = None
     if use_hdfs:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
         if hdfs_client.status(file_path, strict=False):
             with hdfs_client.read(file_path) as reader:
                 output = reader.read().decode()
@@ -35,6 +34,16 @@ def generate_stats_from_record(record, load_dataframes, params):
     global before_gt_after
     global query_size_lte_candidate_size
     global query_size_gt_candidate_size
+
+    # File system information
+    cluster_execution = params['cluster']
+    hdfs_address = params['hdfs_address']
+    hdfs_user = params['hdfs_user']
+
+    # HDFS Client
+    hdfs_client = None
+    if cluster_execution:
+        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
 
     query = record['query_dataset']
     target = record['target']
@@ -64,6 +73,7 @@ def generate_stats_from_record(record, load_dataframes, params):
         query_data = pd.read_csv(StringIO(
             read_file(
                 os.path.join(output_dir, 'files', query),
+                hdfs_client,
                 cluster_execution,
                 hdfs_address,
                 hdfs_user)
@@ -71,6 +81,7 @@ def generate_stats_from_record(record, load_dataframes, params):
         candidate_data = pd.read_csv(StringIO(
             read_file(
                 os.path.join(output_dir, 'files', candidate),
+                hdfs_client,
                 cluster_execution,
                 hdfs_address,
                 hdfs_user)
@@ -97,12 +108,11 @@ def generate_stats_from_record(record, load_dataframes, params):
     return (imputation_strategy, None, None, None, None, None, None)
 
 
-def list_dir(file_path, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+def list_dir(file_path, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """Lists all the files inside the directory specified by file_path.
     """
 
     if use_hdfs:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
         return hdfs_client.list(file_path)
     return os.listdir(file_path)
     
@@ -130,11 +140,16 @@ if __name__ == '__main__':
     hdfs_address = params['hdfs_address']
     hdfs_user = params['hdfs_user']
 
+    # HDFS Client
+    hdfs_client = None
+    if cluster_execution:
+        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
+
     # searching for training data
     algorithms = dict()
     load_dataframes = True
-    for file_ in list_dir(output_dir, cluster_execution, hdfs_address, hdfs_user):
-        if 'training-data' not in file_:
+    for file_ in list_dir(output_dir, hdfs_client, cluster_execution, hdfs_address, hdfs_user):
+        if 'training-data-' not in file_:
             continue
         algorithm_name = ' '.join(file_.replace('training-data-', '').split('-'))
         algorithms[algorithm_name] = dict(
@@ -143,7 +158,7 @@ if __name__ == '__main__':
             before_gt_after=0,
             imputation_strategies=list()
         )
-        filename = os.path.join(output_dir, file_)
+        filename = os.path.join(output_dir, file_ + '/*')
         if not cluster_execution:
             filename = 'file://' + filename
 

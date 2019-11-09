@@ -9,6 +9,7 @@ import pandas as pd
 from pyspark import SparkConf, SparkContext, StorageLevel
 import random
 import re
+from scipy.special import comb
 import shutil
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
@@ -257,15 +258,28 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
     # in this example, n_columns_query_dataset = [1, 2]
     n_potential_columns_query_dataset = list(range(1, n_columns_left))
 
+    # maximum number of column combinations for the query dataset
+    # for the example above, if the query dataset has 1 column,
+    #   then it has 3 options as column (since there are 3 columns left),
+    #   and if the query dataset has 2 columns,
+    #   then it has 3 additional options (number of combinations of 3 columns taken 2 at a time),
+    #   totalling 6
+    n_column_combinations_query_dataset = 0
+    size_column_combinations_query_dataset = list()
+    for k in n_potential_columns_query_dataset:
+        n_comb = int(comb(n_columns_left, k))
+        n_column_combinations_query_dataset += n_comb
+        size_column_combinations_query_dataset += [k for _ in range(n_comb)]
+
     # maximum number of times that the original data will be vertically broken into
     #   multiple datasets
-    n_vertical_data = min(max_times_break_data_vertical, n_columns_left)
+    n_vertical_data = min(max_times_break_data_vertical, n_column_combinations_query_dataset)
 
     # number of columns for each time the data is vertically broken
     n_columns_query_dataset = np.random.choice(
-        n_potential_columns_query_dataset,
+        size_column_combinations_query_dataset,
         n_vertical_data,
-        replace=True
+        replace=False
     )
 
     # list of column indices
@@ -302,6 +316,9 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
     # generating the key column for the data
     key_column = [str(uuid.uuid4()) for _ in range(n_rows)]
 
+    # query dataset column combinations that have been processed
+    seen_combinations = set()
+
     # creating and saving query and candidate datasets
     # print('[INFO] Creating query and candidate data for dataset %s ...' % data_name)
     results = list()
@@ -314,12 +331,19 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
         create_dir(identifier_dir, hdfs_client, cluster_execution, hdfs_address, hdfs_user)
 
         if not candidate_single_column:
-            # randomly choose the columns
-            columns = list(np.random.choice(
-                all_columns,
-                n,
-                replace=False
-            ))
+            columns = list()
+            seen = True
+            while seen:
+                # randomly choose the columns
+                columns = list(np.random.choice(
+                    all_columns,
+                    n,
+                    replace=False
+                ))
+                if tuple(columns) not in seen_combinations:
+                    seen = False
+            seen_combinations.add(tuple(columns))
+
         else:
             # get column indices from combinations
             columns = list(all_combinations[id_])
@@ -405,8 +429,16 @@ def generate_candidate_datasets_negative_examples(target_variable, query_dataset
     query_data = pd.read_csv(StringIO(query_data_str))
     query_data_key_column = list(query_data['key-for-ranking'])
 
+    # ratios of removed records
+    max_ratio_records_removed = 1.0
+    ratio_remove_record = list(np.arange(
+        0, max_ratio_records_removed, max_ratio_records_removed/(len(candidate_datasets) + 1))
+    )[1:]
+
     id_ = 0
-    for candidate_dataset in candidate_datasets:
+    for i in range(len(candidate_datasets)):
+
+        candidate_dataset = candidate_datasets[i]
 
         # reading candidate dataset
         candidate_data_str = read_file(candidate_dataset, hdfs_client, cluster_execution, hdfs_address, hdfs_user)
@@ -427,7 +459,13 @@ def generate_candidate_datasets_negative_examples(target_variable, query_dataset
             'key-for-ranking',
             query_data_key_column[:min_size] + extra_key_column
         )
-        
+
+        # randomly removing records from candidate dataset
+        n_records_remove = int(ratio_remove_record[i] * min_size)
+        drop_indices = np.random.choice(candidate_data.index, n_records_remove, replace=False)
+        if (candidate_data.shape[0] - len(drop_indices)) >= params['min_number_records']:
+            candidate_data = candidate_data.drop(drop_indices)
+
         # saving candidate dataset
         dataset_name = "%s_%d.csv" % (os.path.splitext(os.path.basename(candidate_dataset))[0], id_)
         file_path = os.path.join(identifier_dir, dataset_name)
@@ -499,34 +537,38 @@ def generate_data_from_columns(original_data, columns, column_metadata, key_colu
     )
     paths.append(os.path.join(dataset_path, name))
 
-    # number of times to randomly remove records
-    n_times_remove_records = params['max_times_records_removed']
-    for i in range(n_times_remove_records):
+    # only remove records from candidate datasets
+    if not query:
 
-        # number of records to remove
-        n_records_remove = random.randint(
-            1,
-            int(params['max_ratio_records_removed'] * original_data.shape[0])
-        )
+        # ratios of removed records
+        max_ratio_records_removed = 1.0
+        ratio_remove_record = list(np.arange(
+            0, max_ratio_records_removed, max_ratio_records_removed/(params['max_times_records_removed'] + 1))
+        )[1:]
 
-        # rows to remove
-        drop_indices = np.random.choice(new_data.index, n_records_remove, replace=False)
+        for i in range(len(ratio_remove_record)):
 
-        # ignoring small datasets
-        if (new_data.shape[0] - len(drop_indices)) < params['min_number_records']:
-            continue
+            # number of records to remove
+            n_records_remove = int(ratio_remove_record[i] * original_data.shape[0])
 
-        # saving dataset
-        name = '%s_%s_%d.csv' % (name_identifier, dataset_name, id_ + i + 1)
-        save_file(
-            os.path.join(dataset_path, name),
-            new_data.drop(drop_indices).to_csv(index=False),
-            hdfs_client,
-            params['cluster'],
-            params['hdfs_address'],
-            params['hdfs_user']
-        )
-        paths.append(os.path.join(dataset_path, name))
+            # rows to remove
+            drop_indices = np.random.choice(new_data.index, n_records_remove, replace=False)
+
+            # ignoring small datasets
+            if (new_data.shape[0] - len(drop_indices)) < params['min_number_records']:
+                continue
+
+            # saving dataset
+            name = '%s_%s_%d.csv' % (name_identifier, dataset_name, id_ + i + 1)
+            save_file(
+                os.path.join(dataset_path, name),
+                new_data.drop(drop_indices).to_csv(index=False),
+                hdfs_client,
+                params['cluster'],
+                params['hdfs_address'],
+                params['hdfs_user']
+            )
+            paths.append(os.path.join(dataset_path, name))
 
     return paths
 
@@ -621,7 +663,8 @@ def get_performance_scores(data, target_variable_name, algorithm, missing_value_
     """
 
     if missing_value_imputation:
-        strategies = ['mean', 'median', 'most_frequent']
+        # strategies = ['mean', 'median', 'most_frequent']
+        strategies = ['mean']  # using only mean for now
         scores = list()
         min_mean_absolute_error = math.inf
         min_strategy = ''
