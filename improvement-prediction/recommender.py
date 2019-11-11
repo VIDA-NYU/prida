@@ -154,7 +154,7 @@ class Recommender:
             precision_at_5_baseline.append(compute_precision_at_k(real_gains, baseline_gains))
             #precision_at_50_baseline.append(compute_precision_at_k(real_gains, baseline_gains, k=50))
             i += 1
-            if i == 10:
+            if i == 5:
                 break
         print('average kendall tau:', np.mean(kendall_tau), 'average kendall tau - baseline:', np.mean(kendall_tau_baseline))
         print('average precision at 1:', np.mean(precision_at_1), 'average precision at 1 - baseline:', np.mean(precision_at_1_baseline))

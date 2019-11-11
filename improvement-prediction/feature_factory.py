@@ -4,6 +4,7 @@ import pandas as pd
 from sklearn import preprocessing
 from sklearn.metrics.cluster import normalized_mutual_info_score
 from constants import *
+from util.misc import *
 
 def max_in_modulus(values):
     return max(values, key=abs)
@@ -155,7 +156,8 @@ class FeatureFactory:
         entropy_levels_int = self.get_entropy_levels_integer()
         features.append(func(entropy_levels_int.values())) if entropy_levels_int else features.append(0)
         return features
-        
+
+    #@timing
     def get_pearson_correlations(self):
         """Computes pearson correlation for every pair of numerical
         columns of the dataset
@@ -167,7 +169,8 @@ class FeatureFactory:
                 if column1 != column2 and index1 < index2:
                     correlations.append(((column1, column2), corrs[column1][column2]))
         return correlations
-    
+
+    #@timing
     def get_spearman_correlations(self):
         """Computes spearman correlation for every pair of numerical
         columns of the dataset
@@ -180,6 +183,7 @@ class FeatureFactory:
                     correlations.append(((column1, column2), corrs[column1][column2]))
         return correlations
 
+    #@timing
     def get_kendall_tau_correlations(self):
         """Computes kendall tau correlation for every pair of numerical
         columns of the dataset
@@ -192,6 +196,7 @@ class FeatureFactory:
                     correlations.append(((column1, column2), corrs[column1][column2]))
         return correlations    
 
+    #@timing
     def get_covariances(self):
         """Computes the covariance between every pair of numerical
         columns of the dataset
@@ -204,6 +209,7 @@ class FeatureFactory:
                     covariances.append(((column1, column2), covs[column1][column2]))
         return covariances
 
+    #@timing
     def get_normalized_mutual_information(self):
         """Computes the mutual information between every pair of numerical
         columns of the dataset

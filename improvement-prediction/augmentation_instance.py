@@ -179,7 +179,7 @@ class AugmentationInstance:
         return joined_dataset_features + joined_dataset_features_with_target + \
             query_features_with_target + candidate_features_with_target + \
             [pearson_difference_wrt_target] + [difference_in_numbers_of_rows]
-    
+
     def generate_features(self, query_dataset_individual_features=[], candidate_dataset_individual_features=[]):
         """This method generates features derived from the datasets of the augmentation instance. 
         The recommendation module computes individual features for the query and candidate datasets in order to 
@@ -193,5 +193,6 @@ class AugmentationInstance:
             feature_factory_candidate = FeatureFactory(self.get_joined_candidate_data())
             candidate_dataset_individual_features = feature_factory_candidate.get_individual_features(func=max_in_modulus)
 
-        pairwise_features = self.compute_pairwise_features()
+        #pairwise_features = [0.5 for i in range(22)]
+        pairwise_features =  self.compute_pairwise_features()
         return np.array(query_dataset_individual_features + candidate_dataset_individual_features + pairwise_features)
