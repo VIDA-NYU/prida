@@ -1,0 +1,8 @@
+if test -f logs/$1-stats.out; then
+    rm logs/$1-stats.out
+fi
+if test -f logs/$1-stats.log; then
+    rm logs/$1-stats.log
+fi
+spark2-submit --deploy-mode cluster --master yarn --files .params.json --conf spark.yarn.appMasterEnv.PYSPARK_PYTHON=./env/data-generation/bin/python --archives data-generation-environment.zip#env --driver-memory 6GB --conf spark.driver.memoryOverhead=1G --conf spark.executor.memoryOverhead=1G --num-executors 300 --executor-cores 3 --executor-memory 20G --conf spark.network.timeout=600s --conf spark.dynamicAllocation.enabled=false generate-stats-from-training-data.py &> logs/$1-stats.out
+yarn logs -applicationId $(python logs/capture-application-id.py logs/$1-stats.out) > logs/$1-stats.log

@@ -5,6 +5,7 @@
 * [Python 3](https://www.python.org/)
 * [HdfsCLI](https://hdfscli.readthedocs.io/en/latest/)
 * [NumPy](https://numpy.org/)
+* [Matplotlib](https://matplotlib.org/) (for plots only)
 * [pandas](https://pandas.pydata.org/)
 * [scikit-learn](https://scikit-learn.org/stable/)
 * [SciPy](https://www.scipy.org/)
@@ -95,11 +96,29 @@ Given this id, you can retrieve its corresponding logs by running `yarn logs`:
 
     $ yarn logs -applicationId <application id>
 
-For your convenience, the script [`run-spark-job`](run-spark-job) automatically runs the data generation process on the cluster and retrieves the corresponding logs:
+For your convenience, the script [`run-spark-job-cluster`](run-spark-job-cluster) automatically runs the data generation process on the cluster and retrieves the corresponding logs:
 
-    $ ./run-spark-job <run script> <output name>
+    $ ./run-spark-job-cluster <run script> <output name>
 
 where `<run script>` is the `spark-submit` script (e.g.: [`run-data-generation-spark-cluster`](run-data-generation-spark-cluster) or [`run-model-training-spark-cluster`](run-model-training-spark-cluster)) and `<output name>` is the desired name for the logs. This creates two files: `logs/<output name>.out`, which contains the `stdout` of the job submission, and `logs/<output name>.log`, with contains the logs.
+
+### Generating Data Statistics
+
+To generate some statistics about the generated data, you can run the script [`generate-stats-from-training-data.py`](generate-stats-from-training-data.py) using Spark. For instance, to run it locally:
+
+    $ spark-submit \
+    --deploy-mode client \
+    --files .params.json \
+    generate-stats-from-training-data.py
+
+The output (part of `stdout`) can then be used by script [`generate-plots-from-stats.py`](generate-plots-from-stats.py) to create some plots. These plots are automatically saved under directory `plots/`, which will be created if it does not originally exists. Note that [`generate-plots-from-stats.py`](generate-plots-from-stats.py) uses [Matplotlib](https://matplotlib.org/) for the plots.
+
+For your convenience, the scripts [`run-stats-client`](run-stats-client) and [`run-stats-cluster`](run-stats-cluster) automatically generate the statistics and create the plots for local and cluster executions, respectively. For instance, if you are running locally:
+
+    $ ./run-stats-cluster <output name>
+
+where `<output name>` is the desired name for the plots.
+
 
 ## OpenML Datasets
 
