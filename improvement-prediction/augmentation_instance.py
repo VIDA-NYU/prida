@@ -143,43 +143,30 @@ class AugmentationInstance:
 
     def compute_pairwise_features(self):
         """Given the joined query+candidate dataset, this method computes pairwise features considering:
-        (1) - the joined query+candidate dataset
-        (2) - the joined query+candidate dataset with respect to the target alone
-        (3) - the joined query+candidate dataset, considering just the candidate columns and the target
-        (4) - the joined query+candidate dataset, considering just the query columns and the target
-        (5) - the difference between the max_in_modulus pearson correlation considering query columns and target, and candidate columns and target
-        (6) - the number of rows of the joined query+candidate dataset over the number of rows of the original query dataset
+        (1) - the joined query+candidate dataset, considering just the candidate columns and the target
+        (2) - the joined query+candidate dataset, considering just the query columns and the target
+        (3) - the difference between the max_in_modulus pearson correlation considering query columns and target, and candidate columns and target
+        (4) - the number of rows of the joined query+candidate dataset over the number of rows of the original query dataset
         """
 
         # computing (1)
-        feature_factory_joined_dataset = FeatureFactory(self.get_joined_data())
-        joined_dataset_features = feature_factory_joined_dataset.get_pairwise_features(func=max_in_modulus)
-
-        # computing (2)
-        joined_dataset_features_with_target = feature_factory_joined_dataset.get_pairwise_features_with_target(self.target_name,
-                                                                                                             func=max_in_modulus)
-
-        # computing (3)
         feature_factory_candidate_with_target = FeatureFactory(self.get_joined_candidate_data_and_target())
         candidate_features_with_target = feature_factory_candidate_with_target.get_pairwise_features_with_target(self.target_name,
                                                                                                                func=max_in_modulus)
         
-        # computing (4)
+        # computing (2)
         feature_factory_query = FeatureFactory(self.get_joined_query_data())
         query_features_with_target = feature_factory_query.get_pairwise_features_with_target(self.target_name,
                                                                                            func=max_in_modulus)
 
-        # computing (5)
-        pearson_difference_wrt_target = feature_factory_candidate_with_target.compute_difference_in_pearsons_wrt_target(feature_factory_query.get_max_pearson_wrt_target(self.target_name),
-                                                                                                                        self.target_name)
+        # computing (3)
+        pearson_difference_wrt_target = feature_factory_candidate_with_target.compute_difference_in_pearsons_wrt_target(feature_factory_query.get_max_pearson_wrt_target(self.target_name), self.target_name)
 
-        # computing (6)
+        # computing (4)
         difference_in_numbers_of_rows = feature_factory_candidate_with_target.compute_percentual_difference_in_number_of_rows(self.query_dataset.get_keys())
         
-        return joined_dataset_features + joined_dataset_features_with_target + \
-            query_features_with_target + candidate_features_with_target + \
-            [pearson_difference_wrt_target] + [difference_in_numbers_of_rows]
-
+        return query_features_with_target + candidate_features_with_target + [pearson_difference_wrt_target] + [difference_in_numbers_of_rows]
+        
     def generate_features(self, query_dataset_individual_features=[], candidate_dataset_individual_features=[]):
         """This method generates features derived from the datasets of the augmentation instance. 
         The recommendation module computes individual features for the query and candidate datasets in order to 
