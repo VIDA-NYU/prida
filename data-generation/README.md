@@ -5,12 +5,12 @@
 * [Python 3](https://www.python.org/)
 * [HdfsCLI](https://hdfscli.readthedocs.io/en/latest/)
 * [NumPy](https://numpy.org/)
-* [Matplotlib](https://matplotlib.org/) (for plots only)
 * [pandas](https://pandas.pydata.org/)
 * [scikit-learn](https://scikit-learn.org/stable/)
 * [SciPy](https://www.scipy.org/)
 * [XGBoost](https://xgboost.readthedocs.io/en/latest/python/python_intro.html)
 * [Apache Spark 2.3.0](https://spark.apache.org/)
+* [Matplotlib](https://matplotlib.org/) (for plots only)
 
 ## Generating Data
 
@@ -113,7 +113,7 @@ To generate some statistics about the generated data, you can run the script [`g
 
 The output (part of `stdout`) can then be used by script [`generate-plots-from-stats.py`](generate-plots-from-stats.py) to create some plots. These plots are automatically saved under directory `plots/`, which will be created if it does not originally exists. Note that [`generate-plots-from-stats.py`](generate-plots-from-stats.py) uses [Matplotlib](https://matplotlib.org/) for the plots.
 
-For your convenience, the scripts [`run-stats-client`](run-stats-client) and [`run-stats-cluster`](run-stats-cluster) automatically generate the statistics and create the plots for local and cluster executions, respectively. For instance, if you are running locally:
+For your convenience, the scripts [`run-stats-client`](run-stats-client) and [`run-stats-cluster`](run-stats-cluster) automatically generate the statistics and create the plots for local and cluster executions, respectively. For instance, if you are running in a cluster:
 
     $ ./run-stats-cluster <output name>
 
