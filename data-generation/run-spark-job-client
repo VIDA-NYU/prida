@@ -1,0 +1,4 @@
+if test -f logs/$2.out; then
+    rm logs/$2.out
+fi
+./$1 &> logs/$2.out

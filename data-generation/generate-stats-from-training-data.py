@@ -30,8 +30,14 @@ def generate_stats_from_record(record, load_dataframes, params):
     """
 
     global n_records
-    global before_lte_after
-    global before_gt_after
+    global before_mae_lte_after
+    global before_mae_gt_after
+    global before_mse_lte_after
+    global before_mse_gt_after
+    global before_mdae_lte_after
+    global before_mdae_gt_after
+    global before_r2_lte_after
+    global before_r2_gt_after
     global query_size_lte_candidate_size
     global query_size_gt_candidate_size
 
@@ -49,8 +55,14 @@ def generate_stats_from_record(record, load_dataframes, params):
     target = record['target']
     candidate = record['candidate_dataset']
     imputation_strategy = record['imputation_strategy']
-    score_before = record['mean_absolute_error'][0]
-    score_after = record['mean_absolute_error'][1]
+    mae_before = record['mean_absolute_error'][0]
+    mae_after = record['mean_absolute_error'][1]
+    mse_before = record['mean_squared_error'][0]
+    mse_after = record['mean_squared_error'][1]
+    mdae_before = record['median_absolute_error'][0]
+    mdae_after = record['median_absolute_error'][1]
+    r2_before = record['r2_score'][0]
+    r2_after = record['r2_score'][1]
 
     # parameters
     output_dir = params['new_datasets_directory']
@@ -62,10 +74,22 @@ def generate_stats_from_record(record, load_dataframes, params):
     n_records += 1
 
     # learning scores
-    if score_before <= score_after:
-        before_lte_after += 1
+    if mae_before <= mae_after:
+        before_mae_lte_after += 1
     else:
-        before_gt_after += 1
+        before_mae_gt_after += 1
+    if mse_before <= mse_after:
+        before_mse_lte_after += 1
+    else:
+        before_mse_gt_after += 1
+    if mdae_before <= mdae_after:
+        before_mdae_lte_after += 1
+    else:
+        before_mdae_gt_after += 1
+    if r2_before <= r2_after:
+        before_r2_lte_after += 1
+    else:
+        before_r2_gt_after += 1
 
     # dataframes
     if load_dataframes:
@@ -164,8 +188,14 @@ if __name__ == '__main__':
 
         # accumulators
         n_records = sc.accumulator(0)
-        before_lte_after = sc.accumulator(0)
-        before_gt_after = sc.accumulator(0)
+        before_mae_lte_after = sc.accumulator(0)
+        before_mae_gt_after = sc.accumulator(0)
+        before_mse_lte_after = sc.accumulator(0)
+        before_mse_gt_after = sc.accumulator(0)
+        before_mdae_lte_after = sc.accumulator(0)
+        before_mdae_gt_after = sc.accumulator(0)
+        before_r2_lte_after = sc.accumulator(0)
+        before_r2_gt_after = sc.accumulator(0)
 
         stats = sc.textFile(filename).map(
             lambda x: generate_stats_from_record(json.loads(x), load_dataframes, params)
@@ -198,8 +228,14 @@ if __name__ == '__main__':
             candidate_n_columns += [z for (x, y, w, z) in n_rows_columns]
 
         algorithms[algorithm_name]['n_records'] = n_records.value
-        algorithms[algorithm_name]['before_lte_after'] = before_lte_after.value
-        algorithms[algorithm_name]['before_gt_after'] = before_gt_after.value
+        algorithms[algorithm_name]['before_mae_lte_after'] = before_mae_lte_after.value
+        algorithms[algorithm_name]['before_mae_gt_after'] = before_mae_gt_after.value
+        algorithms[algorithm_name]['before_mse_lte_after'] = before_mse_lte_after.value
+        algorithms[algorithm_name]['before_mse_gt_after'] = before_mse_gt_after.value
+        algorithms[algorithm_name]['before_mdae_lte_after'] = before_mdae_lte_after.value
+        algorithms[algorithm_name]['before_mdae_gt_after'] = before_mdae_gt_after.value
+        algorithms[algorithm_name]['before_r2_lte_after'] = before_r2_lte_after.value
+        algorithms[algorithm_name]['before_r2_gt_after'] = before_r2_gt_after.value
         algorithms[algorithm_name]['imputation_strategies'] = imputation_strategies
 
         load_dataframes = False
@@ -209,12 +245,36 @@ if __name__ == '__main__':
         print('Statistics for %s:' % algorithm)
         print(' -- Number of records: %d' % algorithms[algorithm]['n_records'])
         print(' -- MAE before gt MAE after: %d (%.2f%%)' % (
-            algorithms[algorithm]['before_gt_after'],
-            (100 * algorithms[algorithm]['before_gt_after']) / algorithms[algorithm]['n_records']
+            algorithms[algorithm]['before_mae_gt_after'],
+            (100 * algorithms[algorithm]['before_mae_gt_after']) / algorithms[algorithm]['n_records']
         ))
         print(' -- MAE before lte MAE after: %d (%.2f%%)' % (
-            algorithms[algorithm]['before_lte_after'],
-            (100 * algorithms[algorithm]['before_lte_after']) / algorithms[algorithm]['n_records']
+            algorithms[algorithm]['before_mae_lte_after'],
+            (100 * algorithms[algorithm]['before_mae_lte_after']) / algorithms[algorithm]['n_records']
+        ))
+        print(' -- MSE before gt MSE after: %d (%.2f%%)' % (
+            algorithms[algorithm]['before_mse_gt_after'],
+            (100 * algorithms[algorithm]['before_mse_gt_after']) / algorithms[algorithm]['n_records']
+        ))
+        print(' -- MSE before lte MSE after: %d (%.2f%%)' % (
+            algorithms[algorithm]['before_mse_lte_after'],
+            (100 * algorithms[algorithm]['before_mse_lte_after']) / algorithms[algorithm]['n_records']
+        ))
+        print(' -- MDAE before gt MDAE after: %d (%.2f%%)' % (
+            algorithms[algorithm]['before_mdae_gt_after'],
+            (100 * algorithms[algorithm]['before_mdae_gt_after']) / algorithms[algorithm]['n_records']
+        ))
+        print(' -- MDAE before lte MDAE after: %d (%.2f%%)' % (
+            algorithms[algorithm]['before_mdae_lte_after'],
+            (100 * algorithms[algorithm]['before_mdae_lte_after']) / algorithms[algorithm]['n_records']
+        ))
+        print(' -- R^2 before gt R^2 after: %d (%.2f%%)' % (
+            algorithms[algorithm]['before_r2_gt_after'],
+            (100 * algorithms[algorithm]['before_r2_gt_after']) / algorithms[algorithm]['n_records']
+        ))
+        print(' -- R^2 before lte R^2 after: %d (%.2f%%)' % (
+            algorithms[algorithm]['before_r2_lte_after'],
+            (100 * algorithms[algorithm]['before_r2_lte_after']) / algorithms[algorithm]['n_records']
         ))
         print(' -- Missing value imputation strategies:')
         for (strategy, count) in algorithms[algorithm]['imputation_strategies']:

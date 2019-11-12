@@ -1,0 +1,5 @@
+if test -f logs/$1-stats.out; then
+    rm logs/$1-stats.out
+fi
+spark-submit --deploy-mode client --executor-memory 4G --files .params.json generate-stats-from-training-data.py &> logs/$1-stats.out
+python generate-plots-from-stats.py logs/$1-stats.out $1
