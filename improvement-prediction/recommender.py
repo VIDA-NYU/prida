@@ -33,9 +33,9 @@ class Recommender:
                 instance = parse_augmentation_instance(self.prefix, json.loads(line))
                 rows_list.append(instance.get_formatted_fields())               
                 self.query_individual_features[instance.get_query_filename()] = \
-                    FeatureFactory(instance.get_joined_query_data()).get_individual_features(func=max_in_modulus)
+                    FeatureFactory(instance.get_query_dataset().get_data()).get_individual_features(func=max_in_modulus)
                 self.candidate_individual_features[instance.get_candidate_filename()] = \
-                    FeatureFactory(instance.get_joined_candidate_data()).get_individual_features(func=max_in_modulus)
+                    FeatureFactory(instance.get_candidate_dataset().get_data()).get_individual_features(func=max_in_modulus)
 
             self.learning_table = pd.DataFrame(rows_list) 
             self.learning_table.set_index(['query_filename', 'target_name', 'candidate_filename'])
@@ -136,8 +136,8 @@ class Recommender:
             precision_at_5_baseline.append(compute_precision_at_k(real_gains, baseline_gains))
             #precision_at_50_baseline.append(compute_precision_at_k(real_gains, baseline_gains, k=50))
             i += 1
-            if i == 5:
-                break
+            # if i == 100:
+            #     break
         print('average kendall tau:', np.mean(kendall_tau), 'average kendall tau - baseline:', np.mean(kendall_tau_baseline))
         print('average precision at 1:', np.mean(precision_at_1), 'average precision at 1 - baseline:', np.mean(precision_at_1_baseline))
         print('average precision at 5:', np.mean(precision_at_5), 'average precision at 5 - baseline:', np.mean(precision_at_5_baseline))

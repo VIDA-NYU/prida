@@ -160,7 +160,7 @@ class AugmentationInstance:
         """
 
         # computing (1)
-        feature_factory_candidate_with_target = FeatureFactory(self.get_joined_candidate_data_and_target())
+        feature_factory_candidate_with_target = FeatureFactory(self.get_candidate_data_and_target())
         candidate_features_with_target = feature_factory_candidate_with_target.get_pairwise_features_with_target(self.target_name,
                                                                                                                func=max_in_modulus)
         
@@ -184,10 +184,10 @@ class AugmentationInstance:
         candidate_dataset_individual_features can be different from []
         """
         if not query_dataset_individual_features:
-            feature_factory_query = FeatureFactory(self.get_joined_query_data())
+            feature_factory_query = FeatureFactory(self.get_query_dataset().get_data())
             query_dataset_individual_features = feature_factory_query.get_individual_features(func=max_in_modulus)
         if not candidate_dataset_individual_features:
-            feature_factory_candidate = FeatureFactory(self.get_joined_candidate_data())
+            feature_factory_candidate = FeatureFactory(self.get_candidate_dataset().get_data())
             candidate_dataset_individual_features = feature_factory_candidate.get_individual_features(func=max_in_modulus)
 
         #pairwise_features = [0.5 for i in range(22)]
