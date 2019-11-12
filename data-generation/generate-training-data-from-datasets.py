@@ -266,10 +266,16 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
     #   totalling 6
     n_column_combinations_query_dataset = 0
     size_column_combinations_query_dataset = list()
-    for k in n_potential_columns_query_dataset:
-        n_comb = int(comb(n_columns_left, k))
-        n_column_combinations_query_dataset += n_comb
-        size_column_combinations_query_dataset += [k for _ in range(n_comb)]
+    if n_columns_left > max_times_break_data_vertical:
+        # if the number of columns left is greater or equal than the desired number of vertical
+        #  splits, no need to compute expensive combinations
+        n_column_combinations_query_dataset = max_times_break_data_vertical
+        size_column_combinations_query_dataset = list(range(1, n_columns_left))
+    else:
+        for k in n_potential_columns_query_dataset:
+            n_comb = int(comb(n_columns_left, k))
+            n_column_combinations_query_dataset += n_comb
+            size_column_combinations_query_dataset += [k for _ in range(n_comb)]
 
     # maximum number of times that the original data will be vertically broken into
     #   multiple datasets
