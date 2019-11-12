@@ -112,49 +112,28 @@ class FeatureFactory:
                 number_of_unique_values[column] = self.data[column].nunique()
         return number_of_unique_values
 
-    def get_entropy_levels_float(self):
-        """Computes the entropy level of every real (float) column of the dataset
-        """
-        entropy_levels = {}
-        for column in self.data:
-            if self._is_float(column):
-                original_values = self.data[column]
-                original_values = original_values.values.reshape(1, -1)
-                min_max_scaler = preprocessing.MinMaxScaler()
-                scaled_values = min_max_scaler.fit_transform(original_values)
-                entropy_levels[column] = stats.entropy(np.histogram(scaled_values)[0])
-        return entropy_levels
-    
-    def get_entropy_levels_integer(self):
-        """Computes the entropy level of every integer column of the dataset
-        """        
-        entropy_levels = {}
-        for column in self.data:
-            if self._is_integer(column):
-                value, counts = np.unique(self.data[column], return_counts=True)            
-                entropy_levels[column] = stats.entropy(counts)
-        return entropy_levels
-
     def get_individual_features(self, func=max):
         """Computes all features of the dataset that concern columns individually, 
         i.e., no features that have to do with relationships across different columns. 
         The method returns for example the maximum (in modulus) of them --- it depends 
         on parameter func
         """
+
+        # not using number_of_numerical_columns for now because its correlation with
+        # number_of_columns is 1.0
+        
         features = [self.get_number_of_columns(),
                    self.get_number_of_rows(),
-                   self.get_row_to_column_ratio(),
-                   self.get_number_of_numerical_columns()]
+                   self.get_row_to_column_ratio()]
+
         features.append(func(self.get_means_of_numerical_columns().values()))
-        features.append(func(self.get_percentages_of_missing_values().values()))
+        # not using percentages_of_missing_values for now because the data comes with NaN's
+        # either removed or "imputed"
+        # features.append(func(self.get_percentages_of_missing_values().values()))
         features.append(func(self.get_outlier_percentages_of_numerical_columns().values()))
         features.append(func(self.get_skewness_of_numerical_columns().values()))
         features.append(func(self.get_kurtosis_of_numerical_columns().values()))
         features.append(func(self.get_number_of_unique_values_of_numerical_columns().values()))
-        entropy_levels_float = self.get_entropy_levels_float()
-        features.append(func(entropy_levels_float.values())) if entropy_levels_float else features.append(0.0)
-        entropy_levels_int = self.get_entropy_levels_integer()
-        features.append(func(entropy_levels_int.values())) if entropy_levels_int else features.append(0)
         return features
 
     #@timing
@@ -229,12 +208,15 @@ class FeatureFactory:
         features = []
         pearson = func([i[1] for i in self.get_pearson_correlations()])
         spearman = func([i[1] for i in self.get_spearman_correlations()])
-        kendalltau = func([i[1] for i in self.get_kendall_tau_correlations()])
+
+        # not computing kendalltau for now because it is heavily correlated with
+        # spearman
+        #kendalltau = func([i[1] for i in self.get_kendall_tau_correlations()])
         covariance = func([i[1] for i in self.get_covariances()])
         mutual_info = func([i[1] for i in self.get_normalized_mutual_information()])
         features.append(pearson) if not np.isnan(pearson) else features.append(0.0)
         features.append(spearman) if not np.isnan(spearman) else features.append(0.0)
-        features.append(kendalltau) if not np.isnan(kendalltau) else features.append(0.0)
+        #features.append(kendalltau) if not np.isnan(kendalltau) else features.append(0.0)
         features.append(covariance) if not np.isnan(covariance) else features.append(0.0)
         features.append(mutual_info) if not np.isnan(mutual_info) else features.append(0.0)
         return features
@@ -330,13 +312,16 @@ class FeatureFactory:
         features = []
         pearson = func(self.get_pearson_correlations_with_target(target_name).values())
         spearman = func(self.get_spearman_correlations_with_target(target_name).values())
-        kendalltau = func(self.get_kendall_tau_correlations_with_target(target_name).values())
+
+        # not computing kendalltau for now because it is heavily correlated with
+        # spearman
+        #kendalltau = func(self.get_kendall_tau_correlations_with_target(target_name).values())
         covariance = func(self.get_covariances_with_target(target_name).values())
         mutual_info = func(self.get_normalized_mutual_information_with_target(target_name).values())
         #TODO refactor to avoid repetition
         features.append(pearson) if not np.isnan(pearson) else features.append(0.0)
         features.append(spearman) if not np.isnan(spearman) else features.append(0.0)
-        features.append(kendalltau) if not np.isnan(kendalltau) else features.append(0.0)
+        #features.append(kendalltau) if not np.isnan(kendalltau) else features.append(0.0)
         features.append(covariance) if not np.isnan(covariance) else features.append(0.0)
         features.append(mutual_info) if not np.isnan(mutual_info) else features.append(0.0)
         return features
