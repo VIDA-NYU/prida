@@ -340,13 +340,3 @@ class FeatureFactory:
         features.append(covariance) if not np.isnan(covariance) else features.append(0.0)
         features.append(mutual_info) if not np.isnan(mutual_info) else features.append(0.0)
         return features
-
-    def compute_percentual_difference_in_number_of_rows(self, keys_of_another_dataset):
-        """Computes the ratio between the number of rows of the current dataset (potentially the candidate dataset)  
-        and the number of rows of another dataset (potentially the query dataset), using keys and their intersections as a proxy
-        """
-
-        #self.data.index.values keeps the keys of self.data, i.e., the current dataset
-        final_number_of_rows = len(set(self.data.index.values) & set(keys_of_another_dataset))
-        #print('final number of rows after integration', final_number_of_rows, 'initial number of rows', len(keys_of_another_dataset))
-        return final_number_of_rows/len(keys_of_another_dataset)
