@@ -851,8 +851,6 @@ if __name__ == '__main__':
                 dataset_files.append(problem_doc)
 
         all_files = sc.parallelize(dataset_files)
-        if cluster_execution:
-            all_files = all_files.repartition(100)
 
         # grouping files from same dataset
         # (dataset_name, [('learningData.csv', path),
@@ -860,6 +858,9 @@ if __name__ == '__main__':
         #                 ('problemDoc.json', path)])
         all_files = all_files.map(lambda x: organize_dataset_files(x, cluster_execution))
         all_files = all_files.reduceByKey(lambda x1, x2: x1 + x2)
+
+        if cluster_execution:
+            all_files = all_files.repartition(372)
 
         # generating query and candidate datasets for positive examples
         #   format is the following:
