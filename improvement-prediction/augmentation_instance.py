@@ -184,10 +184,10 @@ class AugmentationInstance:
         candidate_dataset_individual_features can be different from []
         """
         if not query_dataset_individual_features:
-            feature_factory_query = FeatureFactory(self.get_joined_query_data())
+            feature_factory_query = FeatureFactory(self.get_query_dataset().get_data())
             query_dataset_individual_features = feature_factory_query.get_individual_features(func=max_in_modulus)
         if not candidate_dataset_individual_features:
-            feature_factory_candidate = FeatureFactory(self.get_joined_candidate_data())
+            feature_factory_candidate = FeatureFactory(self.get_candidate_dataset().get_data())
             candidate_dataset_individual_features = feature_factory_candidate.get_individual_features(func=max_in_modulus)
 
         #pairwise_features = [0.5 for i in range(22)]
