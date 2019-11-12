@@ -71,13 +71,13 @@ class AugmentationInstance:
         return self.instance_values_dict
              
     def join_query_and_candidate_datasets(self):
-        """Creates a new dataset (Dataset class) by performing an inner join 
+        """Creates a new dataset (Dataset class) by performing a join 
         between the query and candidate datasets. By default, the joining key is 
         'key-for-ranking'
         """
         result_data = self.query_dataset.join_with(self.candidate_dataset, missing_value_imputation=self.imputation_strategy)
         dataset = Dataset()
-        dataset.initialize_from_data_and_column_names(result_data, result_data.columns, result_data.keys)
+        dataset.initialize_from_data_and_column_names(result_data)
         return dataset
 
     def get_joined_query_data(self):
@@ -109,6 +109,16 @@ class AugmentationInstance:
         """
         return self.target_name
 
+    # TODO maybe move method below back to feature factory
+    def get_key_ratio_between_query_and_candidate_datasets(self):
+        """Computes the ratio between the keys that are common for both query and candidate 
+        datasets over all keys in the query dataset
+        """
+        query_data_keys = self.query_dataset.get_keys()
+        candidate_data_keys = self.candidate_dataset.get_keys()
+        intersection_size = len(query_data_keys & candidate_data_keys)
+        return intersection_size/len(query_data_keys)
+      
     def compute_decrease_in_mean_absolute_error(self):
         """Returns the relative decrease in mean_absolute_error if mae_before and
         mae_after are defined
@@ -146,7 +156,7 @@ class AugmentationInstance:
         (1) - the joined query+candidate dataset, considering just the candidate columns and the target
         (2) - the joined query+candidate dataset, considering just the query columns and the target
         (3) - the difference between the max_in_modulus pearson correlation considering query columns and target, and candidate columns and target
-        (4) - the number of rows of the joined query+candidate dataset over the number of rows of the original query dataset
+        (4) - the number of keys in the intersection of query+candidate dataset over the number of keys of the original query dataset
         """
 
         # computing (1)
@@ -163,9 +173,9 @@ class AugmentationInstance:
         pearson_difference_wrt_target = feature_factory_candidate_with_target.compute_difference_in_pearsons_wrt_target(feature_factory_query.get_max_pearson_wrt_target(self.target_name), self.target_name)
 
         # computing (4)
-        difference_in_numbers_of_rows = feature_factory_candidate_with_target.compute_percentual_difference_in_number_of_rows(self.query_dataset.get_keys())
+        key_ratio = self.get_key_ratio_between_query_and_candidate_datasets()
         
-        return query_features_with_target + candidate_features_with_target + [pearson_difference_wrt_target] + [difference_in_numbers_of_rows]
+        return query_features_with_target + candidate_features_with_target + [pearson_difference_wrt_target] + [key_ratio]
         
     def generate_features(self, query_dataset_individual_features=[], candidate_dataset_individual_features=[]):
         """This method generates features derived from the datasets of the augmentation instance. 

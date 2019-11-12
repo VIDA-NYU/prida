@@ -15,19 +15,20 @@ class Dataset:
         self.filename = filename
         self.read_dataset(hdfs_client, use_hdfs, hdfs_address, hdfs_user)
 
-    def initialize_from_data_and_column_names(self, data, columns, keys):
+    def initialize_from_data_and_column_names(self, data):
         """Stores a pandas representation of a dataset that is passed in the parameters
         """
         self.data = data
-        self.column_names = columns
-        self.keys = keys
+        self.column_names = self.data.columns
+        self.keys = set(self.data.index.values)
         
     def read_dataset(self, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
         """Reads lines from self.filename, storing in a pandas dataframe
         """
-        self.data = pd.read_csv(StringIO(read_file(self.filename, hdfs_client, use_hdfs, hdfs_address, hdfs_user))).set_index(keys='key-for-ranking', drop=True)
+        self.data = pd.read_csv(StringIO(read_file(self.filename, hdfs_client, use_hdfs, hdfs_address, hdfs_user)))
+        self.keys = set(self.data['key-for-ranking'])
+        self.data = self.data.set_index(keys='key-for-ranking', drop=True)
         self.column_names = self.data.columns
-        self.keys = self.data.index.values
 
     def get_data(self):
         """Returns the dataset (a pandas dataframe)
@@ -45,7 +46,7 @@ class Dataset:
         return self.column_names
     
     def join_with(self, another_dataset, missing_value_imputation=None):
-        """Performs join between the dataset and another given dataset. _left and _right suffixes are added to columns to 
+        """Performs a join between the dataset and another given dataset. _left and _right suffixes are added to columns to 
         avoid overwriting in the case where both datasets have columns with the same name. Optionally, an imputation strategy is
         passed as a parameter to handle missing values
         """

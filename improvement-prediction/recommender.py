@@ -103,24 +103,6 @@ class Recommender:
                                                                       self.candidate_individual_features[candidate_filename])
             gain_mean = model.predict(test_features_mean.reshape(1, -1))[0]
             
-            # test_instance_median = AugmentationInstance({'query_filename': query_filename,
-            #                                              'target_name': target_name,
-            #                                              'candidate_filename': candidate_filename,
-            #                                              'imputation_strategy': 'median'})
-            # test_features_median = test_instance_median.generate_features(self.query_individual_features[query_filename], 
-            #                                                               self.candidate_individual_features[candidate_filename])
-            # gain_median = model.predict(test_features_median.reshape(1, -1))[0]
-          
-            # test_instance_most_frequent = AugmentationInstance({'query_filename': query_filename,
-            #                                                     'target_name': target_name,
-            #                                                     'candidate_filename': candidate_filename,
-            #                                                     'imputation_strategy': 'most_frequent'})
-            # test_features_most_frequent = test_instance_most_frequent.generate_features(self.query_individual_features[query_filename], 
-            #                                                                             self.candidate_individual_features[candidate_filename])
-            # gain_most_frequent = model.predict(test_features_most_frequent.reshape(1, -1))[0]
-
-            # we keep the best predicted gain we find with different imputation strategies
-            #predicted_gains.append((candidate_filename, max([gain_mean, gain_median, gain_most_frequent])))
             predicted_gains.append((candidate_filename, gain_mean))            
             # the last feature (id -1) in test_features_mean etc is number_of_keys_after_join/number_of_keys_before_join
             # which is exactly what we use as baseline here
