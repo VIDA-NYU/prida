@@ -190,6 +190,5 @@ class AugmentationInstance:
             feature_factory_candidate = FeatureFactory(self.get_candidate_dataset().get_data())
             candidate_dataset_individual_features = feature_factory_candidate.get_individual_features(func=max_in_modulus)
 
-        #pairwise_features = [0.5 for i in range(22)]
         pairwise_features =  self.compute_pairwise_features()
         return np.array(query_dataset_individual_features + candidate_dataset_individual_features + pairwise_features)
