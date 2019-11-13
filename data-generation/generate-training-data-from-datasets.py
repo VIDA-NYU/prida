@@ -979,6 +979,22 @@ if __name__ == '__main__':
             performance_scores.saveAsTextFile(filename)
 
     print('Duration: %.4f seconds' % (time.time() - start_time))
+    print(' -- Configuration:')
+    print('    . original_datasets_directory: %s' % params['original_datasets_directory'])
+    print('    . new_datasets_directory: %s' % params['new_datasets_directory'])
+    print('    . cluster: %s' % str(params['cluster']))
+    print('    . hdfs_address: %s' % params['hdfs_address'])
+    print('    . hdfs_user: %s' % params['hdfs_user'])
+    print('    . ignore_first_attribute: %s' % str(params['ignore_first_attribute']))
+    print('    . skip_dataset_creation: %s' % str(params['skip_dataset_creation']))
+    print('    . skip_training_data: %s' % str(params['skip_training_data']))
+    print('    . candidate_single_column: %s' % str(params['candidate_single_column']))
+    print('    . regression_algorithm: %s' % params['regression_algorithm'])
+    print('    . inner_join: %s' % str(params['inner_join']))
+    print('    . min_number_records: %d' % params['min_number_records'])
+    print('    . max_times_break_data_vertical: %d' % params['max_times_break_data_vertical'])
+    print('    . max_times_records_removed: %d' % params['max_times_records_removed'])
+
     if not skip_dataset_creation:
         print(' -- N. positive examples: %d' %n_positive_examples)
         print(' -- N. negative examples: %d' %n_negative_examples)
