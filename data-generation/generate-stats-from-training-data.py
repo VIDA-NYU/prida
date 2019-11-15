@@ -9,7 +9,7 @@ from pyspark import SparkConf, SparkContext, StorageLevel
 import sys
 
 
-def read_file(file_path, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+def read_file(file_path, hdfs_client=None, use_hdfs=False):
     """Opens a file for read and returns its corresponding content.
     """
 
@@ -98,17 +98,13 @@ def generate_stats_from_record(record, load_dataframes, params):
             read_file(
                 os.path.join(output_dir, 'files', query),
                 hdfs_client,
-                cluster_execution,
-                hdfs_address,
-                hdfs_user)
+                cluster_execution)
         ))
         candidate_data = pd.read_csv(StringIO(
             read_file(
                 os.path.join(output_dir, 'files', candidate),
                 hdfs_client,
-                cluster_execution,
-                hdfs_address,
-                hdfs_user)
+                cluster_execution)
         ))
 
         # dataframe sizes
@@ -132,7 +128,7 @@ def generate_stats_from_record(record, load_dataframes, params):
     return (imputation_strategy, None, None, None, None, None, None)
 
 
-def list_dir(file_path, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+def list_dir(file_path, hdfs_client=None, use_hdfs=False):
     """Lists all the files inside the directory specified by file_path.
     """
 
@@ -172,7 +168,7 @@ if __name__ == '__main__':
     # searching for training data
     algorithms = dict()
     load_dataframes = True
-    for file_ in list_dir(output_dir, hdfs_client, cluster_execution, hdfs_address, hdfs_user):
+    for file_ in list_dir(output_dir, hdfs_client, cluster_execution):
         if 'training-data-' not in file_:
             continue
         algorithm_name = ' '.join(file_.replace('training-data-', '').split('-'))
@@ -340,4 +336,11 @@ if __name__ == '__main__':
             hist_candidate_n_columns[1][i],
             hist_candidate_n_columns[0][i-1])
         )
+    print('')
+
+    print('Configuration:')
+    print(' -- new_datasets_directory: %s' % params['new_datasets_directory'])
+    print(' -- cluster: %s' % str(params['cluster']))
+    print(' -- hdfs_address: %s' % params['hdfs_address'])
+    print(' -- hdfs_user: %s' % params['hdfs_user'])
     print('')
