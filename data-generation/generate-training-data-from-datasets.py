@@ -156,6 +156,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
 
     # params
     max_times_break_data_vertical = params['max_times_break_data_vertical']
+    max_number_columns = int(params['max_number_columns'] / 2)
     ignore_first_attribute = params['ignore_first_attribute']
     candidate_single_column = params['candidate_single_column']
     output_dir = params['new_datasets_directory']
@@ -244,6 +245,8 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
     n_columns_left = len(column_metadata) - 1 - n_non_numeric_att
     if ignore_first_attribute:
         n_columns_left -= 1
+    # number of columns left will also depend on the maximum number of colums chosen by the user
+    n_columns_left = min(n_columns_left, max_number_columns - 1)
     # if there is only one column left, there is no way to
     # generate both query and candidate datasets
     if n_columns_left <= 1:
@@ -295,12 +298,6 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
     for non_numeric_att in non_numeric_att_list:
         all_columns.remove(non_numeric_att)
 
-    # if candidate datasets should have a single column, try all combinations
-    all_combinations = None
-    if candidate_single_column:
-        all_combinations = list(combinations(all_columns, n_columns_left - 1))
-        n_columns_query_dataset = [n_columns_left - 1 for _ in all_combinations]
-
     # pandas dataset
     original_data = None
     try:
@@ -336,28 +333,24 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
         identifier_dir = os.path.join(output_dir, 'files', identifier)
         create_dir(identifier_dir, hdfs_client, cluster_execution)
 
-        if not candidate_single_column:
-            columns = list()
-            seen = True
-            while seen:
-                # randomly choose the columns
-                columns = list(np.random.choice(
-                    all_columns,
-                    n,
-                    replace=False
-                ))
-                if tuple(columns) not in seen_combinations:
-                    seen = False
-            seen_combinations.add(tuple(columns))
-
-        else:
-            # get column indices from combinations
-            columns = list(all_combinations[id_])
+        # selecting columns for query dataset
+        query_columns = list()
+        seen = True
+        while seen:
+            # randomly choose the columns
+            query_columns = list(np.random.choice(
+                all_columns,
+                n,
+                replace=False
+            ))
+            if tuple(query_columns) not in seen_combinations:
+                seen = False
+        seen_combinations.add(tuple(query_columns))
 
         # generate query data
         query_data_paths = generate_data_from_columns(
             original_data=original_data,
-            columns=columns + [target_variable],
+            columns=query_columns + [target_variable],
             column_metadata=column_metadata,
             key_column=key_column,
             params=params,
@@ -367,10 +360,20 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
             query=True
         )
 
+        # selecting columns for candidate dataset
+        n_possible_columns = n_columns_left - n
+        if candidate_single_column:
+            n_possible_columns = 1
+        candidate_columns = list(np.random.choice(
+            list(set(all_columns).difference(set(query_columns))),
+            n_possible_columns,
+            replace=False
+        ))
+
         # generate candidate data
         candidate_data_paths = generate_data_from_columns(
             original_data=original_data,
-            columns=list(set(all_columns).difference(set(columns))),
+            columns=candidate_columns,
             column_metadata=column_metadata,
             key_column=key_column,
             params=params,
@@ -980,6 +983,7 @@ if __name__ == '__main__':
     print('    . regression_algorithm: %s' % params['regression_algorithm'])
     print('    . inner_join: %s' % str(params['inner_join']))
     print('    . min_number_records: %d' % params['min_number_records'])
+    print('    . max_number_columns: %d' % params['max_number_columns'])
     print('    . max_times_break_data_vertical: %d' % params['max_times_break_data_vertical'])
     print('    . max_times_records_removed: %d' % params['max_times_records_removed'])
 
