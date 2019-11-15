@@ -37,6 +37,9 @@ def generate_stats_from_dataset(dataset, params):
     """Computes some statistics related to the dataset.
     """
 
+    global dataframe_exception
+    global processed_datasets
+
     # File system information
     cluster_execution = params['cluster']
     hdfs_address = params['hdfs_address']
@@ -47,14 +50,21 @@ def generate_stats_from_dataset(dataset, params):
     if cluster_execution:
         hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
 
-    data = pd.read_csv(StringIO(
-        read_file(
-            dataset,
-            hdfs_client,
-            cluster_execution)
-    ))
+    data = None
+    try:
+        data = pd.read_csv(StringIO(
+            read_file(
+                dataset,
+                hdfs_client,
+                cluster_execution)
+        ))
+    except Exception as e:
+        print('[WARNING] The following dataset had an exception while parsing into a dataframe: %s (%s)' % (dataset, str(e)))
+        dataframe_exception += 1
+        return []
 
-    return (data.shape[0], data.shape[1])
+    processed_datasets += 1
+    return [(data.shape[0], data.shape[1])]
     
 
 if __name__ == '__main__':
@@ -63,9 +73,11 @@ if __name__ == '__main__':
     conf = SparkConf().setAppName("OpenML Stats")
     sc = SparkContext(conf=conf)
 
-    # global variables
+    # global variables and accumulators
     n_rows = list()
     n_columns = list()
+    dataframe_exception = sc.accumulator(0)
+    processed_datasets = sc.accumulator(0)
 
     # parameters
     params = json.load(open(".params.json"))
@@ -88,7 +100,7 @@ if __name__ == '__main__':
 
     # computing stats
     files = sc.parallelize(dataset_files, 365)
-    stats = files.map(
+    stats = files.flatMap(
         lambda x: generate_stats_from_dataset(x, params)
     ).persist(StorageLevel.MEMORY_AND_DISK)
 
@@ -117,6 +129,11 @@ if __name__ == '__main__':
             hist_n_columns[1][i],
             hist_n_columns[0][i-1])
         )
+    print('')
+
+    print('Stats:')
+    print(' -- Processed datasets: %d' %processed_datasets.value)
+    print(' -- Datasets w/ pandas.Dataframe exception: %d' %dataframe_exception.value)
     print('')
 
     print('Configuration:')
