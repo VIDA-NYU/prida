@@ -48,13 +48,13 @@ output_filename = sys.argv[2]
 # n. rows
 n_rows_bins = list()
 n_rows_n = list()
-for i in range(n_rows_position + 1, n_rows_position + 11):
+for i in range(n_rows_position + 1, n_rows_position + 501):
     line = stats_file[i]
 
     # bin ranges
     bin_ranges = line[line.find('[')+1:line.find(']')].split(',')
     n_rows_bins.append(float(bin_ranges[0]))
-    if i == n_rows_position + 10:  ## last one
+    if i == n_rows_position + 500:  ## last one
         n_rows_bins.append(float(bin_ranges[1]))
 
     # densities
@@ -63,13 +63,13 @@ for i in range(n_rows_position + 1, n_rows_position + 11):
 # n. columns
 n_columns_bins = list()
 n_columns_n = list()
-for i in range(n_rows_position + 12, n_rows_position + 22):
+for i in range(n_rows_position + 502, n_rows_position + 1002):
     line = stats_file[i]
 
     # bin ranges
     bin_ranges = line[line.find('[')+1:line.find(']')].split(',')
     n_columns_bins.append(float(bin_ranges[0]))
-    if i == n_rows_position + 21:  ## last one
+    if i == n_rows_position + 1001:  ## last one
         n_columns_bins.append(float(bin_ranges[1]))
 
     # densities

@@ -112,8 +112,8 @@ if __name__ == '__main__':
         lambda x: x[1]
     ).collect()
 
-    hist_n_rows = np.histogram(n_rows, bins=10)
-    hist_n_columns = np.histogram(n_columns, bins=10)
+    hist_n_rows = np.histogram(n_rows, bins=500)
+    hist_n_columns = np.histogram(n_columns, bins=500)
 
     print(' -- N. Rows:')
     for i in range(1, len(hist_n_rows[1])):
