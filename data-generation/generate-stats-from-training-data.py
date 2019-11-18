@@ -148,6 +148,7 @@ if __name__ == '__main__':
     query_size_gt_candidate_size = sc.accumulator(0)
     query_intersection_sizes = list()
     candidate_intersection_sizes = list()
+    query_candidate_size = list()
     query_n_rows = list()
     query_n_columns = list()
     candidate_n_rows = list()
@@ -222,6 +223,7 @@ if __name__ == '__main__':
             query_n_columns += [y for (x, y, w, z) in n_rows_columns]
             candidate_n_rows += [w for (x, y, w, z) in n_rows_columns]
             candidate_n_columns += [z for (x, y, w, z) in n_rows_columns]
+            query_candidate_size += [y + z - 1 for (x, y, w, z) in n_rows_columns]
 
         algorithms[algorithm_name]['n_records'] = n_records.value
         algorithms[algorithm_name]['before_mae_lte_after'] = before_mae_lte_after.value
@@ -284,6 +286,7 @@ if __name__ == '__main__':
     hist_query_n_columns = np.histogram(query_n_columns, bins=10)
     hist_candidate_n_rows = np.histogram(candidate_n_rows, bins=10)
     hist_candidate_n_columns = np.histogram(candidate_n_columns, bins=10)
+    hist_query_candidate_size = np.histogram(query_candidate_size, bins=10)
 
     print('General statistics:')
     print(' -- Size query lte size candidate: %d (%.2f%%)' % (
@@ -335,6 +338,13 @@ if __name__ == '__main__':
             hist_candidate_n_columns[1][i-1],
             hist_candidate_n_columns[1][i],
             hist_candidate_n_columns[0][i-1])
+        )
+    print(' -- Join size (number of columns): ')
+    for i in range(1, len(hist_query_candidate_size[1])):
+        print('    [%.4f, %4f]\t%d' % (
+            hist_query_candidate_size[1][i-1],
+            hist_query_candidate_size[1][i],
+            hist_query_candidate_size[0][i-1])
         )
     print('')
 

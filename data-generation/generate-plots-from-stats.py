@@ -195,6 +195,21 @@ for i in range(general_stats_position + 59, general_stats_position + 69):
     # densities
     candidate_n_columns_n.append(int(line.split('\t')[1]))
 
+# join size
+join_size_bins = list()
+join_size_n = list()
+for i in range(general_stats_position + 70, general_stats_position + 80):
+    line = stats_file[i]
+
+    # bin ranges
+    bin_ranges = line[line.find('[')+1:line.find(']')].split(',')
+    join_size_bins.append(float(bin_ranges[0]))
+    if i == general_stats_position + 79:  ## last one
+        join_size_bins.append(float(bin_ranges[1]))
+
+    # densities
+    join_size_n.append(int(line.split('\t')[1]))
+
 # plots
 
 if not os.path.exists('plots'):
@@ -242,6 +257,13 @@ make_histogram(
     candidate_n_columns_n,
     'Number of Columns (Candidate Dataset)',
     output_filename + '-candidate-n-columns'
+)
+
+make_histogram(
+    join_size_bins,
+    join_size_n,
+    'Join Size (Number of Columns)',
+    output_filename + '-join-size'
 )
 
 # ML algorithms statistics
