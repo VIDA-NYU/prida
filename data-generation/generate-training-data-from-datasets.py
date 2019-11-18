@@ -156,7 +156,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
 
     # params
     max_times_break_data_vertical = params['max_times_break_data_vertical']
-    max_number_columns = int(params['max_number_columns'] / 2)
+    max_number_columns = params['max_number_columns']
     ignore_first_attribute = params['ignore_first_attribute']
     candidate_single_column = params['candidate_single_column']
     output_dir = params['new_datasets_directory']
@@ -396,7 +396,9 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
             original_data.columns[target_variable],
             query_data_paths,
             candidate_data_paths,
-            data_name
+            data_name,
+            len(query_columns),
+            n_possible_columns
         ))
 
         id_ += 1
@@ -855,7 +857,8 @@ if __name__ == '__main__':
 
         # generating query and candidate datasets for positive examples
         #   format is the following:
-        #   (identifier, target_variable, query_dataset_paths, candidate_dataset_paths, dataset_name)
+        #   (identifier, target_variable, query_dataset_paths, candidate_dataset_paths,
+        #    dataset_name, n_columns_query, n_columns_candidate)
         query_and_candidate_data_positive = all_files.flatMap(
             lambda x: generate_query_and_candidate_datasets_positive_examples(x, params)
         ).persist(StorageLevel.MEMORY_AND_DISK)
@@ -883,8 +886,11 @@ if __name__ == '__main__':
             query_and_candidate_data_negative_tmp = query_and_candidate_data_positive.cartesian(
                 query_and_candidate_data_positive
             ).filter(
-                # filtering same identifier / dataset
-                lambda x: x[0][0] != x[1][0] and x[0][4] != x[1][4]
+                # filtering same identifier / dataset and by max number of columns
+                lambda x: (
+                    (x[0][0] != x[1][0]) and (x[0][4] != x[1][4]) and
+                    (x[0][5] + x[1][6] <= params['max_number_columns'])
+                )
             ).flatMap(
                 # key => (target variable, query dataset)
                 # val => list of candidate datasets
