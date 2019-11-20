@@ -152,6 +152,7 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
     global no_numerical_target
     global no_enough_columns
     global no_enough_records
+    global many_records
     global dataframe_exception
 
     # params
@@ -312,6 +313,10 @@ def generate_query_and_candidate_datasets_positive_examples(input_dataset, param
     if n_rows < params['min_number_records']:
         print('[WARNING] The following dataset does not have the minimum number of records: %s' % data_name)
         no_enough_records += 1
+        return result
+    if n_rows > 900000:
+        print('[WARNING] The following dataset has more than 900,000 records: %s' % data_name)
+        many_records += 1
         return result
 
     processed_datasets += 1
@@ -633,14 +638,14 @@ def generate_performance_scores(query_dataset, target_variable, candidate_datase
             join_.dropna(inplace=True)
 
         # build model on joined data
-        # print('[INFO] Generating performance scores for query dataset %s and candidate dataset %s ...' % (query_dataset, candidate_dataset))
+        print('[INFO] Generating performance scores for query dataset %s and candidate dataset %s ...' % (query_dataset, candidate_dataset))
         imputation_strategy, scores_after = get_performance_scores(
             join_,
             target_variable,
             algorithm,
             not(inner_join)
         )
-        # print('[INFO] Performance scores for query dataset %s and candidate dataset %s done!' % (query_dataset, candidate_dataset))
+        print('[INFO] Performance scores for query dataset %s and candidate dataset %s done!' % (query_dataset, candidate_dataset))
 
         performance_scores.append(
             generate_output_performance_data(
@@ -783,6 +788,7 @@ if __name__ == '__main__':
     no_numerical_target = sc.accumulator(0)
     no_enough_columns = sc.accumulator(0)
     no_enough_records = sc.accumulator(0)
+    many_records = sc.accumulator(0)
     dataframe_exception = sc.accumulator(0)
 
     # parameters
@@ -1003,4 +1009,5 @@ if __name__ == '__main__':
         print(' -- Datasets w/o numeric targets: %d' %no_numerical_target.value)
         print(' -- Datasets w/o enough columns: %d' %no_enough_columns.value)
         print(' -- Datasets w/o enough records: %d' %no_enough_records.value)
+        print(' -- Datasets w/ more than 900,000 records: %d' %many_records.value)
         print(' -- Datasets w/ pandas.Dataframe exception: %d' %dataframe_exception.value)
