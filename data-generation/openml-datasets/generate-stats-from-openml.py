@@ -33,6 +33,15 @@ def list_dir(file_path, hdfs_client=None, use_hdfs=False):
     return os.listdir(file_path)
 
 
+def get_file_size(file_path, hdfs_client=None, use_hdfs=False):
+    """Gets the size of the file in bytes.
+    """
+
+    if use_hdfs:
+        return int(hdfs_client.content(file_path)['length'])
+    return int(os.stat(file_path).st_size)
+
+
 def generate_stats_from_dataset(dataset, params):
     """Computes some statistics related to the dataset.
     """
@@ -64,7 +73,7 @@ def generate_stats_from_dataset(dataset, params):
         return []
 
     processed_datasets += 1
-    return [(data.shape[0], data.shape[1])]
+    return [(data.shape[0], data.shape[1], get_file_size(dataset, hdfs_client, cluster_execution))]
     
 
 if __name__ == '__main__':
@@ -76,6 +85,7 @@ if __name__ == '__main__':
     # global variables and accumulators
     n_rows = list()
     n_columns = list()
+    size_bytes = list()
     dataframe_exception = sc.accumulator(0)
     processed_datasets = sc.accumulator(0)
 
@@ -112,8 +122,13 @@ if __name__ == '__main__':
         lambda x: x[1]
     ).collect()
 
+    size_bytes = stats.map(
+        lambda x: x[2]
+    ).collect()
+
     hist_n_rows = np.histogram(n_rows, bins=500)
     hist_n_columns = np.histogram(n_columns, bins=500)
+    hist_size_bytes = np.histogram(size_bytes, bins=500)
 
     print(' -- N. Rows:')
     for i in range(1, len(hist_n_rows[1])):
@@ -128,6 +143,13 @@ if __name__ == '__main__':
             hist_n_columns[1][i-1],
             hist_n_columns[1][i],
             hist_n_columns[0][i-1])
+        )
+    print(' -- Size in Bytes:')
+    for i in range(1, len(hist_size_bytes[1])):
+        print('    [%.4f, %4f]\t%d' % (
+            hist_size_bytes[1][i-1],
+            hist_size_bytes[1][i],
+            hist_size_bytes[0][i-1])
         )
     print('')
 

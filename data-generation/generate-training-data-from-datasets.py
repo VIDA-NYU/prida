@@ -638,14 +638,14 @@ def generate_performance_scores(query_dataset, target_variable, candidate_datase
             join_.dropna(inplace=True)
 
         # build model on joined data
-        print('[INFO] Generating performance scores for query dataset %s and candidate dataset %s ...' % (query_dataset, candidate_dataset))
+        # print('[INFO] Generating performance scores for query dataset %s and candidate dataset %s ...' % (query_dataset, candidate_dataset))
         imputation_strategy, scores_after = get_performance_scores(
             join_,
             target_variable,
             algorithm,
             not(inner_join)
         )
-        print('[INFO] Performance scores for query dataset %s and candidate dataset %s done!' % (query_dataset, candidate_dataset))
+        # print('[INFO] Performance scores for query dataset %s and candidate dataset %s done!' % (query_dataset, candidate_dataset))
 
         performance_scores.append(
             generate_output_performance_data(
