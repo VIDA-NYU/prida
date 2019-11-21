@@ -35,7 +35,7 @@ class LearningTask:
         """Reads metadata, features derived from training data, and corresponding targets 
         (relative performance gains after augmentation)
         """
-        self.learning_metada, self.learning_features, self.learning_targets = read_augmentation_learning_filename(augmentation_learning_filename)
+        self.learning_metadata, self.learning_features, self.learning_targets = read_augmentation_learning_filename(augmentation_learning_filename)
 
     def filter_learning_features(self, feature_ids):
         """This method ensures that the learning will only use the features 
@@ -63,13 +63,18 @@ class LearningTask:
             features = self.filter_learning_features(feature_ids)
         else:
             features = self.learning_features
-        data_splits_spec.get_n_splits(features)
+        if type(data_splits_spec) is KFold:
+            data_splits = [(train_index, test_index) for train_index, test_index in data_splits_spec.split(features)]
+        else:
+            data_splits = data_splits_spec
         targets = [item[learning_target] for item in self.learning_targets]
         
         i = 0
         models = []
         test_data_results = []
-        for train_index, test_index in data_splits_spec.split(features):
+        for elem in data_splits:
+            train_index = elem[0]
+            test_index = elem[1]
             X_train, X_test = np.array(features)[train_index], np.array(features)[test_index]
             y_train, y_test = np.array(targets)[train_index], np.array(targets)[test_index]
             X_train, y_train = remove_outliers(X_train, y_train, zscore_threshold=0.5)
@@ -113,7 +118,7 @@ class LearningTask:
             i += 1
         return models, test_data_results
 
-    def execute_linear_regression(self, n_splits, learning_target='gain_in_r2_score', feature_ids=None, save_model=True):
+    def execute_linear_regression_cross_validation(self, n_splits, learning_target='gain_in_r2_score', feature_ids=None, save_model=True):
         """Performs linear regression with k-fold cross validation 
         (k = n_splits). 
 
@@ -131,7 +136,7 @@ class LearningTask:
         lm = LinearRegression()
         return self._generate_models(kf, lm, 'linear_regression', learning_target, feature_ids, save_model)
 
-    def execute_random_forest(self, n_splits, learning_target='gain_in_r2_score', feature_ids=None, save_model=True):
+    def execute_random_forest_cross_validation(self, n_splits, learning_target='gain_in_r2_score', feature_ids=None, save_model=True):
         """Performs random forest with k-fold cross validation 
         (k = n_splits). 
 
@@ -148,7 +153,7 @@ class LearningTask:
         rf = RandomForestRegressor(n_estimators=100, random_state=42)
         return self._generate_models(kf, rf, 'random_forest', learning_target, feature_ids, save_model)
 
-    def execute_decision_trees(self, n_splits, learning_target='gain_in_r2_score', feature_ids=None):
+    def execute_decision_trees_cross_validation(self, n_splits, learning_target='gain_in_r2_score', feature_ids=None):
         """Performs decision trees with k-fold cross validation 
         (k = n_splits). 
 
@@ -161,3 +166,14 @@ class LearningTask:
         kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
         dt = DecisionTreeRegressor(random_state=42)
         return self._generate_models(kf, dt, 'decision_tree', learning_target, feature_ids)
+
+    def execute_random_forest_train_test(self, training_fraction, learning_target='gain_in_r2_score', feature_ids=None):
+        """Performs decision trees training over a fraction X of the data and testing over a fraction 1 - X. 
+
+        The learning target (parameter learning_target) needs to be specified, and it can be one of the following values:
+        'decrease_in_mae', 'decrease_in_mse', 'decrease_in_med_ae', or 'gain_in_r2_score' (default).
+
+        If feature_ids == None, all features are used to 
+        predict the targets; otherwise, only feature_ids are used.
+        """
+        return None, None
