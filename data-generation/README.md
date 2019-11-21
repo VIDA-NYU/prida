@@ -30,6 +30,7 @@ The data generation process is done using PySpark. Copy the file [`params.json`]
     "regression_algorithm": the regression algorithm to be used; the available options are "random forest", "linear", "sgd", and "xgboost"
     "inner_join": boolean that indicates whether the join applied between query and candidate datasets is of type inner or not; if false, a left join is applied and a series of univariate value imputation strategies are applied to take care of any missing values, with the one that generates the model with the smallest mean absolute error being chosen at last
     "min_number_records": the minimum number of records that a query or candidate dataset should have
+    "max_number_columns": the maximum number of columns that a query/candidate dataset pair should have
     "max_times_break_data_vertical": the maximum number of times that a dataset will be broken (vertically) into multiple data
     "max_times_records_removed": the maximum number of times that records will be removed from a dataset to derive new data
 }

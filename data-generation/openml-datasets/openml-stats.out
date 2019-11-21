@@ -1,0 +1,174 @@
+19/11/20 15:46:09 INFO client.RMProxy: Connecting to ResourceManager at gray02.poly.edu/128.238.182.62:8032
+19/11/20 15:46:10 INFO yarn.Client: Requesting a new application from cluster with 17 NodeManagers
+19/11/20 15:46:10 INFO yarn.Client: Verifying our application has not requested more than the maximum memory capability of the cluster (131072 MB per container)
+19/11/20 15:46:10 INFO yarn.Client: Will allocate AM container, with 7168 MB memory including 1024 MB overhead
+19/11/20 15:46:10 INFO yarn.Client: Setting up container launch context for our AM
+19/11/20 15:46:10 INFO yarn.Client: Setting up the launch environment for our AM container
+19/11/20 15:46:10 INFO yarn.Client: Preparing resources for our AM container
+19/11/20 15:46:11 INFO yarn.Client: Uploading resource file:/vida/work/dataset-ranking/git/dataset-ranking/data-generation/.params.json -> hdfs://gray01.poly.edu:8020/user/fsc234/.sparkStaging/application_1571062575618_0203/.params.json
+19/11/20 15:46:11 INFO yarn.Client: Uploading resource file:/vida/work/dataset-ranking/git/dataset-ranking/data-generation/data-generation-environment.zip#env -> hdfs://gray01.poly.edu:8020/user/fsc234/.sparkStaging/application_1571062575618_0203/data-generation-environment.zip
+19/11/20 15:46:13 INFO yarn.Client: Uploading resource file:/vida/work/dataset-ranking/git/dataset-ranking/data-generation/openml-datasets/generate-stats-from-openml.py -> hdfs://gray01.poly.edu:8020/user/fsc234/.sparkStaging/application_1571062575618_0203/generate-stats-from-openml.py
+19/11/20 15:46:14 INFO yarn.Client: Uploading resource file:/tmp/spark-036a0049-f2e0-4315-858e-495ed9bc3ac5/__spark_conf__1386140455909624853.zip -> hdfs://gray01.poly.edu:8020/user/fsc234/.sparkStaging/application_1571062575618_0203/__spark_conf__.zip
+19/11/20 15:46:14 INFO spark.SecurityManager: Changing view acls to: fsc234
+19/11/20 15:46:14 INFO spark.SecurityManager: Changing modify acls to: fsc234
+19/11/20 15:46:14 INFO spark.SecurityManager: Changing view acls groups to: 
+19/11/20 15:46:14 INFO spark.SecurityManager: Changing modify acls groups to: 
+19/11/20 15:46:14 INFO spark.SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users  with view permissions: Set(fsc234); groups with view permissions: Set(); users  with modify permissions: Set(fsc234); groups with modify permissions: Set()
+19/11/20 15:46:15 INFO yarn.Client: Submitting application application_1571062575618_0203 to ResourceManager
+19/11/20 15:46:16 INFO impl.YarnClientImpl: Submitted application application_1571062575618_0203
+19/11/20 15:46:17 INFO yarn.Client: Application report for application_1571062575618_0203 (state: ACCEPTED)
+19/11/20 15:46:17 INFO yarn.Client: 
+	 client token: N/A
+	 diagnostics: N/A
+	 ApplicationMaster host: N/A
+	 ApplicationMaster RPC port: -1
+	 queue: root.users.fsc234
+	 start time: 1574282775980
+	 final status: UNDEFINED
+	 tracking URL: http://gray02.poly.edu:8088/proxy/application_1571062575618_0203/
+	 user: fsc234
+19/11/20 15:46:18 INFO yarn.Client: Application report for application_1571062575618_0203 (state: ACCEPTED)
+19/11/20 15:46:19 INFO yarn.Client: Application report for application_1571062575618_0203 (state: ACCEPTED)
+19/11/20 15:46:20 INFO yarn.Client: Application report for application_1571062575618_0203 (state: ACCEPTED)
+19/11/20 15:46:21 INFO yarn.Client: Application report for application_1571062575618_0203 (state: ACCEPTED)
+19/11/20 15:46:22 INFO yarn.Client: Application report for application_1571062575618_0203 (state: ACCEPTED)
+19/11/20 15:46:23 INFO yarn.Client: Application report for application_1571062575618_0203 (state: ACCEPTED)
+19/11/20 15:46:24 INFO yarn.Client: Application report for application_1571062575618_0203 (state: ACCEPTED)
+19/11/20 15:46:25 INFO yarn.Client: Application report for application_1571062575618_0203 (state: ACCEPTED)
+19/11/20 15:46:26 INFO yarn.Client: Application report for application_1571062575618_0203 (state: ACCEPTED)
+19/11/20 15:46:27 INFO yarn.Client: Application report for application_1571062575618_0203 (state: ACCEPTED)
+19/11/20 15:46:28 INFO yarn.Client: Application report for application_1571062575618_0203 (state: ACCEPTED)
+19/11/20 15:46:29 INFO yarn.Client: Application report for application_1571062575618_0203 (state: ACCEPTED)
+19/11/20 15:46:30 INFO yarn.Client: Application report for application_1571062575618_0203 (state: ACCEPTED)
+19/11/20 15:46:31 INFO yarn.Client: Application report for application_1571062575618_0203 (state: ACCEPTED)
+19/11/20 15:46:32 INFO yarn.Client: Application report for application_1571062575618_0203 (state: ACCEPTED)
+19/11/20 15:46:33 INFO yarn.Client: Application report for application_1571062575618_0203 (state: ACCEPTED)
+19/11/20 15:46:34 INFO yarn.Client: Application report for application_1571062575618_0203 (state: ACCEPTED)
+19/11/20 15:46:35 INFO yarn.Client: Application report for application_1571062575618_0203 (state: ACCEPTED)
+19/11/20 15:46:36 INFO yarn.Client: Application report for application_1571062575618_0203 (state: ACCEPTED)
+19/11/20 15:46:37 INFO yarn.Client: Application report for application_1571062575618_0203 (state: ACCEPTED)
+19/11/20 15:46:38 INFO yarn.Client: Application report for application_1571062575618_0203 (state: ACCEPTED)
+19/11/20 15:46:39 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:46:39 INFO yarn.Client: 
+	 client token: N/A
+	 diagnostics: N/A
+	 ApplicationMaster host: 128.238.182.69
+	 ApplicationMaster RPC port: 0
+	 queue: root.users.fsc234
+	 start time: 1574282775980
+	 final status: UNDEFINED
+	 tracking URL: http://gray02.poly.edu:8088/proxy/application_1571062575618_0203/
+	 user: fsc234
+19/11/20 15:46:40 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:46:41 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:46:42 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:46:43 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:46:44 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:46:45 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:46:46 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:46:47 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:46:48 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:46:49 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:46:50 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:46:51 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:46:52 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:46:53 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:46:54 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:46:55 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:46:56 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:46:57 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:46:58 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:46:59 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:00 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:01 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:02 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:03 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:04 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:05 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:06 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:07 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:08 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:09 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:10 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:11 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:12 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:13 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:14 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:15 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:16 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:17 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:18 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:19 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:20 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:21 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:22 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:23 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:24 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:25 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:26 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:27 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:28 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:29 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:30 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:31 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:32 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:33 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:34 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:35 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:36 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:37 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:38 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:39 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:40 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:41 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:42 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:43 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:44 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:45 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:46 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:47 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:48 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:49 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:50 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:51 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:52 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:53 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:54 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:55 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:56 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:57 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:58 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:47:59 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:48:00 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:48:01 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:48:02 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:48:03 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:48:04 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:48:05 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:48:06 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:48:07 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:48:08 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:48:09 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:48:10 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:48:11 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:48:12 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:48:13 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:48:14 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:48:15 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:48:16 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:48:17 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:48:18 INFO yarn.Client: Application report for application_1571062575618_0203 (state: RUNNING)
+19/11/20 15:48:19 INFO yarn.Client: Application report for application_1571062575618_0203 (state: FINISHED)
+19/11/20 15:48:19 INFO yarn.Client: 
+	 client token: N/A
+	 diagnostics: N/A
+	 ApplicationMaster host: 128.238.182.69
+	 ApplicationMaster RPC port: 0
+	 queue: root.users.fsc234
+	 start time: 1574282775980
+	 final status: SUCCEEDED
+	 tracking URL: http://gray02.poly.edu:8088/proxy/application_1571062575618_0203/
+	 user: fsc234
+19/11/20 15:48:19 INFO util.ShutdownHookManager: Shutdown hook called
+19/11/20 15:48:19 INFO util.ShutdownHookManager: Deleting directory /tmp/spark-56666b72-7a82-464e-859c-8d4c79686089
+19/11/20 15:48:19 INFO util.ShutdownHookManager: Deleting directory /tmp/spark-036a0049-f2e0-4315-858e-495ed9bc3ac5
