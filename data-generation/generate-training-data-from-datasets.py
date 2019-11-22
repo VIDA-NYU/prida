@@ -131,6 +131,17 @@ def list_dir(file_path, hdfs_client=None, use_hdfs=False):
     return os.listdir(file_path)
 
 
+def get_file_size(file_path, hdfs_client=None, use_hdfs=False):
+    """Gets the size of the file in bytes.
+    """
+
+    if file_exists(file_path, hdfs_client, use_hdfs):
+        if use_hdfs:
+            return int(hdfs_client.content(file_path)['length'])
+        return int(os.stat(file_path).st_size)
+    return 0
+
+
 def generate_query_and_candidate_datasets_positive_examples(input_dataset, params):
     """Generates query and candidate datasets from a single dataset
     for positive examples.
@@ -577,23 +588,19 @@ def generate_data_from_columns(original_data, columns, column_metadata, key_colu
     return paths
 
 
-def generate_performance_scores(query_dataset, target_variable, candidate_datasets, params):
-    """Generates all the performance scores.
+def generate_query_performance_scores(query_dataset, target_variable, params):
+    """Generates the performance score before augmentation (i.e., query only).
     The format of the output is the following:
 
-      (query dataset, target variable name, candidate dataset,
-       score before augmentation, score after augmentation)
+      (query dataset, target variable name, scores before augmentation)
 
     """
-
-    performance_scores = list()
 
     # params
     algorithm = params['regression_algorithm']
     cluster_execution = params['cluster']
     hdfs_address = params['hdfs_address']
     hdfs_user = params['hdfs_user']
-    inner_join = params['inner_join']
 
     # HDFS Client
     hdfs_client = None
@@ -617,48 +624,71 @@ def generate_performance_scores(query_dataset, target_variable, candidate_datase
         False
     )
 
-    for candidate_dataset in candidate_datasets:
+    return (query_dataset, target_variable, scores_before)
 
-        # reading candidate dataset
-        candidate_data_str = read_file(candidate_dataset, hdfs_client, cluster_execution)
-        candidate_data = pd.read_csv(StringIO(candidate_data_str))
-        candidate_data.set_index(
-            'key-for-ranking',
-            drop=True,
-            inplace=True
-        )
 
-        # join dataset
-        join_ = query_data.join(
-            candidate_data,
-            how='left',
-            rsuffix='_r'
-        )
-        if inner_join:
-            join_.dropna(inplace=True)
+def generate_join_performance_scores(query_dataset, target_variable, candidate_dataset,
+                                     scores_before, params):
+    """Generates the performance scores after augmentation (i.e., query + candidate).
+    """
 
-        # build model on joined data
-        # print('[INFO] Generating performance scores for query dataset %s and candidate dataset %s ...' % (query_dataset, candidate_dataset))
-        imputation_strategy, scores_after = get_performance_scores(
-            join_,
-            target_variable,
-            algorithm,
-            not(inner_join)
-        )
-        # print('[INFO] Performance scores for query dataset %s and candidate dataset %s done!' % (query_dataset, candidate_dataset))
+    # params
+    algorithm = params['regression_algorithm']
+    cluster_execution = params['cluster']
+    hdfs_address = params['hdfs_address']
+    hdfs_user = params['hdfs_user']
+    inner_join = params['inner_join']
 
-        performance_scores.append(
-            generate_output_performance_data(
-                query_dataset=query_dataset,
-                target=target_variable,
-                candidate_dataset=candidate_dataset,
-                scores_before=scores_before,
-                scores_after=scores_after,
-                imputation_strategy=imputation_strategy
-            )
-        )
+    # HDFS Client
+    hdfs_client = None
+    if cluster_execution:
+        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
 
-    return performance_scores
+    # reading query dataset
+    query_data_str = read_file(query_dataset, hdfs_client, cluster_execution)
+    query_data = pd.read_csv(StringIO(query_data_str))
+    query_data.set_index(
+        'key-for-ranking',
+        drop=True,
+        inplace=True
+    )
+
+    # reading candidate dataset
+    candidate_data_str = read_file(candidate_dataset, hdfs_client, cluster_execution)
+    candidate_data = pd.read_csv(StringIO(candidate_data_str))
+    candidate_data.set_index(
+        'key-for-ranking',
+        drop=True,
+        inplace=True
+    )
+
+    # join dataset
+    join_ = query_data.join(
+        candidate_data,
+        how='left',
+        rsuffix='_r'
+    )
+    if inner_join:
+        join_.dropna(inplace=True)
+
+    # build model on joined data
+    # print('[INFO] Generating performance scores for query dataset %s and candidate dataset %s ...' % (query_dataset, candidate_dataset))
+    imputation_strategy, scores_after = get_performance_scores(
+        join_,
+        target_variable,
+        algorithm,
+        not(inner_join)
+    )
+    # print('[INFO] Performance scores for query dataset %s and candidate dataset %s done!' % (query_dataset, candidate_dataset))
+
+    return generate_output_performance_data(
+        query_dataset=query_dataset,
+        target=target_variable,
+        candidate_dataset=candidate_dataset,
+        scores_before=scores_before,
+        scores_after=scores_after,
+        imputation_strategy=imputation_strategy
+    )
 
 
 def get_performance_scores(data, target_variable_name, algorithm, missing_value_imputation):
@@ -871,92 +901,123 @@ if __name__ == '__main__':
 
         if not query_and_candidate_data_positive.isEmpty():
 
-            # total number of query datasets
-            n_query_datasets = query_and_candidate_data_positive.map(
-                lambda x: len(x[2])
-            ).reduce(
-                lambda x, y: x + y
-            )
+            # processed datasets
+            dataset_examples = list(set(query_and_candidate_data_positive.map(
+                lambda x: x[4]
+            ).collect()))
 
-            # total number of positive examples
-            n_positive_examples = query_and_candidate_data_positive.map(
-                lambda x: len(x[2]) * len(x[3])
-            ).reduce(
-                lambda x, y: x + y
-            )
+            # choosing datasets for training and testing
+            training_datasets = list(np.random.choice(
+                dataset_examples,
+                math.floor(0.7*len(dataset_examples)),  ## 70% for training
+                replace=False
+            ))
+            testing_datasets = list(set(dataset_examples).difference(set(training_datasets)))
 
-            # generating query and candidate dataset pairs for negative examples
-            #   number of negative examples should be similar to the number of
-            #   positive examples
-            n_random_candidates_per_query = int(n_positive_examples / n_query_datasets)
-            query_and_candidate_data_negative_tmp = query_and_candidate_data_positive.cartesian(
-                query_and_candidate_data_positive
-            ).filter(
-                # filtering same identifier / dataset and by max number of columns
-                lambda x: (
-                    (x[0][0] != x[1][0]) and (x[0][4] != x[1][4]) and
-                    (x[0][5] + x[1][6] <= params['max_number_columns'])
+            # filtering positive examples based on training and testing datasets
+            query_and_candidate_data_positive_dict = dict()
+            query_and_candidate_data_positive_dict['training'] = query_and_candidate_data_positive.filter(
+                lambda x: x[4] in training_datasets
+            ).persist(StorageLevel.MEMORY_AND_DISK)
+            query_and_candidate_data_positive_dict['testing'] = query_and_candidate_data_positive.filter(
+                lambda x: x[4] in testing_datasets
+            ).persist(StorageLevel.MEMORY_AND_DISK)
+
+            for key in query_and_candidate_data_positive_dict:
+
+                query_and_candidate_data_positive_ = query_and_candidate_data_positive_dict[key]
+
+                # total number of query datasets
+                n_query_datasets = query_and_candidate_data_positive_.map(
+                    lambda x: len(x[2])
+                ).reduce(
+                    lambda x, y: x + y
                 )
-            ).flatMap(
-                # key => (target variable, query dataset)
-                # val => list of candidate datasets
-                lambda x: [((x[0][1], query_data), x[1][3]) for query_data in x[0][2]]
-            ).reduceByKey(
-                # concatenating lists of candidate datasets
-                lambda x, y: x + y
-            ).map(
-                # (target variable, query dataset, random sample of other candidate datasets)
-                lambda x: (x[0][0], x[0][1], list(np.random.choice(
-                    x[1], size=min(n_random_candidates_per_query, len(x[1])), replace=False
-                )))
-            ).persist(StorageLevel.MEMORY_AND_DISK)
 
-            # total number of negative examples
-            n_negative_examples = query_and_candidate_data_negative_tmp.map(
-                lambda x: len(x[2])
-            ).reduce(
-                lambda x, y: x + y
-            )
+                # total number of positive examples
+                n_positive_examples = query_and_candidate_data_positive_.map(
+                    lambda x: len(x[2]) * len(x[3])
+                ).reduce(
+                    lambda x, y: x + y
+                )
 
-            # generating candidate datasets for negative examples
-            #   format is the following:
-            #   (target_variable, query_dataset_path, candidate_dataset_paths)
-            query_and_candidate_data_negative = query_and_candidate_data_negative_tmp.map(
-                lambda x: generate_candidate_datasets_negative_examples(x[0], x[1], x[2], params)
-            ).persist(StorageLevel.MEMORY_AND_DISK)
+                # generating query and candidate dataset pairs for negative examples
+                #   number of negative examples should be similar to the number of
+                #   positive examples
+                n_random_candidates_per_query = int(n_positive_examples / n_query_datasets)
+                query_and_candidate_data_negative_tmp = query_and_candidate_data_positive_.cartesian(
+                    query_and_candidate_data_positive_
+                ).filter(
+                    # filtering same identifier / dataset and by max number of columns
+                    lambda x: (
+                        (x[0][0] != x[1][0]) and (x[0][4] != x[1][4]) and
+                        (x[0][5] + x[1][6] <= params['max_number_columns'])
+                    )
+                ).flatMap(
+                    # key => (target variable, query dataset)
+                    # val => list of candidate datasets
+                    lambda x: [((x[0][1], query_data), x[1][3]) for query_data in x[0][2]]
+                ).reduceByKey(
+                    # concatenating lists of candidate datasets
+                    lambda x, y: x + y
+                ).map(
+                    # (target variable, query dataset, random sample of other candidate datasets)
+                    lambda x: (x[0][0], x[0][1], list(np.random.choice(
+                        x[1], size=min(n_random_candidates_per_query, len(x[1])), replace=False
+                    )))
+                ).persist(StorageLevel.MEMORY_AND_DISK)
 
-            query_candidate_datasets = sc.union([
-                query_and_candidate_data_positive.flatMap(
-                    lambda x: [(x[1], query, x[3]) for query in x[2]]
-                ),
-                query_and_candidate_data_negative
-            ]).persist(StorageLevel.MEMORY_AND_DISK)
+                # total number of negative examples
+                n_negative_examples = query_and_candidate_data_negative_tmp.map(
+                    lambda x: len(x[2])
+                ).reduce(
+                    lambda x, y: x + y
+                )
 
-            
-            # saving filenames
-            filename = os.path.join(output_dir, '.files-training-data')
-            if not cluster_execution:
-                filename = 'file://' + filename
-            query_candidate_datasets.flatMap(
-                lambda x: [[x[0], x[1]] + x[2]]
-            ).map(
-                lambda x: ','.join(x)
-            ).saveAsTextFile(filename)
+                # generating candidate datasets for negative examples
+                #   format is the following:
+                #   (target_variable, query_dataset_path, candidate_dataset_paths)
+                query_and_candidate_data_negative = query_and_candidate_data_negative_tmp.map(
+                    lambda x: generate_candidate_datasets_negative_examples(x[0], x[1], x[2], params)
+                )
+
+                query_candidate_datasets_tmp = sc.union([
+                    query_and_candidate_data_positive_.flatMap(
+                        lambda x: [(x[1], query, x[3]) for query in x[2]]
+                    ),
+                    query_and_candidate_data_negative
+                ]).persist(StorageLevel.MEMORY_AND_DISK)
+
+                
+                # saving filenames
+                filename = os.path.join(output_dir, '.files-%s-data' % key)
+                if not cluster_execution:
+                    filename = 'file://' + filename
+                query_candidate_datasets_tmp.flatMap(
+                    lambda x: [[x[0], x[1]] + x[2]]
+                ).map(
+                    lambda x: ','.join(x)
+                ).saveAsTextFile(filename)
+
+                query_candidate_datasets = sc.union([
+                    query_candidate_datasets,
+                    query_candidate_datasets_tmp
+                ]).persist(StorageLevel.MEMORY_AND_DISK)
 
     else:
 
         # datasets previously generated
-        filename = os.path.join(output_dir, '.files-training-data/*')
-        if not cluster_execution:
-            filename = 'file://' + filename
-        query_candidate_datasets = sc.textFile(filename).map(
-            lambda x: x.split(',')
-        ).map(
-            lambda x: (x[0], x[1], x[2:])
-        ).persist(StorageLevel.MEMORY_AND_DISK)
-
-        # if cluster_execution:
-        #     query_candidate_datasets = query_candidate_datasets.repartition(300)
+        for key in ['training', 'testing']:
+            filename = os.path.join(output_dir, '.files-%s-data/*' % key)
+            if not cluster_execution:
+                filename = 'file://' + filename
+            query_candidate_datasets = sc.union([
+                query_candidate_datasets,
+                sc.textFile(filename).map(
+                    lambda x: x.split(',')
+                ).map(
+                    lambda x: (x[0], x[1], x[2:])
+            )]).persist(StorageLevel.MEMORY_AND_DISK)
 
 
     if not skip_training_data:
@@ -966,9 +1027,29 @@ if __name__ == '__main__':
 
         if not query_candidate_datasets.isEmpty():
 
-            # getting performance scores
-            performance_scores = query_candidate_datasets.flatMap(
-                lambda x: generate_performance_scores(x[1], x[0], x[2], params)
+            # getting performance scores before augmentation
+            performance_scores_before = query_candidate_datasets.map(
+                lambda x: generate_query_performance_scores(x[1], x[0], params)
+            ).map(
+                lambda x: ((x[0], x[1]), x[2])
+            )
+
+            # query / candidate pairs
+            query_candidate_pairs = query_candidate_datasets.flatMap(
+                lambda x: [((x[1], x[0]), candidate) for candidate in x[2]]
+            )
+
+            # mergings RDDs and getting performance scores after augmentation
+            performance_scores = performance_scores_before.join(
+                query_candidate_pairs
+            ).map(
+                lambda x: generate_join_performance_scores(
+                    query_dataset=x[0][0],
+                    target_variable=x[0][1],
+                    candidate_dataset=x[1][1],
+                    scores_before=x[1][0],
+                    params=params
+                )
             )
 
             # saving scores
