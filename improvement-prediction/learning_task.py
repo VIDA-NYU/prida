@@ -16,14 +16,16 @@ import pickle
 import json
 
 class LearningTask:
-    def __init__(self):
+    def __init__(self, validation_type):
         """This class implements different models to learn relative performance gains 
         after executing data augmentation
         """
+        self.validation_type = validation_type
         self.learning_metadata = []
         self.learning_features = []
         self.learning_targets = []
-
+        
+        
     def add_learning_instance(self, learning_features, learning_target):
         """Stores features and learning target (relative gain) from an 
         augmentation instance
@@ -31,12 +33,18 @@ class LearningTask:
         self.learning_features.append(learning_features)
         self.learning_targets.append(learning_target)
 
-    def read_features_and_targets(self, augmentation_learning_filename):
+    def read_features_and_targets(self, augmentation_learning_filenames):
         """Reads metadata, features derived from training data, and corresponding targets 
         (relative performance gains after augmentation)
         """
-        self.learning_metadata, self.learning_features, self.learning_targets = read_augmentation_learning_filename(augmentation_learning_filename)
-
+        self.learning_metadata, self.learning_features, self.learning_targets = read_augmentation_learning_filename(augmentation_learning_filenames[0])
+        if self.validation_type == 'training-test':
+            test_metadata, test_features, test_targets = read_augmentation_learning_filename(augmentation_learning_filenames[1])
+            self.training_size = len(self.learning_metadata)
+            self.learning_metadata += test_metadata
+            self.learning_features += test_features
+            self.learning_targets += test_targets
+              
     def filter_learning_features(self, feature_ids):
         """This method ensures that the learning will only use the features 
         indicated with feature_ids
@@ -67,6 +75,7 @@ class LearningTask:
             data_splits = [(train_index, test_index) for train_index, test_index in data_splits_spec.split(features)]
         else:
             data_splits = data_splits_spec
+        
         targets = [item[learning_target] for item in self.learning_targets]
         
         i = 0
@@ -136,8 +145,8 @@ class LearningTask:
         lm = LinearRegression()
         return self._generate_models(kf, lm, 'linear_regression', learning_target, feature_ids, save_model)
 
-    def execute_random_forest_cross_validation(self, n_splits, learning_target='gain_in_r2_score', feature_ids=None, save_model=True):
-        """Performs random forest with k-fold cross validation 
+    def execute_decision_trees_cross_validation(self, n_splits, learning_target='gain_in_r2_score', feature_ids=None, save_model=True):
+        """Performs decision trees with k-fold cross validation 
         (k = n_splits). 
 
         The learning target (parameter learning_target) needs to be specified, and it can be one of the following values:
@@ -147,33 +156,36 @@ class LearningTask:
         predict the targets; otherwise, only feature_ids are used.
 
         If save_model == True, save it with pickle.
-        """
-        
-        kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
-        rf = RandomForestRegressor(n_estimators=100, random_state=42)
-        return self._generate_models(kf, rf, 'random_forest', learning_target, feature_ids, save_model)
-
-    def execute_decision_trees_cross_validation(self, n_splits, learning_target='gain_in_r2_score', feature_ids=None):
-        """Performs decision trees with k-fold cross validation 
-        (k = n_splits). 
-
-        The learning target (parameter learning_target) needs to be specified, and it can be one of the following values:
-        'decrease_in_mae', 'decrease_in_mse', 'decrease_in_med_ae', or 'gain_in_r2_score' (default).
-
-        If feature_ids == None, all features are used to 
-        predict the targets; otherwise, only feature_ids are used.
         """        
         kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
         dt = DecisionTreeRegressor(random_state=42)
         return self._generate_models(kf, dt, 'decision_tree', learning_target, feature_ids)
 
-    def execute_random_forest_train_test(self, training_fraction, learning_target='gain_in_r2_score', feature_ids=None):
-        """Performs decision trees training over a fraction X of the data and testing over a fraction 1 - X. 
+    def execute_random_forest(self, n_splits, learning_target='gain_in_r2_score', feature_ids=None, save_model=True):
+        """Performs random forest with k-fold cross validation (k = n_splits) if self.validation_type == 'cross-validation'. 
+        Otherwise, if self.validation_type == 'training-test', the random forest is trained over a fraction X of the data 
+        and tested over a fraction 1 - X. 
 
         The learning target (parameter learning_target) needs to be specified, and it can be one of the following values:
         'decrease_in_mae', 'decrease_in_mse', 'decrease_in_med_ae', or 'gain_in_r2_score' (default).
 
         If feature_ids == None, all features are used to 
         predict the targets; otherwise, only feature_ids are used.
+        The learning target (parameter learning_target) needs to be specified, and it can be one of the following values:
+        'decrease_in_mae', 'decrease_in_mse', 'decrease_in_med_ae', or 'gain_in_r2_score' (default).
+
+        If feature_ids == None, all features are used to 
+        predict the targets; otherwise, only feature_ids are used.
+
+        If save_model == True, save it with pickle.
         """
+        if self.validation_type == 'cross-validation':
+            kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+            rf = RandomForestRegressor(n_estimators=100, random_state=42)
+            return self._generate_models(kf, rf, 'random_forest', learning_target, feature_ids, save_model)
+        elif self.validation_type == 'training-test':
+            training_index = np.array([i for i in range(self.training_size)])
+            test_index = np.array([i + self.training_size for i in range(len(self.learning_features) - self.training_size)])
+            rf = RandomForestRegressor(n_estimators=100, random_state=42)
+            return self._generate_models([(training_index, test_index)], rf, 'random_forest', learning_target, feature_ids, save_model)
         return None, None
