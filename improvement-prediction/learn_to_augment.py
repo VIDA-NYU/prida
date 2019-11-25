@@ -30,6 +30,5 @@ if __name__ == '__main__':
     learning_task = LearningTask('training-test')
     learning_task.read_features_and_targets(augmentation_learning_data_filenames)
     n_splits = params['n_splits']
-    training_fraction = params['training_fraction']
     models, test_data = learning_task.execute_random_forest(n_splits)
     
