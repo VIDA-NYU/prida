@@ -988,6 +988,8 @@ if __name__ == '__main__':
                     query_and_candidate_data_negative
                 ]).persist(StorageLevel.MEMORY_AND_DISK)
 
+                if cluster_execution:
+                    query_candidate_datasets_tmp = query_candidate_datasets_tmp.repartition(600)
                 
                 # saving filenames
                 filename = os.path.join(output_dir, '.files-%s-data' % key)
@@ -1026,6 +1028,9 @@ if __name__ == '__main__':
             start_time = time.time()
 
         if not query_candidate_datasets.isEmpty():
+
+            if cluster_execution:
+                query_candidate_datasets = query_candidate_datasets.repartition(600)
 
             # getting performance scores before augmentation
             performance_scores_before = query_candidate_datasets.map(
