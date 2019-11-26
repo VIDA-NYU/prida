@@ -18,14 +18,17 @@ import json
 class LearningTask:
     def __init__(self, validation_type):
         """This class implements different models to learn relative performance gains 
-        after executing data augmentation
+        after executing data augmentation. 
+
+        If validation_type == 'cross-validation', we generate different models with 
+        k-fold cross-validation. Otherwise, if validation_type == 'training-test', 
+        we use a file with training data and one with test data for the validation.
         """
         self.validation_type = validation_type
         self.learning_metadata = []
         self.learning_features = []
         self.learning_targets = []
-        
-        
+                
     def add_learning_instance(self, learning_features, learning_target):
         """Stores features and learning target (relative gain) from an 
         augmentation instance
