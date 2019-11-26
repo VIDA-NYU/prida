@@ -588,28 +588,19 @@ def generate_data_from_columns(original_data, columns, column_metadata, key_colu
     return paths
 
 
-def generate_query_performance_scores(query_dataset, target_variable, params):
+def generate_query_performance_scores(query_filepath, query_dataset, target_variable, params):
     """Generates the performance score before augmentation (i.e., query only).
     The format of the output is the following:
 
-      (query dataset, target variable name, scores before augmentation)
+      (query filepath, target variable name, scores before augmentation)
 
     """
 
     # params
     algorithm = params['regression_algorithm']
-    cluster_execution = params['cluster']
-    hdfs_address = params['hdfs_address']
-    hdfs_user = params['hdfs_user']
-
-    # HDFS Client
-    hdfs_client = None
-    if cluster_execution:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
 
     # reading query dataset
-    query_data_str = read_file(query_dataset, hdfs_client, cluster_execution)
-    query_data = pd.read_csv(StringIO(query_data_str))
+    query_data = pd.read_csv(StringIO(query_dataset))
     query_data.set_index(
         'key-for-ranking',
         drop=True,
@@ -617,36 +608,29 @@ def generate_query_performance_scores(query_dataset, target_variable, params):
     )
 
     # build model on query data only
+    # print('[INFO] Generating performance scores for query dataset ...' % query_filepath)
     _, scores_before = get_performance_scores(
         query_data,
         target_variable,
         algorithm,
         False
     )
+    # print('[INFO] Performance scores for query dataset %s done!' % query_filepath)
 
-    return (query_dataset, target_variable, scores_before)
+    return (query_filepath, target_variable, scores_before)
 
 
-def generate_join_performance_scores(query_dataset, target_variable, candidate_dataset,
-                                     scores_before, params):
+def generate_join_performance_scores(query_filepath, query_dataset, target_variable,
+                                     candidate_filepath, candidate_dataset, scores_before, params):
     """Generates the performance scores after augmentation (i.e., query + candidate).
     """
 
     # params
     algorithm = params['regression_algorithm']
-    cluster_execution = params['cluster']
-    hdfs_address = params['hdfs_address']
-    hdfs_user = params['hdfs_user']
     inner_join = params['inner_join']
 
-    # HDFS Client
-    hdfs_client = None
-    if cluster_execution:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
-
     # reading query dataset
-    query_data_str = read_file(query_dataset, hdfs_client, cluster_execution)
-    query_data = pd.read_csv(StringIO(query_data_str))
+    query_data = pd.read_csv(StringIO(query_dataset))
     query_data.set_index(
         'key-for-ranking',
         drop=True,
@@ -654,8 +638,7 @@ def generate_join_performance_scores(query_dataset, target_variable, candidate_d
     )
 
     # reading candidate dataset
-    candidate_data_str = read_file(candidate_dataset, hdfs_client, cluster_execution)
-    candidate_data = pd.read_csv(StringIO(candidate_data_str))
+    candidate_data = pd.read_csv(StringIO(candidate_dataset))
     candidate_data.set_index(
         'key-for-ranking',
         drop=True,
@@ -672,102 +655,23 @@ def generate_join_performance_scores(query_dataset, target_variable, candidate_d
         join_.dropna(inplace=True)
 
     # build model on joined data
-    # print('[INFO] Generating performance scores for query dataset %s and candidate dataset %s ...' % (query_dataset, candidate_dataset))
+    # print('[INFO] Generating performance scores for query dataset %s and candidate dataset %s ...' % (query_filepath, candidate_filepath))
     imputation_strategy, scores_after = get_performance_scores(
         join_,
         target_variable,
         algorithm,
         not(inner_join)
     )
-    # print('[INFO] Performance scores for query dataset %s and candidate dataset %s done!' % (query_dataset, candidate_dataset))
+    # print('[INFO] Performance scores for query dataset %s and candidate dataset %s done!' % (query_filepath, candidate_filepath))
 
     return generate_output_performance_data(
-        query_dataset=query_dataset,
+        query_dataset=query_filepath,
         target=target_variable,
-        candidate_dataset=candidate_dataset,
+        candidate_dataset=candidate_filepath,
         scores_before=scores_before,
         scores_after=scores_after,
         imputation_strategy=imputation_strategy
     )
-
-
-def generate_performance_scores(query_dataset, target_variable, candidate_datasets, params):
-    """Generates all the performance scores.
-    """
-
-    performance_scores = list()
-
-    # params
-    algorithm = params['regression_algorithm']
-    cluster_execution = params['cluster']
-    hdfs_address = params['hdfs_address']
-    hdfs_user = params['hdfs_user']
-    inner_join = params['inner_join']
-
-    # HDFS Client
-    hdfs_client = None
-    if cluster_execution:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
-
-    # reading query dataset
-    query_data_str = read_file(query_dataset, hdfs_client, cluster_execution)
-    query_data = pd.read_csv(StringIO(query_data_str))
-    query_data.set_index(
-        'key-for-ranking',
-        drop=True,
-        inplace=True
-    )
-
-    # build model on query data only
-    _, scores_before = get_performance_scores(
-        query_data,
-        target_variable,
-        algorithm,
-        False
-    )
-
-    for candidate_dataset in candidate_datasets:
-
-        # reading candidate dataset
-        candidate_data_str = read_file(candidate_dataset, hdfs_client, cluster_execution)
-        candidate_data = pd.read_csv(StringIO(candidate_data_str))
-        candidate_data.set_index(
-            'key-for-ranking',
-            drop=True,
-            inplace=True
-        )
-
-        # join dataset
-        join_ = query_data.join(
-            candidate_data,
-            how='left',
-            rsuffix='_r'
-        )
-        if inner_join:
-            join_.dropna(inplace=True)
-
-        # build model on joined data
-        # print('[INFO] Generating performance scores for query dataset %s and candidate dataset %s ...' % (query_dataset, candidate_dataset))
-        imputation_strategy, scores_after = get_performance_scores(
-            join_,
-            target_variable,
-            algorithm,
-            not(inner_join)
-        )
-        # print('[INFO] Performance scores for query dataset %s and candidate dataset %s done!' % (query_dataset, candidate_dataset))
-
-        performance_scores.append(
-            generate_output_performance_data(
-                query_dataset=query_dataset,
-                target=target_variable,
-                candidate_dataset=candidate_dataset,
-                scores_before=scores_before,
-                scores_after=scores_after,
-                imputation_strategy=imputation_strategy
-            )
-        )
-
-    return performance_scores
 
 
 def get_performance_scores(data, target_variable_name, algorithm, missing_value_imputation):
@@ -913,11 +817,6 @@ if __name__ == '__main__':
     hdfs_client = None
     if cluster_execution:
         hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
-
-    # all query and candidate datasets
-    #   format is the following:
-    #   (target_variable, query_dataset_path, candidate_dataset_paths)
-    query_candidate_datasets = sc.emptyRDD()
 
     n_positive_examples = 0
     n_negative_examples = 0
@@ -1080,37 +979,63 @@ if __name__ == '__main__':
                     lambda x: ','.join(x)
                 ).saveAsTextFile(filename)
 
-                query_candidate_datasets = sc.union([
-                    query_candidate_datasets,
-                    query_candidate_datasets_tmp
-                ]).persist(StorageLevel.MEMORY_AND_DISK)
-
-    else:
-
-        # datasets previously generated
-        for key in ['training', 'testing']:
-            filename = os.path.join(output_dir, '.files-%s-data/*' % key)
-            if not cluster_execution:
-                filename = 'file://' + filename
-            query_candidate_datasets = sc.union([
-                query_candidate_datasets,
-                sc.textFile(filename).map(
-                    lambda x: x.split(',')
-                ).map(
-                    lambda x: (x[0], x[1], x[2:])
-            )]).persist(StorageLevel.MEMORY_AND_DISK)
-
-
     if not skip_training_data:
+
+        # query and candidate datasets
+        filename = os.path.join(output_dir, 'files', '*', '*.csv')
+        if not cluster_execution:
+            filename = 'file://' + filename
+        query_candidate_datasets = sc.wholeTextFiles(filename).groupBy(
+            lambda x: x[0].split(os.path.sep)[-2]
+        ).mapValues(list).persist(StorageLevel.MEMORY_AND_DISK)
+
+        # target variables
+        filename = os.path.join(output_dir, 'files', '*', '.target')
+        if not cluster_execution:
+            filename = 'file://' + filename
+        target_variables = sc.wholeTextFiles(filename).map(
+            lambda x: (x[0].split(os.path.sep)[-2], x[1])
+        ).persist(StorageLevel.MEMORY_AND_DISK)
 
         if not skip_training_data and skip_dataset_creation:
             start_time = time.time()
 
         if not query_candidate_datasets.isEmpty():
 
-            # getting performance scores
+            # getting performance scores before augmentation
+            performance_scores_before = query_candidate_datasets.map(
+                # (unique id, (query file path, query dataset))
+                lambda x: (x[0], [item for item in x[1] if 'query_' in item[0]][0])
+            ).join(
+                # (unique id, ((query file path, query dataset), target variable))
+                target_variables
+            ).map(
+                # (unique id, query dataset, (query file path, target variable, scores before))
+                lambda x: (x[0], x[1][0][1], generate_query_performance_scores(x[1][0][0], x[1][0][1], x[1][1], params))
+            ).map(
+                # (unique id, (query dataset, query file path, target variable, scores before))
+                lambda x: (x[0], (x[1], x[2][0], x[2][1], x[2][2]))
+            )
+
+            # mergings RDDs and getting performance scores after augmentation
             performance_scores = query_candidate_datasets.flatMap(
-                lambda x: generate_performance_scores(x[1], x[0], x[2], params)
+                # (unique id, (candidate file path, candidate dataset))
+                lambda x: [(x[0], item) for item in x[1] if 'candidate_' in item[0]]
+            ).join(
+                # (unique id, ((candidate file path, candidate dataset),
+                #              (query dataset, query file path, target variable, scores before))
+                # )
+                performance_scores_before
+            ).map(
+                lambda x: generate_join_performance_scores(
+                    query_filepath=x[1][1][1],
+                    query_dataset=x[1][1][0],
+                    target_variable=x[1][1][2],
+                    candidate_filepath=x[1][0][0],
+                    candidate_dataset=x[1][0][1],
+                    scores_before=x[1][1][3],
+                    params=params
+                )
             )
 
             # saving scores
@@ -1121,42 +1046,7 @@ if __name__ == '__main__':
             delete_dir(filename, hdfs_client, cluster_execution)
             if not cluster_execution:
                 filename = 'file://' + filename
-            performance_scores.saveAsTextFile(filename)
-
-            # # getting performance scores before augmentation
-            # performance_scores_before = query_candidate_datasets.map(
-            #     lambda x: generate_query_performance_scores(x[1], x[0], params)
-            # ).map(
-            #     lambda x: ((x[0], x[1]), x[2])
-            # )
-
-            # # query / candidate pairs
-            # query_candidate_pairs = query_candidate_datasets.flatMap(
-            #     lambda x: [((x[1], x[0]), candidate) for candidate in x[2]]
-            # )
-
-            # # mergings RDDs and getting performance scores after augmentation
-            # performance_scores = performance_scores_before.join(
-            #     query_candidate_pairs
-            # ).map(
-            #     lambda x: generate_join_performance_scores(
-            #         query_dataset=x[0][0],
-            #         target_variable=x[0][1],
-            #         candidate_dataset=x[1][1],
-            #         scores_before=x[1][0],
-            #         params=params
-            #     )
-            # )
-
-            # # saving scores
-            # algorithm_name = params['regression_algorithm']
-            # if params['regression_algorithm'] == 'random forest':
-            #     algorithm_name = 'random-forest'
-            # filename = os.path.join(output_dir, 'training-data-' + algorithm_name)
-            # delete_dir(filename, hdfs_client, cluster_execution)
-            # if not cluster_execution:
-            #     filename = 'file://' + filename
-            # performance_scores.repartition(1200).saveAsTextFile(filename)
+            performance_scores.repartition(1200).saveAsTextFile(filename)
 
     print('Duration: %.4f seconds' % (time.time() - start_time))
     print(' -- Configuration:')
