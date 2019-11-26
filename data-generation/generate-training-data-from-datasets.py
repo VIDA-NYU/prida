@@ -721,7 +721,12 @@ def train_and_test_model(data, target_variable_name, algorithm):
         X_test = scaler_X.transform(X_test)
         y_test = scaler_y.transform(y_test.values.reshape(-1, 1))
 
-        forest = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1, max_depth=len(X_train.columns))
+        forest = RandomForestRegressor(
+            n_estimators=100,
+            random_state=42,
+            n_jobs=-1,
+            max_depth=len(data.columns)-1
+        )
         forest.fit(X_train, y_train.ravel())
         yfit = forest.predict(X_test)
     elif algorithm == 'linear':
