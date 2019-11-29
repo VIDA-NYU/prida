@@ -46,13 +46,14 @@ class Dataset:
         return self.column_names
     
     def join_with(self, another_dataset, missing_value_imputation=None):
-        """Performs a join between the dataset and another given dataset. _left and _right suffixes are added to columns to 
+        """Performs a join between the dataset and another given dataset. _left suffixes are added to columns to 
         avoid overwriting in the case where both datasets have columns with the same name. Optionally, an imputation strategy is
         passed as a parameter to handle missing values
         """
         
-        join_ = self.data.join(another_dataset.get_data(), how='left', lsuffix='_left', rsuffix='_right')
-
+        join_ = self.data.join(another_dataset.get_data(), how='left', lsuffix='_left')
+        print('names of columns before', self.data.columns, 'and', another_dataset.get_data().columns)
+        print('names of columns after', join_.columns)
         # if no missing_value_imputation policy is passed, it is an inner join and the method just drops the missing values (nan's)
         if not missing_value_imputation:
             return join_.dropna(inplace=True)

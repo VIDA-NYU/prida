@@ -30,8 +30,11 @@ class FeatureFactory:
     def _is_numerical(self, column_name):
         """Given the name of a column in the dataset, this method checks if it is numerical (either real or integer)
         """
-        return self.data[column_name].dtype == np.int64 or self.data[column_name].dtype == np.int32 or self.data[column_name].dtype == np.float64 or self.data[column_name].dtype == np.float32
-        
+        try:
+          return self.data[column_name].dtype == np.int64 or self.data[column_name].dtype == np.int32 or self.data[column_name].dtype == np.float64 or self.data[column_name].dtype == np.float32
+        except AttributeError:
+          return False
+
     def get_number_of_columns(self):
         """Returns the number of columns in the dataset
         """
@@ -227,6 +230,9 @@ class FeatureFactory:
         """
         correlations = {}
         for column in self.data:
+            #print('COLUMN IN PEARSON', column, 'TARGET IN PEARSON', target_name)
+            #print('numerical column:', self._is_numerical(column))
+            #print('numerical target', self._is_numerical(target_name))
             if column != target_name and self._is_numerical(column) and self._is_numerical(target_name):
                 coefficient, pvalue = stats.pearsonr(self.data[column], self.data[target_name])
                 #for now, i am ignoring the pvalues
@@ -242,8 +248,10 @@ class FeatureFactory:
         this method returns the maximum (in modulus) of them
         """
         correlations = self.get_pearson_correlations_with_target(target_name)
-        return max_in_modulus(correlations.values())
-        
+        if correlations.values():
+          return max_in_modulus(correlations.values())
+        return 0.0
+
     def compute_difference_in_pearsons_wrt_target(self, max_in_modulus_pearson, target_name):
         """Given the maximum pearson correlation (in modulus) between the numerical columns of this dataset 
         and the target column, and the maximum pearson correlation (in modulus) between the numerical columns of 
@@ -310,18 +318,31 @@ class FeatureFactory:
         returning for example the maximum (in modulus) of them --- it depends on parameter func
         """        
         features = []
-        pearson = func(self.get_pearson_correlations_with_target(target_name).values())
-        spearman = func(self.get_spearman_correlations_with_target(target_name).values())
+        pearson_values = self.get_pearson_correlations_with_target(target_name).values()
+        if not pearson_values:
+          pearson = 0.0
+        else:
+          pearson = func(pearson_values)
 
-        # not computing kendalltau for now because it is heavily correlated with
-        # spearman
-        #kendalltau = func(self.get_kendall_tau_correlations_with_target(target_name).values())
-        covariance = func(self.get_covariances_with_target(target_name).values())
-        mutual_info = func(self.get_normalized_mutual_information_with_target(target_name).values())
-        #TODO refactor to avoid repetition
+        spearman_values = self.get_spearman_correlations_with_target(target_name).values()
+        if not spearman_values:
+          spearman = 0.0        
+        else:
+          spearman = func(spearman_values)
+
+        covariance_values = self.get_covariances_with_target(target_name).values()
+        if not covariance_values:
+           covariance = 0.0
+        else:
+           covariance = func(covariance_values)
+
+        mutual_info_values = self.get_normalized_mutual_information_with_target(target_name).values()
+        if not mutual_info_values:
+          mutual_info = 0.0
+        else:
+          mutual_info = func(mutual_info_values)
         features.append(pearson) if not np.isnan(pearson) else features.append(0.0)
         features.append(spearman) if not np.isnan(spearman) else features.append(0.0)
-        #features.append(kendalltau) if not np.isnan(kendalltau) else features.append(0.0)
         features.append(covariance) if not np.isnan(covariance) else features.append(0.0)
         features.append(mutual_info) if not np.isnan(mutual_info) else features.append(0.0)
         return features
