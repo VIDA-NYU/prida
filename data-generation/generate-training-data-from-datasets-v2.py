@@ -924,6 +924,7 @@ if __name__ == '__main__':
                         (x[0][0][0] != x[1][0][0]) and (x[0][0][1] != x[1][0][1]) and
                         (x[0][3] + x[1][4] <= params['max_number_columns'])
                     )
+                ## TODO
                 ).flatMap(
                     # key => (target variable, query dataset)
                     # val => list of candidate datasets
