@@ -306,6 +306,7 @@ def generate_query_and_candidate_splits(input_dataset, params):
     original_data = None
     try:
         original_data = pd.read_csv(StringIO(data_file))
+        original_data.name = data_name
     except Exception as e:
         print('[WARNING] The following dataset had an exception while parsing into a dataframe: %s (%s)' % (data_name, str(e)))
         dataframe_exception += 1
@@ -365,29 +366,30 @@ def generate_query_and_candidate_splits(input_dataset, params):
     # target variable
     target_variable_name = original_data.columns[target_variable]
 
-    return [((data_name, target_variable), data_file, column_metadata, splits)]
+    return [((data_name, target_variable_name), data_file, column_metadata, splits)]
 
 
-def generate_query_and_candidate_datasets_positive_examples(dataset, column_metadata, query_columns, candidate_columns, params):
+def generate_query_and_candidate_datasets_positive_examples(data, column_metadata, query_columns, candidate_columns, params):
     """Generates query and candidate datasets from the suggested split.
     """
 
     results = list()
 
-    original_data = pd.read_csv(StringIO(dataset))
-    n_rows = original_data.shape[0]
+    dataset = pd.read_csv(StringIO(data))
+    n_rows = dataset.shape[0]
 
     # generating the key column for the data
     key_column = [str(uuid.uuid4()) for _ in range(n_rows)]
 
-    # creating query and candidate datasets
-    # print('[INFO] Creating query and candidate data for dataset %s ...' % data_name)
+    # fixing data types
+    for col in column_metadata:
+        if 'real' in column_metadata[col] or 'integer' in column_metadata[col]:
+            dataset[dataset.columns[col]] = pd.to_numeric(dataset[dataset.columns[col]], errors='coerce')
     
     # generate query data
     query_dataset = generate_data_from_columns(
-        original_data=original_data,
+        original_data=dataset,
         columns=query_columns,
-        column_metadata=column_metadata,
         key_column=key_column,
         params=params,
         query=True
@@ -395,47 +397,27 @@ def generate_query_and_candidate_datasets_positive_examples(dataset, column_meta
 
     # generate candidate data
     candidate_datasets = generate_data_from_columns(
-        original_data=original_data,
+        original_data=dataset,
         columns=candidate_columns,
-        column_metadata=column_metadata,
         key_column=key_column,
         params=params,
         query=False
     )
 
-    # print('[INFO] Query and candidate data for dataset %s have been created and saved!' % data_name)
     return (query_dataset, candidate_datasets, len(query_columns), len(candidate_columns))
 
 
-def generate_candidate_datasets_negative_examples(target_variable, query_dataset, candidate_datasets, params):
+def generate_candidate_datasets_negative_examples(query_dataset, target_variable, candidate_datasets, params):
     """Generates candidate datasets for negative examples.
     This is necessary because query and candidate datasets must match for the join;
     therefore, we need to re-create the key column.
     """
 
-    # print('[INFO] Creating negative examples with dataset %s ...' % query_dataset)
-
     new_candidate_datasets = list()
 
-    # params
-    output_dir = params['new_datasets_directory']
-    cluster_execution = params['cluster']
-    hdfs_address = params['hdfs_address']
-    hdfs_user = params['hdfs_user']
+    query_data = pd.read_csv(StringIO(query_dataset))
 
-    # HDFS Client
-    hdfs_client = None
-    if cluster_execution:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
-
-    # information for saving datasets
-    identifier = str(uuid.uuid4())
-    identifier_dir = os.path.join(output_dir, 'files', identifier)
-    create_dir(identifier_dir, hdfs_client, cluster_execution)
-
-    # reading query dataset
-    query_data_str = read_file(query_dataset, hdfs_client, cluster_execution)
-    query_data = pd.read_csv(StringIO(query_data_str))
+    # key column
     query_data_key_column = list(query_data['key-for-ranking'])
 
     # ratios of removed records
@@ -444,14 +426,9 @@ def generate_candidate_datasets_negative_examples(target_variable, query_dataset
         0, max_ratio_records_removed, max_ratio_records_removed/(len(candidate_datasets) + 1))
     )[1:]
 
-    id_ = 0
     for i in range(len(candidate_datasets)):
 
-        candidate_dataset = candidate_datasets[i]
-
-        # reading candidate dataset
-        candidate_data_str = read_file(candidate_dataset, hdfs_client, cluster_execution)
-        candidate_data = pd.read_csv(StringIO(candidate_data_str))
+        candidate_data = pd.read_csv(StringIO(candidate_datasets[i]))
         candidate_data.drop(columns=['key-for-ranking'], inplace=True)
 
         # generating extra key column entries, if necessary
@@ -475,50 +452,17 @@ def generate_candidate_datasets_negative_examples(target_variable, query_dataset
         if (candidate_data.shape[0] - len(drop_indices)) >= params['min_number_records']:
             candidate_data = candidate_data.drop(drop_indices)
 
-        # saving candidate dataset
-        dataset_name = "%s_%d.csv" % (os.path.splitext(os.path.basename(candidate_dataset))[0], id_)
-        file_path = os.path.join(identifier_dir, dataset_name)
-        save_file(
-            file_path,
-            candidate_data.to_csv(index=False),
-            hdfs_client,
-            cluster_execution
-        )
+        new_candidate_datasets.append(candidate_data.to_csv(index=False))
 
-        new_candidate_datasets.append(file_path)
-
-        id_ += 1
-
-    # saving query dataset
-    query_dataset_path = os.path.join(identifier_dir, os.path.basename(query_dataset))
-    save_file(
-        query_dataset_path,
-        query_data.to_csv(index=False),
-        hdfs_client,
-        cluster_execution
-    )
-
-    # saving target information
-    save_file(
-        os.path.join(identifier_dir, '.target'),
-        target_variable,
-        hdfs_client,
-        cluster_execution
-    )
-
-    # print('[INFO] Negative examples with dataset %s have been created and saved!' % query_dataset)
-    return (target_variable, query_dataset_path, new_candidate_datasets)
+    return (query_data.to_csv(index=False), target_variable, new_candidate_datasets)
 
 
-def generate_data_from_columns(original_data, columns, column_metadata, key_column, params, query=True):
+def generate_data_from_columns(original_data, columns, key_column, params, query=True):
     """Generates datasets from the original data using only the columns specified in 'columns'.
     """
 
     datasets = list()
-
-    for col in column_metadata:
-        if 'real' in column_metadata[col] or 'integer' in column_metadata[col]:
-            original_data[original_data.columns[col]] = pd.to_numeric(original_data[original_data.columns[col]], errors='coerce')
+    
     column_names = [original_data.columns[i] for i in columns]
     new_data = original_data[column_names].copy()
     new_data.fillna(value=0, inplace=True)
@@ -810,7 +754,7 @@ if __name__ == '__main__':
         else:
             filename = 'file://' + os.path.join(dir_, '*', '*_dataset', 'tables', 'learningData.csv')
         dataset_files = sc.wholeTextFiles(filename).map(
-            lambda x: (get_dataset_name(x[0]), x[1])
+            lambda x: (get_dataset_name(x[0], cluster_execution), x[1])
         ).map(
             lambda x: (x[0][0], [(x[0][1], x[1])])
         )
@@ -821,7 +765,7 @@ if __name__ == '__main__':
         else:
             filename = 'file://' + os.path.join(dir_, '*', '*_dataset', 'datasetDoc.json')
         dataset_doc_files = sc.wholeTextFiles(filename).map(
-            lambda x: (get_dataset_name(x[0]), x[1])
+            lambda x: (get_dataset_name(x[0], cluster_execution), x[1])
         ).map(
             lambda x: (x[0][0], [(x[0][1], x[1])])
         )
@@ -832,7 +776,7 @@ if __name__ == '__main__':
         else:
             filename = 'file://' + os.path.join(dir_, '*', '*_problem', 'problemDoc.json')
         problem_doc_files = sc.wholeTextFiles(filename).map(
-            lambda x: (get_dataset_name(x[0]), x[1])
+            lambda x: (get_dataset_name(x[0], cluster_execution), x[1])
         ).map(
             lambda x: (x[0][0], [(x[0][1], x[1])])
         )
@@ -861,8 +805,8 @@ if __name__ == '__main__':
 
             # creating query and candidate datasets
             #   format is the following:
-            #   ((datataset name, target variable name),
-            #    query dataset, candidate datasets, n. columns in query, n.columns in candidate)
+            #   ((dataset name, target variable name),
+            #    query dataset, candidate datasets, n. columns in query, n. columns in candidate)
             query_and_candidate_data_positive = query_and_candidate_splits.map(
                 lambda x: (x[0], generate_query_and_candidate_datasets_positive_examples(
                     x[1], x[2], x[3][0], x[3][1], params
@@ -916,27 +860,64 @@ if __name__ == '__main__':
                 #   number of negative examples should be similar to the number of
                 #   positive examples
                 n_random_candidates_per_query = int(n_positive_examples / n_query_datasets)
+
+                # first, we create a mapping between candidate id and dataset
+                #   format is the following:
+                #   ((dataset name, candidate id), candidate dataset)
+                candidate_id_to_dataset = query_and_candidate_data_positive_.flatMap(
+                    lambda x: [((x[0][0], candidate_id), x[2][candidate_id]) for candidate_id in range(len(x[2]))]
+                )
+                
+                # then, we replace candidate datasets for ids (index) to avoid
+                #   using too much memory
+                #   format is the following:
+                #   (dataset name, candidate id, n. columns in candidate)
+                candidate_id_positive_examples = query_and_candidate_data_positive_.flatMap(
+                    lambda x: [(x[0][0], candidate_id, x[4]) for candidate_id in range(len(x[2]))]
+                )
+
+                # then, we do the cartesian product between query_and_candidate_data_positive_ and
+                #   candidate_id_positive_examples to choose a random set of candidates
+                #   per query dataset (that does not belong to the same dataset)
                 query_and_candidate_data_negative_tmp = query_and_candidate_data_positive_.cartesian(
-                    query_and_candidate_data_positive_
+                    candidate_id_positive_examples
                 ).filter(
-                    # filtering same dataset and by max number of columns
+                    # filtering out same dataset and by max number of columns
                     lambda x: (
-                        (x[0][0][0] != x[1][0][0]) and (x[0][0][1] != x[1][0][1]) and
-                        (x[0][3] + x[1][4] <= params['max_number_columns'])
+                        (x[0][0][0] != x[1][0]) and
+                        (x[0][3] + x[1][2] <= params['max_number_columns'])
                     )
-                ## TODO
-                ).flatMap(
-                    # key => (target variable, query dataset)
-                    # val => list of candidate datasets
-                    lambda x: [((x[0][1], query_data), x[1][3]) for query_data in x[0][2]]
+                ).map(
+                    # key => (dataset name, target variable name)
+                    # val => list of candidate datasets: (dataset name, candidate id) tuple
+                    lambda x: ((x[0][0]), [(x[1][0], x[1][1])])
                 ).reduceByKey(
                     # concatenating lists of candidate datasets
                     lambda x, y: x + y
                 ).map(
-                    # (target variable, query dataset, random sample of other candidate datasets)
-                    lambda x: (x[0][0], x[0][1], list(np.random.choice(
-                        x[1], size=min(n_random_candidates_per_query, len(x[1])), replace=False
-                    )))
+                    # ((dataset name, target variable name), random sample of other candidate datasets)
+                    lambda x: (x[0], [x[1][i] for i in list(np.random.choice(
+                        range(len(x[1])), size=min(n_random_candidates_per_query, len(x[1])), replace=False
+                    ))])
+                ).flatMap(
+                    # ((dataset name, target variable name), (dataset name, candidate id))
+                    lambda x: [(x[0], candidate_pair) for candidate_pair in x[1]]
+                ).map(
+                    # then, get the candidate datasets back (instead of ids) and query datasets
+                    lambda x: (x[1], x[0])
+                ).join(
+                    candidate_id_to_dataset
+                ).map(
+                    # ((dataset name, target variable name), candidate dataset)
+                    lambda x: (x[1][0], [x[1][1]])
+                ).reduceByKey(
+                    # concatenating lists of candidate datasets
+                    lambda x, y: x + y
+                ).join(
+                    query_and_candidate_data_positive_
+                ).map(
+                    # (query dataset, target variable, candidate datasets)
+                    lambda x: (x[1][1][0], x[0][1], x[1][0])
                 ).persist(StorageLevel.MEMORY_AND_DISK)
 
                 # total number of negative examples
@@ -948,33 +929,31 @@ if __name__ == '__main__':
 
                 # generating candidate datasets for negative examples
                 #   format is the following:
-                #   (target_variable, query_dataset_path, candidate_dataset_paths)
+                #   (uiud, query dataset, target variable, candidate datasets)
                 query_and_candidate_data_negative = query_and_candidate_data_negative_tmp.map(
-                    lambda x: generate_candidate_datasets_negative_examples(x[0], x[1], x[2], params)
+                    lambda x: (
+                        str(uuid.uuid4()),
+                        generate_candidate_datasets_negative_examples(x[0], x[1], x[2], params)
+                    )
                 )
 
                 query_candidate_datasets_tmp = sc.union([
-                    query_and_candidate_data_positive_.flatMap(
-                        lambda x: [(x[1], query, x[3]) for query in x[2]]
+                    query_and_candidate_data_positive_.map(
+                        lambda x: (str(uuid.uuid4()), x[1], x[0][1], x[2])
                     ),
                     query_and_candidate_data_negative
                 ]).persist(StorageLevel.MEMORY_AND_DISK)
-
                 
                 # saving filenames
-                filename = os.path.join(output_dir, '.files-%s-data' % key)
+                filename = os.path.join(output_dir, 'files-%s-data' % key)
                 if not cluster_execution:
                     filename = 'file://' + filename
-                query_candidate_datasets_tmp.flatMap(
-                    lambda x: [[x[0], x[1]] + x[2]]
-                ).map(
-                    lambda x: ','.join(x)
-                ).saveAsTextFile(filename)
+                query_candidate_datasets_tmp.saveAsPickleFile(filename)
 
-                query_candidate_datasets = sc.union([
-                    query_candidate_datasets,
-                    query_candidate_datasets_tmp
-                ]).persist(StorageLevel.MEMORY_AND_DISK)
+                # query_candidate_datasets = sc.union([
+                #     query_candidate_datasets,
+                #     query_candidate_datasets_tmp
+                # ]).persist(StorageLevel.MEMORY_AND_DISK)
 
     else:
 
@@ -990,6 +969,8 @@ if __name__ == '__main__':
                 ).map(
                     lambda x: (x[0], x[1], x[2:])
             )]).persist(StorageLevel.MEMORY_AND_DISK)
+
+    sys.exit(0)
 
 
     if not skip_training_data:
