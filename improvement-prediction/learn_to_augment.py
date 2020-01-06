@@ -27,8 +27,8 @@ if __name__ == '__main__':
     # The model can be a random forest, a decision tree, or a linear regression, and test_data is a
     # list where each item has the index of the test instances and their true relative
     # performance gain, so we can adequately evaluate the models over them. 
+    #learning_task = LearningTask('training-test')
     learning_task = LearningTask('cross-validation')
     learning_task.read_features_and_targets(augmentation_learning_data_filenames)
     n_splits = params['n_splits']
-    models, test_data = learning_task.execute_random_forest(n_splits)
-    
+    models, test_data = learning_task.execute_random_forest(n_splits) #, feature_ids=[20, 21, 22, 23, 24, 25])
