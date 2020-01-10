@@ -9,7 +9,10 @@ GAIN_IN_R2_SCORE_ID = -1
 DECREASE_IN_MEDIAN_ABSOLUTE_ERROR_ID = -2
 DECREASE_IN_MEAN_SQUARED_ERROR_ID = -3
 DECREASE_IN_MEAN_ABSOLUTE_ERROR_ID = -4
-
+REAL_GAIN_ID = 0
+PREDICTED_GAIN_ID = 1
+CONTAINMENT_BASELINE_GAIN_ID = 2
+DIFF_PEARSON_BASELINE_GAIN_ID = 3
 
 color_dict = {'query_max_kurtosis': 'lightblue', 'query_max_mean': 'lightblue', 'query_row_column_ratio': 'lightblue', 'query_num_of_columns': 'lightblue', 'query_max_outlier_percentage': 'lightblue', 'query_max_unique': 'lightblue', 'query_num_rows': 'lightblue', 'query_target_max_mutual_info': 'blue', 'query_target_max_covariance': 'blue', 'query_target_max_pearson': 'blue', 'query_target_max_spearman': 'blue', 'candidate_max_kurtosis': 'pink', 'candidate_max_unique': 'pink', 'candidate_num_rows': 'pink', 'candidate_max_mean': 'pink', 'candidate_row_column_ratio': 'pink', 'candidate_max_skewness': 'pink', 'candidate_max_outlier_percentage': 'pink', 'candidate_num_of_columns': 'pink', 'candidate_max_skewness': 'pink', 'candidate_target_max_mutual_info': 'red', 'candidate_target_max_spearman': 'red', 'candidate_target_max_pearson': 'red', 'candidate_target_max_covariance': 'red', 'containment_fraction': 'green', 'max_pearson_difference': 'yellow'}
 

@@ -25,6 +25,7 @@ class Dataset:
     def read_dataset(self, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
         """Reads lines from self.filename, storing in a pandas dataframe
         """
+        print('FILENAME', self.filename)
         self.data = pd.read_csv(StringIO(read_file(self.filename, hdfs_client, use_hdfs, hdfs_address, hdfs_user)))
         self.keys = set(self.data['key-for-ranking'])
         self.data = self.data.set_index(keys='key-for-ranking', drop=True)

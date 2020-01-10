@@ -46,6 +46,16 @@ def dump_learning_instances(data_filename, features, targets):
             output_string = ','.join([str(i) for i in features]) + ',' + str(target) + '\n'
             f.write(output_string)
 
+def parse_learning_instance(instance_line):
+    fields = instance_line.strip().split(SEPARATOR)
+    metadata = {'query_filename': fields[QUERY_FILENAME_ID], 'target_name': fields[TARGET_NAME_ID], 'candidate_filename': fields[CANDIDATE_FILENAME_ID]}
+    features = [float(i) for i in fields[CANDIDATE_FILENAME_ID+1:DECREASE_IN_MEAN_ABSOLUTE_ERROR_ID]]
+    targets = {'decrease_in_mae': float(fields[DECREASE_IN_MEAN_ABSOLUTE_ERROR_ID]),
+               'decrease_in_mse': float(fields[DECREASE_IN_MEAN_SQUARED_ERROR_ID]),
+               'decrease_in_med_ae': float(fields[DECREASE_IN_MEDIAN_ABSOLUTE_ERROR_ID]),
+               'gain_in_r2_score': float(fields[GAIN_IN_R2_SCORE_ID])}
+    return metadata, features, targets
+            
 def read_augmentation_learning_filename(augmentation_learning_filename):
     """Reads augmentation_learning_filename to extract metadata, features and targets 
     (relative performance gains after augmentation)
@@ -55,14 +65,8 @@ def read_augmentation_learning_filename(augmentation_learning_filename):
     learning_targets = []
     with open(augmentation_learning_filename, 'r') as f:
         for line in f:
-            fields = line.strip().split(SEPARATOR)
-            metadata = {'query_filename': fields[QUERY_FILENAME_ID], 'target_name': fields[TARGET_NAME_ID], 'candidate_filename': fields[CANDIDATE_FILENAME_ID]}
+            metadata, features, targets = parse_learning_instance(line)
             learning_metadata.append(metadata)
-            features = [float(i) for i in fields[CANDIDATE_FILENAME_ID+1:DECREASE_IN_MEAN_ABSOLUTE_ERROR_ID]]
             learning_features.append(features)
-            targets = {'decrease_in_mae': float(fields[DECREASE_IN_MEAN_ABSOLUTE_ERROR_ID]),
-                       'decrease_in_mse': float(fields[DECREASE_IN_MEAN_SQUARED_ERROR_ID]),
-                       'decrease_in_med_ae': float(fields[DECREASE_IN_MEDIAN_ABSOLUTE_ERROR_ID]),
-                       'gain_in_r2_score': float(fields[GAIN_IN_R2_SCORE_ID])}
             learning_targets.append(targets)
     return learning_metadata, learning_features, learning_targets
