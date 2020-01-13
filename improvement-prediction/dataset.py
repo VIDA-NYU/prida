@@ -25,6 +25,7 @@ class Dataset:
     def read_dataset(self, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
         """Reads lines from self.filename, storing in a pandas dataframe
         """
+        print('FILENAME', self.filename)
         self.data = pd.read_csv(StringIO(read_file(self.filename, hdfs_client, use_hdfs, hdfs_address, hdfs_user)))
         self.keys = set(self.data['key-for-ranking'])
         self.data = self.data.set_index(keys='key-for-ranking', drop=True)
@@ -46,13 +47,14 @@ class Dataset:
         return self.column_names
     
     def join_with(self, another_dataset, missing_value_imputation=None):
-        """Performs a join between the dataset and another given dataset. _left and _right suffixes are added to columns to 
+        """Performs a join between the dataset and another given dataset. _left suffixes are added to columns to 
         avoid overwriting in the case where both datasets have columns with the same name. Optionally, an imputation strategy is
         passed as a parameter to handle missing values
         """
         
-        join_ = self.data.join(another_dataset.get_data(), how='left', lsuffix='_left', rsuffix='_right')
-
+        join_ = self.data.join(another_dataset.get_data(), how='left', lsuffix='_left')
+        print('names of columns before', self.data.columns, 'and', another_dataset.get_data().columns)
+        print('names of columns after', join_.columns)
         # if no missing_value_imputation policy is passed, it is an inner join and the method just drops the missing values (nan's)
         if not missing_value_imputation:
             return join_.dropna(inplace=True)

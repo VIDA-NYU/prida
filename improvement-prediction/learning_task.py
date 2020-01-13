@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, SGDRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.metrics import r2_score
@@ -52,7 +52,7 @@ class LearningTask:
         """This method ensures that the learning will only use the features 
         indicated with feature_ids
         """
-        return self.learning_features[feature_ids]
+        return np.array(self.learning_features)[:,feature_ids]
 
     def _generate_models(self, data_splits_spec,
                          ml_algorithm_object,
@@ -69,7 +69,6 @@ class LearningTask:
 
         If save_model == True, save it with pickle.
         """
-
         if feature_ids:
             features = self.filter_learning_features(feature_ids)
         else:
@@ -78,7 +77,7 @@ class LearningTask:
             data_splits = [(train_index, test_index) for train_index, test_index in data_splits_spec.split(features)]
         else:
             data_splits = data_splits_spec
-        
+
         targets = [item[learning_target] for item in self.learning_targets]
         
         i = 0
@@ -92,12 +91,13 @@ class LearningTask:
             X_train, y_train = remove_outliers(X_train, y_train, zscore_threshold=0.5)
             X_test, y_test = remove_outliers(X_test, y_test, zscore_threshold=0.5)
             ml_algorithm_object.fit(X_train, y_train)            
-                
             # generate predictions for test data
             predictions = ml_algorithm_object.predict(X_test)
             models.append(ml_algorithm_object)
             test_results = {'index_of_test_instances': test_index.tolist(),
                        'true_relative_gain_for_test_instances': y_test.tolist()}
+            print('predictions', list(predictions))
+            print('y_test', list(y_test))
             test_data_results.append(test_results)
 
             # save model (fitted ml_algorithm_object) and correspondint test data to disk
@@ -114,8 +114,8 @@ class LearningTask:
                                              key= lambda i: i[1], 
                                              reverse=True)
                 print([(FEATURE_NAMES[i[0]], i[1]) for i in feature_importances])
-            elif ml_algorithm_name == 'linear_regression':
-                mutual_information_univariate_selection(X_train, y_train)
+            #elif ml_algorithm_name == 'linear_regression' or ml_algorithm_name == 'sgd_regressor':
+            #    mutual_information_univariate_selection(X_train, y_train)
             
             ## inspects the r2 score of the model over the test data
             print('how good this ' + ml_algorithm_name + ' is:', r2_score(y_test, predictions))
@@ -126,6 +126,9 @@ class LearningTask:
             ## contrasts actual targets (real values) and predictions (predicted values)
             plot_scatterplot(y_test, predictions, 'predicted_r2_score_gains_fold_' + str(i) + '_' + ml_algorithm_name + '.png', 'Real values', 'Predicted values')
 
+            ## contrasts actual targets (real values) and a few features that can be used as baselines
+            plot_scatterplot(y_test, X_test[:,-1], 'containment_baseline_r2_score_gains_fold_' + str(i) + '_' + ml_algorithm_name + '.png', 'Real values', 'Containment')
+            plot_scatterplot(y_test, X_test[:,-2], 'max_pearson_diff_baseline_r2_score_gains_fold_' + str(i) + '_' + ml_algorithm_name + '.png', 'Real values', 'Max pearson diff')
             #############
             i += 1
         return models, test_data_results
@@ -145,7 +148,7 @@ class LearningTask:
         """
         
         kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
-        lm = LinearRegression()
+        lm = LinearRegression(normalize=True)
         return self._generate_models(kf, lm, 'linear_regression', learning_target, feature_ids, save_model)
 
     def execute_decision_trees_cross_validation(self, n_splits, learning_target='gain_in_r2_score', feature_ids=None, save_model=True):
@@ -182,13 +185,40 @@ class LearningTask:
 
         If save_model == True, save it with pickle.
         """
+        rf = RandomForestRegressor(n_estimators=100, random_state=42)
         if self.validation_type == 'cross-validation':
             kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
-            rf = RandomForestRegressor(n_estimators=100, random_state=42)
             return self._generate_models(kf, rf, 'random_forest', learning_target, feature_ids, save_model)
         elif self.validation_type == 'training-test':
             training_index = np.array([i for i in range(self.training_size)])
             test_index = np.array([i + self.training_size for i in range(len(self.learning_features) - self.training_size)])
-            rf = RandomForestRegressor(n_estimators=100, random_state=42)
             return self._generate_models([(training_index, test_index)], rf, 'random_forest', learning_target, feature_ids, save_model)
+        return None, None
+
+    def execute_sgd(self, n_splits, learning_target='gain_in_r2_score', feature_ids=None, save_model=True):
+        """Performs a linear model that uses stochastic gradient descent. The execution uses k-fold cross validation (k = n_splits) if 
+        self.validation_type == 'cross-validation'. Otherwise, if self.validation_type == 'training-test', the model is trained 
+        over a fraction X of the data and tested over a fraction 1 - X. 
+
+        The learning target (parameter learning_target) needs to be specified, and it can be one of the following values:
+        'decrease_in_mae', 'decrease_in_mse', 'decrease_in_med_ae', or 'gain_in_r2_score' (default).
+
+        If feature_ids == None, all features are used to 
+        predict the targets; otherwise, only feature_ids are used.
+        The learning target (parameter learning_target) needs to be specified, and it can be one of the following values:
+        'decrease_in_mae', 'decrease_in_mse', 'decrease_in_med_ae', or 'gain_in_r2_score' (default).
+
+        If feature_ids == None, all features are used to 
+        predict the targets; otherwise, only feature_ids are used.
+
+        If save_model == True, save it with pickle.
+        """
+        sgd = SGDRegressor(random_state=42)
+        if self.validation_type == 'cross-validation':
+            kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+            return self._generate_models(kf, sgd, 'sgd_regressor', learning_target, feature_ids, save_model)
+        elif self.validation_type == 'training-test':
+            training_index = np.array([i for i in range(self.training_size)])
+            test_index = np.array([i + self.training_size for i in range(len(self.learning_features) - self.training_size)])
+            return self._generate_models([(training_index, test_index)], sgd, 'sgd_regressor', learning_target, feature_ids, save_model)
         return None, None

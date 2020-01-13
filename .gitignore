@@ -1,3 +1,10 @@
+data/*
+improvement-prediction/augmentation_learning_models/
+improvement-prediction/data/
+improvement-prediction/execution_parameters/
+improvement-prediction/features_for_learning_augmentation/
+improvement-prediction/models_and_tests/
+
 # Emacs backup files
 *~
 */*~
