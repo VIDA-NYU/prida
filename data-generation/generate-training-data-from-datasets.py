@@ -575,11 +575,19 @@ def generate_data_from_columns(original_data, columns, column_metadata, key_colu
             if (new_data.shape[0] - len(drop_indices)) < params['min_number_records']:
                 continue
 
+            candidate_data = new_data.drop(drop_indices)
+
+            # adding noise to data
+            n_noisy_records = int((params['max_percentage_noise']/100.0) * candidate_data.shape[0])
+            noisy_records = np.random.choice(candidate_data.index, n_noisy_records, replace=False)
+            noise =  np.random.normal(0, 0.1, [n_noisy_records, len(column_names)])
+            candidate_data.loc[noisy_records, column_names] = candidate_data.loc[noisy_records, column_names] + noise
+
             # saving dataset
             name = '%s_%s_%d.csv' % (name_identifier, dataset_name, id_ + i + 1)
             save_file(
                 os.path.join(dataset_path, name),
-                new_data.drop(drop_indices).to_csv(index=False),
+                candidate_data.to_csv(index=False),
                 hdfs_client,
                 params['cluster']
             )

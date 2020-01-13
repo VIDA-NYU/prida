@@ -33,6 +33,7 @@ The data generation process is done using PySpark. Copy the file [`params.json`]
     "max_number_columns": the maximum number of columns that a query/candidate dataset pair should have
     "max_times_break_data_vertical": the maximum number of times that a dataset will be broken (vertically) into multiple data
     "max_times_records_removed": the maximum number of times that records will be removed from a dataset to derive new data
+    "max_percentage_noise": the maximum percentage of records from the candidate dataset that will be replaced by gaussian noise
 }
 ```
 
