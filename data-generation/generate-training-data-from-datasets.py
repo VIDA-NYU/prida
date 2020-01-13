@@ -1057,6 +1057,7 @@ if __name__ == '__main__':
     print('    . max_number_columns: %d' % params['max_number_columns'])
     print('    . max_times_break_data_vertical: %d' % params['max_times_break_data_vertical'])
     print('    . max_times_records_removed: %d' % params['max_times_records_removed'])
+    print('    . max_percentage_noise: %d' % params['max_percentage_noise'])
 
     if not skip_dataset_creation:
         print(' -- N. positive examples: %d' %n_positive_examples)
