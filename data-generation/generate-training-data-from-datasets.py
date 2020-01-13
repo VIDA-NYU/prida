@@ -604,6 +604,7 @@ def generate_performance_scores(query_dataset, target_variable, candidate_datase
     # HDFS Client
     hdfs_client = None
     if cluster_execution:
+        time.sleep(np.random.randint(1, 120))  # avoid opening multiple sockets at the same time
         hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
 
     # reading query dataset
