@@ -126,6 +126,9 @@ class LearningTask:
             ## contrasts actual targets (real values) and predictions (predicted values)
             plot_scatterplot(y_test, predictions, 'predicted_r2_score_gains_fold_' + str(i) + '_' + ml_algorithm_name + '.png', 'Real values', 'Predicted values')
 
+            ## contrasts actual targets (real values) and a few features that can be used as baselines
+            plot_scatterplot(y_test, X_test[:,-1], 'containment_baseline_r2_score_gains_fold_' + str(i) + '_' + ml_algorithm_name + '.png', 'Real values', 'Containment')
+            plot_scatterplot(y_test, X_test[:,-2], 'max_pearson_diff_baseline_r2_score_gains_fold_' + str(i) + '_' + ml_algorithm_name + '.png', 'Real values', 'Max pearson diff')
             #############
             i += 1
         return models, test_data_results

@@ -28,3 +28,4 @@ if __name__ == '__main__':
     print('done creating models and corresponding test_data')
     for model, data_filename in zip(models, test_data):
         recommender.generate_and_evaluate_predicted_gains(model, data_filename)
+        break
