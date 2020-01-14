@@ -76,8 +76,10 @@ def compute_ndcg_at_k(real_gains, predicted_gains, k=5, use_gains_as_relevance_w
     else:
         real_relevances = {tuple[0]:len(real_ranking)-index for index, tuple in enumerate(real_ranking)}
     predicted_ranking = sorted(predicted_gains, key = lambda x:x[1], reverse=True)
+    #print('real gains', real_gains, 'predicted gains', predicted_gains)
+    #print('real relevances', real_relevances, 'predicted relevances', predicted_ranking)
     real_relevances_of_predicted_items = [real_relevances[i[0]] if i[0] in real_relevances else 0 for i in predicted_ranking]
-    print('real_relevances_of_predicted_items', real_relevances_of_predicted_items)
+    #print('real_relevances_of_predicted_items', real_relevances_of_predicted_items)
     numerator = np.sum(np.asfarray(real_relevances_of_predicted_items)/np.log2(np.arange(2, np.asfarray(real_relevances_of_predicted_items).size + 2)))
     sorted_real_relevances_of_predicted_items = sorted(real_relevances_of_predicted_items, reverse=True)
     denominator = np.sum(np.asfarray(sorted_real_relevances_of_predicted_items)/np.log2(np.arange(2, np.asfarray(sorted_real_relevances_of_predicted_items).size + 2)))
@@ -104,18 +106,33 @@ def compute_mean_reciprocal_rank_for_single_sample(real_gains, predicted_gains):
             return 1/(index + 1)
     return 0
 
-def compute_precision_at_k(real_gains, predicted_gains, k=5):
-    """This function computes precision@k, mathematically defined
-    as (# of recommended items @k that are relevant) /k
-
-    Given a certain k in this implementation, we assume that an item is 
-    relevant if it is one of the top k in real_gains
+def compute_r_precision(real_gains, predicted_gains, k=5, positive_only=False):
+    """This function computes R-precision, which is the ratio between all the relevant documents 
+    retrieved until the rank that equals the number of relevant documents you have in your collection in total (r), 
+    to the total number of relevant documents in your collection R.
+    
+    In this setting, if positive_only == True, relevant documents correspond exclusively to candidates associated to positive 
+    gains. If there are no relevant documents in this case, this function returns 'nan'. Alternatively, if positive_only == False 
+    we consider that the relevant documents are the k highest ranked candidates in real_gains (it basically turns into precision at k).
     """
-    real_ranking = dict(sorted(real_gains, key = lambda x:x[1], reverse=True)[:k])
-    predicted_ranking = sorted(predicted_gains, key = lambda x:x[1], reverse=True)[:k]
-    num = 0.
-    den = k
-    for item in predicted_ranking:
-        if item[0] in real_ranking: 
-            num += 1.
-    return num/den
+
+    if positive_only:
+        relevant_documents = [elem[0] for elem in real_gains if elem[1] > 0]
+        predicted_ranking = [elem[0] for elem in sorted(predicted_gains, key = lambda x:x[1], reverse=True)[:len(relevant_documents)]]
+        if not relevant_documents or not predicted_ranking:
+            return float('nan')
+        return len(set(relevant_documents) & set(predicted_ranking))/len(relevant_documents)
+
+    #positive_only == False
+    real_ranking = [elem[0] for elem in sorted(real_gains, key = lambda x:x[1], reverse=True)[:k]]
+    predicted_ranking = [elem[0] for elem in sorted(predicted_gains, key = lambda x:x[1], reverse=True)[:k]]
+    return len(set(real_ranking) & set(predicted_ranking))/k
+
+def compute_average_precision(real_gains, predicted_gains):
+    """This function computes average precision, which is the average of precision at k values for k=1..len(real_gains).
+    Average precision values can later be used for the computation of MAP (Mean Average Precision)
+    """
+    precs = [compute_r_precision(real_gains, predicted_gains, k=x+1) for x in range(len(real_gains))]
+    if not precs:
+        return 0.
+    return np.mean(precs)

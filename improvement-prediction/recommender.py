@@ -107,13 +107,24 @@ class Recommender:
         kendall_tau = []
         precision_at_1 = []
         precision_at_5 = []
+        r_precision = []
+        avg_precs = []
+        ndcgs = []
+        
         kendall_tau_containment_baseline = []
         precision_at_1_containment_baseline = []
         precision_at_5_containment_baseline = []
+        r_precision_containment_baseline = []
+        avg_precs_containment_baseline = []
+        ndcgs_containment_baseline = []
+        
         kendall_tau_difference_in_pearson_baseline = []
         precision_at_1_difference_in_pearson_baseline = []
         precision_at_5_difference_in_pearson_baseline = []
-
+        r_precision_difference_in_pearson_baseline = []
+        avg_precs_difference_in_pearson_baseline = []
+        ndcgs_difference_in_pearson_baseline = []
+        
         number_of_candidates_per_query_target = []
         for query_target in gains_dict.keys():
             query_target_gains = gains_dict[query_target]
@@ -122,122 +133,45 @@ class Recommender:
             predicted_gains = [(i, query_target_gains[i][PREDICTED_GAIN_ID]) for i in query_target_gains]
             containment_gains = [(i, query_target_gains[i][CONTAINMENT_BASELINE_GAIN_ID]) for i in query_target_gains]
             diff_pearson_gains = [(i, query_target_gains[i][DIFF_PEARSON_BASELINE_GAIN_ID]) for i in query_target_gains]
-            kendall_tau.append(compute_kendall_tau(real_gains, predicted_gains)[0])
-            precision_at_1.append(compute_precision_at_k(real_gains, predicted_gains, k=1))
-            precision_at_5.append(compute_precision_at_k(real_gains, predicted_gains))
-            kendall_tau_containment_baseline.append(compute_kendall_tau(real_gains, containment_gains)[0])
-            precision_at_1_containment_baseline.append(compute_precision_at_k(real_gains, containment_gains, k=1))
-            precision_at_5_containment_baseline.append(compute_precision_at_k(real_gains, containment_gains))
-            kendall_tau_difference_in_pearson_baseline.append(compute_kendall_tau(real_gains, diff_pearson_gains)[0])
-            precision_at_1_difference_in_pearson_baseline.append(compute_precision_at_k(real_gains, diff_pearson_gains, k=1))
-            precision_at_5_difference_in_pearson_baseline.append(compute_precision_at_k(real_gains, diff_pearson_gains))
-        print('lengths', len(precision_at_1), len(precision_at_1_containment_baseline), len(precision_at_1_difference_in_pearson_baseline))
-        print('average number of candidates per query-target', np.mean(number_of_candidates_per_query_target))
+
+            precision_at_1.append(compute_r_precision(real_gains, predicted_gains, k=1))
+            precision_at_5.append(compute_r_precision(real_gains, predicted_gains))
+            avg_precs.append(compute_average_precision(real_gains, predicted_gains))
+            ndcgs.append(compute_ndcg_at_k(real_gains, predicted_gains))
+            
+            precision_at_1_containment_baseline.append(compute_r_precision(real_gains, containment_gains, k=1))
+            precision_at_5_containment_baseline.append(compute_r_precision(real_gains, containment_gains))
+            avg_precs_containment_baseline.append(compute_average_precision(real_gains, containment_gains))
+            ndcgs_containment_baseline.append(compute_ndcg_at_k(real_gains, containment_gains))
+            
+            precision_at_1_difference_in_pearson_baseline.append(compute_r_precision(real_gains, diff_pearson_gains, k=1))
+            precision_at_5_difference_in_pearson_baseline.append(compute_r_precision(real_gains, diff_pearson_gains))
+            avg_precs_difference_in_pearson_baseline.append(compute_average_precision(real_gains, diff_pearson_gains))
+            ndcgs_difference_in_pearson_baseline.append(compute_ndcg_at_k(real_gains, diff_pearson_gains))
+            
+            kendalltau = compute_kendall_tau(real_gains, predicted_gains)[0]
+            kendalltau_containment = compute_kendall_tau(real_gains, containment_gains)[0]
+            kendalltau_pearson = compute_kendall_tau(real_gains, diff_pearson_gains)[0]
+            if not np.isnan(kendalltau) and not np.isnan(kendalltau_containment) and not np.isnan(kendalltau_pearson):
+                kendall_tau.append(kendalltau)
+                kendall_tau_containment_baseline.append(kendalltau_containment)
+                kendall_tau_difference_in_pearson_baseline.append(kendalltau_pearson)
+
+            rprecision = compute_r_precision(real_gains, predicted_gains, positive_only=True)
+            rprecision_containment = compute_r_precision(real_gains, containment_gains, positive_only=True)
+            rprecision_pearson = compute_r_precision(real_gains, diff_pearson_gains, positive_only=True)
+            if not np.isnan(rprecision) and not np.isnan(rprecision_containment) and not np.isnan(rprecision_pearson):
+                r_precision.append(rprecision)
+                r_precision_containment_baseline.append(rprecision_containment)
+                r_precision_difference_in_pearson_baseline.append(rprecision_pearson)
+        
+            #if len(number_of_candidates_per_query_target) == 50:
+            #    break
+            
+        print('average number of candidates per query-target', np.mean(number_of_candidates_per_query_target), 'total number of times we could compute kendalltau', len(kendall_tau))
         print('average kendall tau:', np.mean(kendall_tau), 'average kendall tau - containment baseline:', np.mean(kendall_tau_containment_baseline), 'average kendall tau - difference_in_pearson baseline:', np.mean(kendall_tau_difference_in_pearson_baseline))
         print('average precision at 1:', np.mean(precision_at_1), 'average precision at 1 - containment baseline:', np.mean(precision_at_1_containment_baseline), 'average precision at 1 - difference_in_pearson baseline:', np.mean(precision_at_1_difference_in_pearson_baseline))
         print('average precision at 5:', np.mean(precision_at_5), 'average precision at 5 - containment baseline:', np.mean(precision_at_5_containment_baseline), 'average precision at 5 - difference_in_pearson baseline:', np.mean(precision_at_5_difference_in_pearson_baseline))
-
-
-    # def read_models_and_test_data(self, augmentation_models_and_tests_filename):
-    #     """Given a filename where each line lists a file with a model (.sav format) and test 
-    #     instances for it (.json format), this method loads both models and test instances
-    #     """
-    #     models = []
-    #     test_data = []
-    #     with open(augmentation_models_and_tests_filename, 'r') as f:
-    #         for line in f:
-    #             model_filename, test_filename = line.strip().split(SEPARATOR)
-    #             models.append(pickle.load(open(model_filename, 'rb')))
-    #             test_data.append(json.load(open(test_filename, 'r')))
-    #     return models, test_data
-
-    # def get_real_and_predicted_gains(self, query_filename, target_name, model, metric='r2_score'):
-    #     """Given the names of a query dataset and a target (a column in the query dataset), 
-    #     this method predicts the relative gain obtained via data augmentation with a variety of 
-    #     candidate datasets, then returning these predicted gains and the corresponding real ones, 
-    #     which are stored in a table
-    #     """
-    #     subtable = self.learning_table[(self.learning_table['query_filename'] == query_filename) & 
-    #                                    (self.learning_table['target_name'] == target_name)]
-    #     try:
-    #         subtable = subtable.sample(n=20, random_state=42)
-    #     except:
-    #         print('For given query and target_name, there are fewer than 20 candidate datasets')
-        
-    #     predicted_gains = []
-    #     real_gains = []
-
-    #     # - containment_baseline_gains uses the maximum key intersection between query and candidate
-    #     #   datasets
-    #     # - difference_in_pearson_baseline_gains uses the difference between the max_in_modulus pearson
-    #     #   correlation considering query columns and target, and candidate columns and target
-    #     #TODO encapsulate these baselines
-    #     containment_baseline_gains = []
-    #     difference_in_pearson_baseline_gains = []
-    #     for index, row in subtable.iterrows():
-    #         candidate_filename = row['candidate_filename']
-    #         if metric == 'r2_score':
-    #             real_gains.append((candidate_filename, compute_r2_gain(row['r2_score_before'], row['r2_score_after'])))
-    #         elif metric == 'mean_absolute_error':
-    #             real_gains.append((candidate_filename, compute_mae_decrease(row['mae_before'], row['mae_after'])))
-    #         elif metric == 'mean_squared_error':
-    #             real_gains.append((candidate_filename, compute_mse_decrease(row['mse_before'], row['mse_after'])))
-    #         else:
-    #             real_gains.append((candidate_filename, compute_med_ae_decrease(row['med_ae_before'], row['med_ae_after'])))
-
-    #         # we test joining query and candidate datasets with different types
-    #         # of imputation, as they are hidden in test time
-    #         test_instance_mean = AugmentationInstance({'query_filename': query_filename,
-    #                                                    'target_name': target_name,
-    #                                                    'candidate_filename': candidate_filename,
-    #                                                    'imputation_strategy': 'mean'})
-    #         test_features_mean = test_instance_mean.generate_features(self.query_individual_features[query_filename], 
-    #                                                                   self.candidate_individual_features[candidate_filename])
-    #         gain_mean = model.predict(test_features_mean.reshape(1, -1))[0]
-            
-    #         predicted_gains.append((candidate_filename, gain_mean))            
-    #         # there are features already computed in test_features_mean that actually correspond to the two baselines we are
-    #         # experimenting with here.
-    #         containment_baseline_gains.append((candidate_filename, test_features_mean[CONTAINMENT_FEATURE_ID]))
-    #         difference_in_pearson_baseline_gains.append((candidate_filename, test_features_mean[DIFFERENCE_IN_PEARSON_FEATURE_ID]))
-    #     return real_gains, predicted_gains, containment_baseline_gains, difference_in_pearson_baseline_gains
-
-    # def predict_gains_for_candidate_datasets(self, model, data):
-    #     """This method encapsulates the prediction of relative gains via data augmentation using a given 
-    #     machine learning model and test data
-    #     """
-    #     i = 0
-    #     kendall_tau = []
-    #     precision_at_1 = []
-    #     precision_at_5 = []
-    #     #precision_at_50 = []
-    #     kendall_tau_containment_baseline = []
-    #     precision_at_1_containment_baseline = []
-    #     precision_at_5_containment_baseline = []
-    #     kendall_tau_difference_in_pearson_baseline = []
-    #     precision_at_1_difference_in_pearson_baseline = []
-    #     precision_at_5_difference_in_pearson_baseline = []
-    #     for index in data['index_of_test_instances']:
-    #         query_filename = self.learning_table.iloc[index]['query_filename']
-    #         target_name = self.learning_table.iloc[index]['target_name']
-    #         real, predicted, containment_baseline, difference_in_pearson_baseline = self.get_real_and_predicted_gains(query_filename, target_name, model)
-    #         kendall_tau.append(compute_kendall_tau(real, predicted)[0])
-    #         precision_at_1.append(compute_precision_at_k(real, predicted, k=1))
-    #         prec = compute_precision_at_k(real, predicted)
-    #         precision_at_5.append(prec)
-    #         if prec < 0.2:
-    #             print('precision at 5 for index', index, 'is', prec)
-    #         kendall_tau_containment_baseline.append(compute_kendall_tau(real, containment_baseline)[0])
-    #         precision_at_1_containment_baseline.append(compute_precision_at_k(real, containment_baseline, k=1))
-    #         precision_at_5_containment_baseline.append(compute_precision_at_k(real, containment_baseline))
-    #         kendall_tau_difference_in_pearson_baseline.append(compute_kendall_tau(real, difference_in_pearson_baseline)[0])
-    #         precision_at_1_difference_in_pearson_baseline.append(compute_precision_at_k(real, difference_in_pearson_baseline, k=1))
-    #         precision_at_5_difference_in_pearson_baseline.append(compute_precision_at_k(real, difference_in_pearson_baseline))
-    #         i += 1
-    #         if i == 5:
-    #             break
-    #     print('lengths', len(precision_at_1), len(precision_at_1_containment_baseline), len(precision_at_1_difference_in_pearson_baseline))
-    #     print('average kendall tau:', np.mean(kendall_tau), 'average kendall tau - containment baseline:', np.mean(kendall_tau_containment_baseline), 'average kendall tau - difference_in_pearson baseline:', np.mean(kendall_tau_difference_in_pearson_baseline))
-    #     print('average precision at 1:', np.mean(precision_at_1), 'average precision at 1 - containment baseline:', np.mean(precision_at_1_containment_baseline), 'average precision at 1 - difference_in_pearson baseline:', np.mean(precision_at_1_difference_in_pearson_baseline))
-    #     print('average precision at 5:', np.mean(precision_at_5), 'average precision at 5 - containment baseline:', np.mean(precision_at_5_containment_baseline), 'average precision at 5 - difference_in_pearson baseline:', np.mean(precision_at_5_difference_in_pearson_baseline))
-            
+        print('average R-precision:', np.mean(r_precision), 'average R-precision - containment baseline:', np.mean(r_precision_containment_baseline), 'average R-precision - difference_in_pearson baseline:', np.mean(r_precision_difference_in_pearson_baseline))
+        print('MAP:', np.mean(avg_precs), 'MAP - containment baseline:', np.mean(avg_precs_containment_baseline), 'MAP - difference_in_pearson baseline:', np.mean(avg_precs_difference_in_pearson_baseline))
+        print('NDCGs:', np.mean(ndcgs), 'NDCGs - containment baseline:', np.mean(ndcgs_containment_baseline), 'NDCGs - difference_in_pearson baseline:', np.mean(ndcgs_difference_in_pearson_baseline))
