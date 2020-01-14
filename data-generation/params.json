@@ -13,5 +13,6 @@
     "min_number_records": 50,
     "max_number_columns": 30,
     "max_times_break_data_vertical": 8,
-    "max_times_records_removed": 10
+    "max_times_records_removed": 10,
+    "max_percentage_noise": 10
 }
