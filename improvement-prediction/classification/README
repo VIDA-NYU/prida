@@ -1,0 +1,10 @@
+The code in this folder explores the use of classification as a step towards the generation of a data set ranking. 
+When it's mature enough, the goal is to merge it with the main code, replacing its regression-based parts. 
+
+The tasks we tackle are:
+
+1 - How should we separate the classes?
+
+2 - Which features do we actually need?
+
+3 - How should we use the classification results for ranking?
