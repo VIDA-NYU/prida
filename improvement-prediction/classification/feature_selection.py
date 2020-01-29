@@ -10,6 +10,7 @@ import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import f1_score, classification_report
 from sklearn.feature_selection import RFE
+from sklearn.utils import shuffle
 
 VARIANCE_THRESHOLD = 0.01
 CORRELATION_THRESHOLD = 0.85
@@ -19,6 +20,20 @@ FEATURES = ['query_num_of_columns', 'query_num_of_rows', 'query_row_column_ratio
             'candidate_max_unique', 'query_target_max_pearson','query_target_max_spearman', 'query_target_max_covariance',
             'query_target_max_mutual_info', 'candidate_target_max_pearson', 'candidate_target_max_spearman', 'candidate_target_max_covariance',
             'candidate_target_max_mutual_info', 'max_pearson_difference','containment_fraction']
+
+def downsample_data(dataset):
+  """This function downsamples the number of instances of a class that is over-represented in the dataset.
+  It's important to keep the learning 'fair'
+  """
+  loss =  dataset.loc[dataset['classes'] == 'loss']
+  good_gain = dataset.loc[dataset['classes'] == 'good_gain']
+  
+  sample_size = min([loss.shape[0], good_gain.shape[0]])
+  loss = loss.sample(n=sample_size, random_state=42)
+  good_gain = good_gain.sample(n=sample_size, random_state=42)
+  
+  frames = [loss, good_gain]
+  return shuffle(pd.concat(frames), random_state=0)
 
 def remove_low_variance_features(train_features, test_features):
   """This function removes features that have low variance in train_features
@@ -44,7 +59,7 @@ def remove_highly_correlated_features(train_features, test_features):
   test_features = pd.DataFrame(test_features).drop(labels=correlated_features, axis=1)
   return train_features, test_features
 
-def determine_classes_based_on_gain_in_r2_score(dataset, alpha, downsample=False):
+def determine_classes_based_on_gain_in_r2_score(dataset, alpha, downsample=True):
   """This function determines the class of each row in the dataset based on the value 
   of column 'gain_in_r2_score'
   """
@@ -72,23 +87,23 @@ if __name__ == '__main__':
 
   print('before', pd.DataFrame(X_train).columns)
 
-#   clf = RandomForestClassifier(random_state=42)
-#   num_features = len(FEATURES)
-#   fscores = []
-#   features = []
-#   while num_features > 10:
-#     rfe = RFE(estimator=clf, n_features_to_select=num_features, step=1)
-#     rfe.fit(X_train, y_train)
-#     tmp_X_train = rfe.transform(X_train)
-#     tmp_X_test = rfe.transform(X_test)
-#     clf.fit(tmp_X_train, y_train)
-#     y_pred = clf.predict(tmp_X_test)
-#     fscores.append(f1_score(y_test, y_pred, pos_label='good_gain'))
-#     features.append([f for f, r in zip(FEATURES, list(rfe.ranking_)) if r == 1])
-#     num_features -= 1
+  # clf = RandomForestClassifier(random_state=42)
+  # num_features = len(FEATURES)
+  # fscores = []
+  # features = []
+  # while num_features > 10:
+  #   rfe = RFE(estimator=clf, n_features_to_select=num_features, step=1)
+  #   rfe.fit(X_train, y_train)
+  #   tmp_X_train = rfe.transform(X_train)
+  #   tmp_X_test = rfe.transform(X_test)
+  #   clf.fit(tmp_X_train, y_train)
+  #   y_pred = clf.predict(tmp_X_test)
+  #   fscores.append(f1_score(y_test, y_pred, pos_label='good_gain'))
+  #   features.append([f for f, r in zip(FEATURES, list(rfe.ranking_)) if r == 1])
+  #   num_features -= 1
   
-#   for f, feat in zip(fscores, features):
-#     print(f, feat)
+  # for f, feat in zip(fscores, features):
+  #   print(f, len(feat), feat)
 
   clf = RandomForestClassifier(random_state=42)
   clf.fit(X_train, y_train)

@@ -48,8 +48,8 @@ if __name__ == '__main__':
   max_f1score = float('-inf')
   best_alpha = -1
   for alpha in ALPHA_GRID:
-    tmp_training = determine_classes_based_on_gain_in_r2_score(training, alpha, downsample=False)
-    tmp_validation = determine_classes_based_on_gain_in_r2_score(validation, alpha, downsample=False)
+    tmp_training = determine_classes_based_on_gain_in_r2_score(training, alpha) #, downsample=False)
+    tmp_validation = determine_classes_based_on_gain_in_r2_score(validation, alpha)#, downsample=False)
 
     X_train = tmp_training[['query_num_of_columns', 'query_num_of_rows', 'query_row_column_ratio',
        'query_max_mean', 'query_max_outlier_percentage', 'query_max_skewness',

@@ -7,4 +7,4 @@ The tasks we tackle are:
 
 2 - Which features do we actually need? (see feature_selection.py)
 
-3 - How should we use the classification results for ranking?
+3 - How should we use the classification results for ranking? (see ranking_prototype.py)
