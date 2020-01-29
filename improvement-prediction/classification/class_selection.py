@@ -9,6 +9,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import f1_score, classification_report
 from sklearn.utils import shuffle
 
+ALPHA_GRID = [0.1 * x for x in range(10)]
+
 def downsample_data(dataset):
   """This function downsamples the number of instances of a class that is over-represented in the dataset.
   It's important to keep the learning 'fair'
@@ -35,7 +37,6 @@ def determine_classes_based_on_gain_in_r2_score(dataset, alpha, downsample=True)
     return downsample_data(dataset)
   return dataset
 
-ALPHA_GRID = [0.1 * x for x in range(10)]
 if __name__ == '__main__':
 
   training_filename = sys.argv[1]

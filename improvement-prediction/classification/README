@@ -3,8 +3,8 @@ When it's mature enough, the goal is to merge it with the main code, replacing i
 
 The tasks we tackle are:
 
-1 - How should we separate the classes?
+1 - How should we separate the classes? (see class_selection.py)
 
-2 - Which features do we actually need?
+2 - Which features do we actually need? (see feature_selection.py)
 
 3 - How should we use the classification results for ranking?
