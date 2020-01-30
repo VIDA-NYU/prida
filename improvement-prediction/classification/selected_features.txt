@@ -1,0 +1,1 @@
+['query_num_of_columns', 'query_row_column_ratio', 'query_max_mean', 'query_max_skewness', 'query_max_kurtosis', 'query_max_unique', 'query_target_max_pearson', 'query_target_max_spearman', 'query_target_max_covariance', 'candidate_target_max_pearson', 'candidate_target_max_spearman', 'candidate_target_max_covariance', 'candidate_target_max_mutual_info', 'max_pearson_difference']
