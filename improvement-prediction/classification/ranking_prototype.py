@@ -11,6 +11,8 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.utils import shuffle
 from sklearn.metrics import f1_score, classification_report
+from scipy.stats import pearsonr
+import numpy as np
 
 TARGET_COLUMN = 'gain_in_r2_score'
 POSITIVE_CLASS = 'good_gain'
@@ -69,16 +71,68 @@ def parse_rows(dataset_with_predictions):
         key = row['query'] + row['target']
         candidates_per_query_target[key][row['candidate']] = {TARGET_COLUMN: row[TARGET_COLUMN], 'class': row['class'], 'pred': row['pred'], 'pred_prob': row['prob_positive_class']}
     return candidates_per_query_target
-        
-def analyze_predictions(test_with_preds):
+
+def compute_correlation_prob_class_target(candidates_per_query_target):
+    """This function computes the overall correlation between the probability of being in 
+    the positive class and the value of the target column
+    """
+    probs_per_query_target = []
+    gains_per_query_target = []
+    for key in candidates_per_query_target.keys():
+        candidates = candidates_per_query_target[key].keys()
+        tmp_probs = [candidates_per_query_target[key][candidate]['pred_prob'] for candidate in candidates]
+        tmp_gains = [candidates_per_query_target[key][candidate][TARGET_COLUMN] for candidate in candidates]
+        probs_per_query_target += tmp_probs
+        gains_per_query_target += tmp_gains
+    return pearsonr(probs_per_query_target, gains_per_query_target)
+
+def compute_precision_per_query_target(candidates_per_query_target, alpha):
+    """This function computes the precision for the positive class for each query-target
+    """
+    precs = []
+    num_candidates = []
+    for key in candidates_per_query_target.keys():
+        candidates = candidates_per_query_target[key].keys()
+        positive_right = 0
+        for candidate in candidates: #TODO what if there are no true positives?
+            if candidates_per_query_target[key][candidate][TARGET_COLUMN] > alpha and candidates_per_query_target[key][candidate]['class'] == POSITIVE_CLASS:
+                positive_right += 1
+        num_candidates.append(len(candidates))
+        precs.append(positive_right/len(candidates))
+    print('correlation between precision and number of candidates', pearsonr(num_candidates, precs))
+    return precs
+
+def compute_recall_for_top_k_candidates(candidates_per_query_target, alpha, k):
+    """This function computes how many of the top k candidates we efficiently retrieve
+    """
+    top_recall = []
+    num_cands = []
+    for key in candidates_per_query_target.keys():
+        candidates = candidates_per_query_target[key].keys()
+        num_cands.append(len(candidates))
+        gains = []
+        for candidate in candidates:
+            gains.append((candidates_per_query_target[key][candidate][TARGET_COLUMN], candidates_per_query_target[key][candidate]['class']))
+        relevant_gains = [i for i in sorted(gains)[-k:] if i[0] > alpha]
+        positive_right = 0
+        for (gain, class_) in relevant_gains:
+            if class_ == POSITIVE_CLASS:
+                positive_right += 1
+        if len(relevant_gains):
+            top_recall.append(positive_right/k)
+    return top_recall
+        #break
+    
+def analyze_predictions(test_with_preds, alpha):
     """This function separates all candidates for each 
     query-target pair and then analyzes how well the classification worked in 
     each case
     """
     candidates_per_query_target = parse_rows(test_with_preds)
-    print(candidates_per_query_target['dataset-ranking/openml-datasets-single-column-results/files/80f5e205-f72c-4dde-a9dc-7fd17f376af2/query_SensIT-Vehicle-Combined_0.csvclass'])
-    #Analysis 1: do prob_positive_class correlate with the target column?
-    #Analysis 2: are we not classifying candidates with bad gain as candidates with good gain?
+    print('overall corr', compute_correlation_prob_class_target(candidates_per_query_target))
+    print('precision for positive class per query-target', sorted(compute_precision_per_query_target(candidates_per_query_target, alpha)))
+    print('are we missing really good candidates?', np.mean(compute_recall_for_top_k_candidates(candidates_per_query_target, alpha, 5)))
+    
     #Analysis 3: are candidates with really high gain often predicted as such? i.e., are we missing them (low recall right there?)
     
 if __name__ == '__main__':
@@ -88,4 +142,4 @@ if __name__ == '__main__':
     features = eval(open(sys.argv[4]).readline())
 
     test_with_predictions = generate_predictions(pd.read_csv(training_filename), pd.read_csv(test_filename), alpha, features)
-    analyze_predictions(test_with_predictions)
+    analyze_predictions(test_with_predictions, alpha)
