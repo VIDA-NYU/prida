@@ -119,9 +119,8 @@ def compute_recall_for_top_k_candidates(candidates_per_query_target, alpha, k):
             if class_ == POSITIVE_CLASS:
                 positive_right += 1
         if len(relevant_gains):
-            top_recall.append(positive_right/k)
+            top_recall.append(positive_right/min(k, len(relevant_gains)))
     return top_recall
-        #break
     
 def analyze_predictions(test_with_preds, alpha):
     """This function separates all candidates for each 
@@ -129,10 +128,11 @@ def analyze_predictions(test_with_preds, alpha):
     each case
     """
     candidates_per_query_target = parse_rows(test_with_preds)
-    print('overall corr', compute_correlation_prob_class_target(candidates_per_query_target))
-    print('precision for positive class per query-target', sorted(compute_precision_per_query_target(candidates_per_query_target, alpha)))
-    print('are we missing really good candidates?', np.mean(compute_recall_for_top_k_candidates(candidates_per_query_target, alpha, 5)))
-    
+    print('correlation between the probability of being in the positive class and the actual gains', compute_correlation_prob_class_target(candidates_per_query_target))
+    #print('average precision for positive class per query-target', np.mean(compute_precision_per_query_target(candidates_per_query_target, alpha)))
+    print('What is the average recall for the top-5 candidates?', np.mean(compute_recall_for_top_k_candidates(candidates_per_query_target, alpha, 5)))
+    print('What is the average recall for the top-1 candidates?', np.mean(compute_recall_for_top_k_candidates(candidates_per_query_target, alpha, 1)))
+    print('What is the average recall for the top-3 candidates?', np.mean(compute_recall_for_top_k_candidates(candidates_per_query_target, alpha, 3)))
     #Analysis 3: are candidates with really high gain often predicted as such? i.e., are we missing them (low recall right there?)
     
 if __name__ == '__main__':
