@@ -1,4 +1,4 @@
-datetime,n. trips,n. collisions,Amt[PrecipHourly1],Temp[Temp],Visby[Visibility]
+key-for-ranking,n. trips,n. collisions,Amt[PrecipHourly1],Temp[Temp],Visby[Visibility]
 2014-01-01,420810,399,0.0,-1.5156249999999996,16069.75
 2014-01-02,359958,603,0.0,-1.1342105263157891,15365.052631578948
 2014-01-03,275470,423,0.6195121951219513,-8.546511627906975,4990.697674418605
