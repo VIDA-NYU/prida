@@ -33,7 +33,7 @@ def downsample_data(dataset):
   return shuffle(pd.concat(frames), random_state=0)
 
 
-def determine_classes_based_on_gain_in_r2_score(dataset, alpha, downsample=True):
+def determine_classes_based_on_gain_in_r2_score(dataset, alpha, downsample=False):
   """This function determines the class of each row in the dataset based on the value 
   of TARGET_COLUMN
   """
@@ -107,6 +107,7 @@ def compute_recall_for_top_k_candidates(candidates_per_query_target, alpha, k):
     """
     top_recall = []
     num_cands = []
+    keys_with_at_least_k_relevant_gains = 0
     for key in candidates_per_query_target.keys():
         candidates = candidates_per_query_target[key].keys()
         num_cands.append(len(candidates))
@@ -114,12 +115,17 @@ def compute_recall_for_top_k_candidates(candidates_per_query_target, alpha, k):
         for candidate in candidates:
             gains.append((candidates_per_query_target[key][candidate][TARGET_COLUMN], candidates_per_query_target[key][candidate]['class']))
         relevant_gains = [i for i in sorted(gains)[-k:] if i[0] > alpha]
+        print('gains', gains)
+        #print('relevant gains', relevant_gains)
+        #break
         positive_right = 0
         for (gain, class_) in relevant_gains:
             if class_ == POSITIVE_CLASS:
                 positive_right += 1
-        if len(relevant_gains):
+        if len(relevant_gains) >= k:
             top_recall.append(positive_right/min(k, len(relevant_gains)))
+            keys_with_at_least_k_relevant_gains += 1
+    print('this recall was computed taking', keys_with_at_least_k_relevant_gains, 'keys out of', len(candidates_per_query_target.keys()), 'into account')
     return top_recall
     
 def analyze_predictions(test_with_preds, alpha):
@@ -128,7 +134,7 @@ def analyze_predictions(test_with_preds, alpha):
     each case
     """
     candidates_per_query_target = parse_rows(test_with_preds)
-    print('correlation between the probability of being in the positive class and the actual gains', compute_correlation_prob_class_target(candidates_per_query_target))
+    #print('correlation between the probability of being in the positive class and the actual gains', compute_correlation_prob_class_target(candidates_per_query_target))
     #print('average precision for positive class per query-target', np.mean(compute_precision_per_query_target(candidates_per_query_target, alpha)))
     print('What is the average recall for the top-5 candidates?', np.mean(compute_recall_for_top_k_candidates(candidates_per_query_target, alpha, 5)))
     print('What is the average recall for the top-1 candidates?', np.mean(compute_recall_for_top_k_candidates(candidates_per_query_target, alpha, 1)))
