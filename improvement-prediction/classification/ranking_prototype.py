@@ -66,9 +66,9 @@ def parse_rows(dataset_with_predictions):
     """This function extracts different features for combinations of 
     query, target, and candidate
     """
-    candidates_per_query_target = {row['query'] + row['target']: {} for index, row in dataset_with_predictions.iterrows()}
+    candidates_per_query_target = {str(row['query']) + str(row['target']): {} for index, row in dataset_with_predictions.iterrows()}
     for index, row in dataset_with_predictions.iterrows():
-        key = row['query'] + row['target']
+        key = str(row['query']) + str(row['target'])
         candidates_per_query_target[key][row['candidate']] = {TARGET_COLUMN: row[TARGET_COLUMN], 'class': row['class'], 'pred': row['pred'], 'pred_prob': row['prob_positive_class']}
     return candidates_per_query_target
 
@@ -90,16 +90,17 @@ def compute_precision_per_query_target(candidates_per_query_target, alpha):
     """This function computes the precision for the positive class for each query-target
     """
     precs = []
-    num_candidates = []
     for key in candidates_per_query_target.keys():
         candidates = candidates_per_query_target[key].keys()
-        positive_right = 0
-        for candidate in candidates: #TODO what if there are no true positives?
-            if candidates_per_query_target[key][candidate][TARGET_COLUMN] > alpha and candidates_per_query_target[key][candidate]['class'] == POSITIVE_CLASS:
-                positive_right += 1
-        num_candidates.append(len(candidates))
-        precs.append(positive_right/len(candidates))
-    print('correlation between precision and number of candidates', pearsonr(num_candidates, precs))
+        predicted_positive = 0
+        real_positive = 0
+        for candidate in candidates:
+            if candidates_per_query_target[key][candidate]['class'] == POSITIVE_CLASS:
+              real_positive += 1
+              if candidates_per_query_target[key][candidate]['pred'] == POSITIVE_CLASS:
+                predicted_positive += 1
+        if real_positive:
+          precs.append(predicted_positive/real_positive)
     return precs
 
 def compute_recall_for_top_k_candidates(candidates_per_query_target, alpha, k):
@@ -113,19 +114,17 @@ def compute_recall_for_top_k_candidates(candidates_per_query_target, alpha, k):
         num_cands.append(len(candidates))
         gains = []
         for candidate in candidates:
-            gains.append((candidates_per_query_target[key][candidate][TARGET_COLUMN], candidates_per_query_target[key][candidate]['class']))
+            gains.append((candidates_per_query_target[key][candidate][TARGET_COLUMN], candidates_per_query_target[key][candidate]['pred']))
         relevant_gains = [i for i in sorted(gains)[-k:] if i[0] > alpha]
-        print('gains', gains)
-        #print('relevant gains', relevant_gains)
-        #break
         positive_right = 0
         for (gain, class_) in relevant_gains:
             if class_ == POSITIVE_CLASS:
                 positive_right += 1
         if len(relevant_gains) >= k:
-            top_recall.append(positive_right/min(k, len(relevant_gains)))
+            top_recall.append(positive_right/k)
             keys_with_at_least_k_relevant_gains += 1
     print('this recall was computed taking', keys_with_at_least_k_relevant_gains, 'keys out of', len(candidates_per_query_target.keys()), 'into account')
+    print('avg and median num of candidates per query-target pair', np.mean(num_cands), np.median(num_cands))
     return top_recall
     
 def analyze_predictions(test_with_preds, alpha):
@@ -134,12 +133,11 @@ def analyze_predictions(test_with_preds, alpha):
     each case
     """
     candidates_per_query_target = parse_rows(test_with_preds)
-    #print('correlation between the probability of being in the positive class and the actual gains', compute_correlation_prob_class_target(candidates_per_query_target))
-    #print('average precision for positive class per query-target', np.mean(compute_precision_per_query_target(candidates_per_query_target, alpha)))
+    print('correlation between the probability of being in the positive class and the actual gains', compute_correlation_prob_class_target(candidates_per_query_target))
+    print('What is the average precision for positive class per query-target?', np.mean(compute_precision_per_query_target(candidates_per_query_target, alpha)))
     print('What is the average recall for the top-5 candidates?', np.mean(compute_recall_for_top_k_candidates(candidates_per_query_target, alpha, 5)))
     print('What is the average recall for the top-1 candidates?', np.mean(compute_recall_for_top_k_candidates(candidates_per_query_target, alpha, 1)))
     print('What is the average recall for the top-3 candidates?', np.mean(compute_recall_for_top_k_candidates(candidates_per_query_target, alpha, 3)))
-    #Analysis 3: are candidates with really high gain often predicted as such? i.e., are we missing them (low recall right there?)
     
 if __name__ == '__main__':
     training_filename = sys.argv[1]

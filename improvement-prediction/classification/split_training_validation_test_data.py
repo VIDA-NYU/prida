@@ -10,6 +10,7 @@ the threshold that are used to separate classes are modeled as constants.
 import sys
 import pandas as pd
 from sklearn.utils import shuffle
+import os
 
 ALPHA = 0.7
 TARGET = 'gain_in_r2_score'
@@ -24,25 +25,28 @@ def determine_classes_based_on_gain_in_r2_score(dataset):
   return dataset
 
 def split_data(data, training_fraction, validation_fraction):
-    
-    keys = list(set([(row['query'], row['target']) for i, row in data.iterrows()])) 
-    num_keys_training = int(training_fraction * len(keys)) 
-    num_keys_validation = int(validation_fraction * len(keys)) 
-    training_read = 0 
-    validation_read = 0 
-    training_rows = pd.DataFrame(columns=data.columns) 
-    validation_rows = pd.DataFrame(columns=data.columns) 
-    test_rows = pd.DataFrame(columns=data.columns) 
-    for k in keys: 
-        if training_read < num_keys_training: 
-            training_rows = training_rows.append(data.loc[(data['query'] == k[0]) & (data['target'] == k[1])]) 
-            training_read += 1 
-        elif validation_read < num_keys_validation: 
-            validation_rows = validation_rows.append(data.loc[(data['query'] == k[0]) & (data['target'] == k[1])]) 
-            validation_read += 1 
-        else: 
-            test_rows = test_rows.append(data.loc[(data['query'] == k[0]) & (data['target'] == k[1])]) 
-    return training_rows, validation_rows, test_rows 
+  data['basename'] = [os.path.basename(row['query']) for i, row in data.iterrows()]
+  keys = list(set([(row['basename'], row['target']) for i, row in data.iterrows()])) 
+  num_keys_training = int(training_fraction * len(keys)) 
+  num_keys_validation = int(validation_fraction * len(keys)) 
+  training_read = 0 
+  validation_read = 0 
+  training_rows = pd.DataFrame(columns=data.columns) 
+  validation_rows = pd.DataFrame(columns=data.columns) 
+  test_rows = pd.DataFrame(columns=data.columns) 
+  for k in keys: 
+    if training_read < num_keys_training: 
+      training_rows = training_rows.append(data.loc[(data['basename'] == k[0]) & (data['target'] == k[1])]) 
+      training_read += 1 
+    elif validation_read < num_keys_validation: 
+      validation_rows = validation_rows.append(data.loc[(data['basename'] == k[0]) & (data['target'] == k[1])]) 
+      validation_read += 1 
+    else: 
+      test_rows = test_rows.append(data.loc[(data['basename'] == k[0]) & (data['target'] == k[1])])
+  training_rows = training_rows.drop(columns='basename')
+  validation_rows = validation_rows.drop(columns='basename')
+  test_rows = test_rows.drop(columns='basename')
+  return training_rows, validation_rows, test_rows 
 
 if __name__ == '__main__':
     data = pd.read_csv(sys.argv[1])
