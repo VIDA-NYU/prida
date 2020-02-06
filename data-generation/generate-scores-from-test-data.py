@@ -5,7 +5,7 @@ import math
 import numpy as np
 import os
 import pandas as pd
-from pyspark import SparkConf, SparkContext, StorageLevel
+from pyspark import SparkConf, SparkContext, SparkFiles, StorageLevel
 import random
 import re
 import shutil
@@ -97,6 +97,9 @@ def generate_candidate_datasets_negative_examples(query_dataset, target_variable
 
     # print('[INFO] Creating negative examples with dataset %s ...' % query_dataset)
 
+    # accumulator
+    global new_combinations_counter
+
     new_candidate_datasets = list()
 
     # params
@@ -120,6 +123,8 @@ def generate_candidate_datasets_negative_examples(query_dataset, target_variable
     query_data_str = read_file(query_dataset, hdfs_client, cluster_execution)
     query_data = pd.read_csv(StringIO(query_data_str))
     query_data_key_column = list(query_data['key-for-ranking'])
+
+    new_combinations_counter += len(candidate_datasets)
 
     id_ = 0
     for i in range(len(candidate_datasets)):
@@ -395,7 +400,7 @@ if __name__ == '__main__':
 
     # counters
     existing_combinations_counter = 0
-    new_combinations_counter = 0
+    new_combinations_counter = sc.accumulator(0)
 
     # parameters
     params = json.load(open(".params.json"))
@@ -412,46 +417,39 @@ if __name__ == '__main__':
 
     create_dir(files_dir, hdfs_client, cluster_execution)
 
-    # data structures to create combinations
-    all_candidates = set()
-    query_to_candidate = dict()
-
     # reading test data
     #   assuming filename is 'test-data.csv'
     if not os.path.exists("test-data.csv"):
         print("Test data does not exist: test-data.csv")
         sys.exit(0)
-    test_data = open("test-data.csv")
-    line = test_data.readline()  # skipping header
-    line = test_data.readline()
-    while line != '':
-        elems = line.split(",")
-        query_data_target = ",".join(elems[:2])
-        candidate_data = elems[2]
-        all_candidates.add(candidate_data)
-        if not query_data_target in query_to_candidate:
-            query_to_candidate[query_data_target] = set()
-        query_to_candidate[query_data_target].add(candidate_data)
-        existing_combinations_counter += 1
-        line = test_data.readline()
-    test_data.close()
 
-    # creating new combinations
-    new_combinations = list()
-    for query_data_target in query_to_candidate:
-        query_data, target = query_data_target.split(",")
-        new_candidates = all_candidates.difference(query_to_candidate[query_data_target])
-        new_combinations_counter += len(new_candidates)
-        new_combinations.append((query_data, target, list(new_candidates)))
+    test_data = sc.textFile("file://" + SparkFiles.get("test-data.csv")).map(
+        lambda x: x.split(',')
+    ).map(
+        lambda x: (x[0], x[1], x[2])
+    ).persist(StorageLevel.MEMORY_AND_DISK)
 
-    query_candidate_pairs = sc.parallelize(new_combinations)
-    if cluster_execution:
-            query_candidate_pairs = query_candidate_pairs.repartition(600)
+    existing_combinations_counter = test_data.count()
 
-    if not query_candidate_pairs.isEmpty():
+    new_combinations = test_data.cartesian(test_data).filter(
+        # filtering same query candidate
+        lambda x: x[0][0] != x[1][0]
+    ).map(
+        # key => (query dataset, target variable)
+        # val => [candidate dataset]
+        lambda x: ((x[0][0], x[0][1]), [x[1][2]])
+    ).reduceByKey(
+        # concatenating lists of candidate datasets
+        lambda x, y: x + y
+    ).map(
+        # (query dataset, target variable, list of candidate datasets)
+        lambda x: (x[0][0], x[0][1], x[1])
+    ).persist(StorageLevel.MEMORY_AND_DISK)
+
+    if not new_combinations.isEmpty():
 
         # getting performance scores
-        performance_scores = query_candidate_pairs.map(
+        performance_scores = new_combinations.map(
             lambda x: generate_candidate_datasets_negative_examples(x[0], x[1], x[2], params)
         ).flatMap(
             lambda x: generate_performance_scores(x[0], x[1], x[2], params)
@@ -488,4 +486,4 @@ if __name__ == '__main__':
     print('    . max_percentage_noise: %d' % params['max_percentage_noise'])
 
     print(' -- N. existing combinations: %d' %existing_combinations_counter)
-    print(' -- N. new combinations: %d' %new_combinations_counter)
+    print(' -- N. new combinations: %d' %new_combinations_counter.value)
