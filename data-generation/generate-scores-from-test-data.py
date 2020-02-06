@@ -18,6 +18,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import sys
 import time
+import uuid
 from xgboost import XGBRegressor
 
 # regex to take care of XGBoost ValueError
@@ -40,6 +41,41 @@ def read_file(file_path, hdfs_client=None, use_hdfs=False):
     return output
 
 
+def create_dir(file_path, hdfs_client=None, use_hdfs=False):
+    """Creates a new directory specified by file_path.
+    Returns True on success.
+    """
+
+    if use_hdfs:
+        if hdfs_client.status(file_path, strict=False):
+            print('[WARNING] Directory already exists: %s' % file_path)
+            hdfs_client.delete(file_path, recursive=True, skip_trash=True)
+        hdfs_client.makedirs(file_path)
+    else:
+        if os.path.exists(file_path):
+            print('[WARNING] Directory already exists: %s' % file_path)
+            shutil.rmtree(file_path)
+        os.makedirs(file_path)
+    return True
+
+
+def save_file(file_path, content, hdfs_client=None, use_hdfs=False):
+    """Opens a file for write and returns its corresponding file object.
+    """
+
+    if use_hdfs:
+        if hdfs_client.status(file_path, strict=False):
+            print('[WARNING] File already exists: %s' % file_path)
+        with hdfs_client.write(file_path) as writer:
+            writer.write(content.encode())
+    else:
+        if os.path.exists(file_path):
+            print('[WARNING] File already exists: %s' % file_path)
+        with open(file_path, 'w') as writer:
+            writer.write(content)
+    # print('[INFO] File %s saved!' % file_path)
+
+
 def delete_dir(file_path, hdfs_client=None, use_hdfs=False):
     """Deletes a directory.
     """
@@ -51,6 +87,98 @@ def delete_dir(file_path, hdfs_client=None, use_hdfs=False):
         if os.path.exists(file_path):
             shutil.rmtree(file_path)
     # print('[INFO] File %s saved!' % file_path)
+
+
+def generate_candidate_datasets_negative_examples(query_dataset, target_variable, candidate_datasets, params):
+    """Generates candidate datasets for negative examples.
+    This is necessary because query and candidate datasets must match for the join;
+    therefore, we need to re-create the key column.
+    """
+
+    # print('[INFO] Creating negative examples with dataset %s ...' % query_dataset)
+
+    new_candidate_datasets = list()
+
+    # params
+    output_dir = params['new_datasets_directory']
+    files_dir = os.path.join(output_dir, 'files-test-data')
+    cluster_execution = params['cluster']
+    hdfs_address = params['hdfs_address']
+    hdfs_user = params['hdfs_user']
+
+    # HDFS Client
+    hdfs_client = None
+    if cluster_execution:
+        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
+
+    # information for saving datasets
+    identifier = str(uuid.uuid4())
+    identifier_dir = os.path.join(files_dir, identifier)
+    create_dir(identifier_dir, hdfs_client, cluster_execution)
+
+    # reading query dataset
+    query_data_str = read_file(query_dataset, hdfs_client, cluster_execution)
+    query_data = pd.read_csv(StringIO(query_data_str))
+    query_data_key_column = list(query_data['key-for-ranking'])
+
+    id_ = 0
+    for i in range(len(candidate_datasets)):
+
+        candidate_dataset = candidate_datasets[i]
+
+        # reading candidate dataset
+        candidate_data_str = read_file(candidate_dataset, hdfs_client, cluster_execution)
+        candidate_data = pd.read_csv(StringIO(candidate_data_str))
+        candidate_data.drop(columns=['key-for-ranking'], inplace=True)
+
+        # generating extra key column entries, if necessary
+        extra_key_column = list()
+        if query_data.shape[0] < candidate_data.shape[0]:
+            extra_key_column = [
+                str(uuid.uuid4()) for _ in range(candidate_data.shape[0] - query_data.shape[0])
+            ]
+
+        # adding the key column to the candidate data
+        min_size = min(query_data.shape[0], candidate_data.shape[0])
+        candidate_data.insert(
+            0,
+            'key-for-ranking',
+            query_data_key_column[:min_size] + extra_key_column
+        )
+
+        # saving candidate dataset
+        dataset_name = "%s_%d.csv" % (os.path.splitext(os.path.basename(candidate_dataset))[0], id_)
+        file_path = os.path.join(identifier_dir, dataset_name)
+        save_file(
+            file_path,
+            candidate_data.to_csv(index=False),
+            hdfs_client,
+            cluster_execution
+        )
+
+        new_candidate_datasets.append(file_path)
+
+        id_ += 1
+
+    # saving query dataset
+    query_dataset_path = os.path.join(identifier_dir, os.path.basename(query_dataset))
+    save_file(
+        query_dataset_path,
+        query_data.to_csv(index=False),
+        hdfs_client,
+        cluster_execution
+    )
+
+    # saving target information
+    save_file(
+        os.path.join(identifier_dir, '.target'),
+        target_variable,
+        hdfs_client,
+        cluster_execution
+    )
+
+    # print('[INFO] Negative examples with dataset %s have been created and saved!' % query_dataset)
+    return (query_dataset_path, target_variable, new_candidate_datasets)
 
 
 def generate_performance_scores(query_dataset, target_variable, candidate_datasets, params):
@@ -271,6 +399,8 @@ if __name__ == '__main__':
 
     # parameters
     params = json.load(open(".params.json"))
+    output_dir = params['new_datasets_directory']
+    files_dir = os.path.join(output_dir, 'files-test-data')
     cluster_execution = params['cluster']
     hdfs_address = params['hdfs_address']
     hdfs_user = params['hdfs_user']
@@ -279,6 +409,8 @@ if __name__ == '__main__':
     hdfs_client = None
     if cluster_execution:
         hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
+
+    create_dir(files_dir, hdfs_client, cluster_execution)
 
     # data structures to create combinations
     all_candidates = set()
@@ -319,7 +451,9 @@ if __name__ == '__main__':
     if not query_candidate_pairs.isEmpty():
 
         # getting performance scores
-        performance_scores = query_candidate_pairs.flatMap(
+        performance_scores = query_candidate_pairs.map(
+            lambda x: generate_candidate_datasets_negative_examples(x[0], x[1], x[2], params)
+        ).flatMap(
             lambda x: generate_performance_scores(x[0], x[1], x[2], params)
         )
 
