@@ -5,7 +5,7 @@ import math
 import numpy as np
 import os
 import pandas as pd
-from pyspark import SparkConf, SparkContext, SparkFiles, StorageLevel
+from pyspark import SparkConf, SparkContext, StorageLevel
 import random
 import re
 import shutil
@@ -202,7 +202,7 @@ def generate_performance_scores(query_dataset, target_variable, candidate_datase
     # HDFS Client
     hdfs_client = None
     if cluster_execution:
-        time.sleep(np.random.randint(1, 120))  # avoid opening multiple sockets at the same time
+        # time.sleep(np.random.randint(1, 120))  # avoid opening multiple sockets at the same time
         hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
 
     # reading query dataset
@@ -423,7 +423,7 @@ if __name__ == '__main__':
         print("Test data does not exist: test-data.csv")
         sys.exit(0)
 
-    test_data = sc.textFile("file://" + SparkFiles.get("test-data.csv")).map(
+    test_data = sc.parallelize(open("test-data.csv").readlines()).map(
         lambda x: x.split(',')
     ).map(
         lambda x: (x[0], x[1], x[2])
