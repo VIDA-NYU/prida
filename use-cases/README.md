@@ -4,9 +4,13 @@
 
 The regression problem uses the number of taxi trips in NYC to predict the number of vehicle collisions in the city. For the augmentation, the weather data significantly improves the model.
 
+## NYC Taxi Demand Problem
+
+The regression problem uses temporal features to predict the number of taxi trips in NYC. For the augmentation, the weather data improves the model performance.
+
 ## Poverty Estimation Problem
 
-The task is to estimate the number of people living in poverty in 2016 across counties in the US. For the augmentation, socioeconomic indicators, such as population change and unemployment rates, help improve the model performance.
+The task is to estimate the number of people living in poverty in 2016 across counties in the US using population estimates. For the augmentation, unemployment rates are used to help improve the model performance.
 
 ## College Debt Problem
 
