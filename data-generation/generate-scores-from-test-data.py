@@ -24,6 +24,9 @@ from xgboost import XGBRegressor
 # regex to take care of XGBoost ValueError
 regex = re.compile(r"\[|\]|<", re.IGNORECASE)
 
+# number of additional candidates per query
+NUMBER_ADDITIONAL_DATASETS = 175
+
 
 def read_file(file_path, hdfs_client=None, use_hdfs=False):
     """Opens a file for read and returns its corresponding content.
@@ -437,7 +440,8 @@ if __name__ == '__main__':
     ).map(
         # key => (query dataset, target variable)
         # val => [candidate dataset]
-        lambda x: ((x[0][0], x[0][1]), [x[1][2]])
+        lambda x: ((x[0][0], x[0][1]), list(
+            np.random.choice(x[1][2], size=NUMBER_ADDITIONAL_DATASETS, replace=False)))
     ).reduceByKey(
         # concatenating lists of candidate datasets
         lambda x, y: x + y
