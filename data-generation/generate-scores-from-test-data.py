@@ -440,14 +440,14 @@ if __name__ == '__main__':
     ).map(
         # key => (query dataset, target variable)
         # val => [candidate dataset]
-        lambda x: ((x[0][0], x[0][1]), list(
-            np.random.choice(x[1][2], size=NUMBER_ADDITIONAL_DATASETS, replace=False)))
+        lambda x: ((x[0][0], x[0][1]), [x[1][2]])
     ).reduceByKey(
         # concatenating lists of candidate datasets
         lambda x, y: x + y
     ).map(
-        # (query dataset, target variable, list of candidate datasets)
-        lambda x: (x[0][0], x[0][1], x[1])
+        # (query dataset, target variable, random candidate datasets)
+        lambda x: (x[0][0], x[0][1], list(
+            np.random.choice(x[1], size=NUMBER_ADDITIONAL_DATASETS, replace=False)))
     ).persist(StorageLevel.MEMORY_AND_DISK)
 
     if not new_combinations.isEmpty():
