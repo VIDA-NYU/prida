@@ -3,12 +3,6 @@ from augmentation_instance import *
 from constants import *
 import os
 
-def get_prefix_of_training_files(filename):
-    """Given a filename in the format of a path, e.g., /home/alibezz/foo, 
-    returns its prefix. In this example, it would be /home/alibezz
-    """
-    return os.path.join(os.path.split(filename)[0], 'files')
-    
 def parse_augmentation_instances(training_data_filename):
     """If spark is not being used, this method reads every line of 
     the training data (training_data_filename) and invokes their 
