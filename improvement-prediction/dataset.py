@@ -9,11 +9,11 @@ class Dataset:
     """This class stores and manages a certain dataset and performs join operations with other given 
     datasets
     """    
-    def initialize_from_filename(self, filename, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+    def initialize_from_filename(self, filename, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None, key=None):
         """Generates a pandas representation of a dataset read from a given filename
         """
         self.filename = filename
-        self.read_dataset(hdfs_client, use_hdfs, hdfs_address, hdfs_user)
+        self.read_dataset(hdfs_client, use_hdfs, hdfs_address, hdfs_user, key)
 
     def initialize_from_data_and_column_names(self, data):
         """Stores a pandas representation of a dataset that is passed in the parameters
@@ -22,13 +22,14 @@ class Dataset:
         self.column_names = self.data.columns
         self.keys = set(self.data.index.values)
         
-    def read_dataset(self, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+    def read_dataset(self, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None, key=None):
         """Reads lines from self.filename, storing in a pandas dataframe
         """
         try:
           self.data = pd.read_csv(StringIO(read_file(self.filename, hdfs_client, use_hdfs, hdfs_address, hdfs_user)))
-          self.keys = set(self.data['key-for-ranking'])
-          self.data = self.data.set_index(keys='key-for-ranking', drop=True)
+          key_name = key if key else 'key-for-ranking'
+          self.keys = set(self.data[key_name])
+          self.data = self.data.set_index(keys=key_name, drop=True)
           self.column_names = self.data.columns
         except pd.errors.EmptyDataError:
           print('PANDAS ERROR FOR FILENAME', self.filename)
@@ -54,7 +55,7 @@ class Dataset:
         passed as a parameter to handle missing values
         """
         
-        join_ = self.data.join(another_dataset.get_data(), how='left', lsuffix='_left')
+        join_ = self.data.join(another_dataset.get_data(), how='left', rsuffix='_r')
         print('names of columns before', self.data.columns, 'and', another_dataset.get_data().columns)
         print('names of columns after', join_.columns)
         # if no missing_value_imputation policy is passed, it is an inner join and the method just drops the missing values (nan's)
@@ -66,6 +67,15 @@ class Dataset:
         new_join_.columns = join_.columns
         new_join_.index = join_.index
         return new_join_
+
+    def handle_missing_values(self, missing_value_imputation):
+        """Applies imputation strategy to handle missing values in the dataset.
+        """
+        fill_NaN = SimpleImputer(missing_values=np.nan, strategy=missing_value_imputation)
+        new_data_ = pd.DataFrame(fill_NaN.fit_transform(self.data))
+        new_data_.columns = self.data.columns
+        new_data_.index = self.data.index
+        self.data = new_data_
 
     def _determine_correct_column_names(self, column_names, possible_suffix):
         """Given column names, this method returns their corresponding actual names, which can either be the column 

@@ -13,10 +13,24 @@ class AugmentationInstance:
         self.instance_values_dict = instance_values
         self.query_filename = self.instance_values_dict['query_filename']
         self.query_dataset = Dataset()
-        self.query_dataset.initialize_from_filename(self.query_filename, hdfs_client, use_hdfs, hdfs_address, hdfs_user)
+        self.query_dataset.initialize_from_filename(
+            self.query_filename,
+            hdfs_client,
+            use_hdfs,
+            hdfs_address,
+            hdfs_user,
+            key=self.instance_values_dict['query_key']
+        )
         self.candidate_filename = self.instance_values_dict['candidate_filename']
         self.candidate_dataset = Dataset()
-        self.candidate_dataset.initialize_from_filename(self.candidate_filename, hdfs_client, use_hdfs, hdfs_address, hdfs_user)
+        self.candidate_dataset.initialize_from_filename(
+            self.candidate_filename,
+            hdfs_client,
+            use_hdfs,
+            hdfs_address,
+            hdfs_user,
+            key=self.instance_values_dict['candidate_key']
+        )
         self.target_name = self.instance_values_dict['target_name']
         self.imputation_strategy = self.instance_values_dict['imputation_strategy']
             
@@ -43,7 +57,20 @@ class AugmentationInstance:
             self.med_ae_after = np.nan
             self.r2_score_before = np.nan
             self.r2_score_after = np.nan
-        self.joined_dataset = self.join_query_and_candidate_datasets()
+
+        if self.instance_values_dict['joined_dataset']:
+            self.joined_dataset = Dataset()
+            self.joined_dataset.initialize_from_filename(
+                self.instance_values_dict['joined_dataset'],
+                hdfs_client,
+                use_hdfs,
+                hdfs_address,
+                hdfs_user,
+                key=self.instance_values_dict['query_key']
+            )
+            self.joined_dataset.handle_missing_values(self.imputation_strategy)
+        else:
+            self.joined_dataset = self.join_query_and_candidate_datasets()
         
     def get_query_dataset(self):
         """Returns the query dataset of the augmentation instance (Dataset class)
@@ -84,19 +111,19 @@ class AugmentationInstance:
         """Returns the query columns from the joined query+candidate dataset
         """
         query_column_names = self.query_dataset.get_column_names()
-        return self.joined_dataset.get_data_columns(query_column_names, '_left')
+        return self.joined_dataset.get_data_columns(query_column_names, '_l')
 
     def get_joined_candidate_data(self):
         """Returns the candidate columns from the joined query+candidate dataset
         """
         candidate_column_names = self.candidate_dataset.get_column_names()
-        return self.joined_dataset.get_data_columns(candidate_column_names, '_right')
+        return self.joined_dataset.get_data_columns(candidate_column_names, '_r')
 
     def get_joined_candidate_data_and_target(self):
         """Returns the candidate columns, and the target column, from the joined query+candidate dataset
         """
         column_names = self.candidate_dataset.get_column_names().tolist() + [self.target_name] 
-        return self.joined_dataset.get_data_columns(column_names, '_right')
+        return self.joined_dataset.get_data_columns(column_names, '_r')
 
     def get_joined_data(self):
         """Returns the joined query+candidate dataset
