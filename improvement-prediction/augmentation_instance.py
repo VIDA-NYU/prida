@@ -36,7 +36,7 @@ class AugmentationInstance:
             
         # if the augmentation instance does not come from the test data, the prediction metrics before and
         # after augmentation are available
-        if len(instance_values.keys()) > NUMBER_OF_FIELDS_IN_TEST_AUGMENTATION_INSTANCE:
+        if 'mae_before' in instance_values:
             self.mae_before = self.instance_values_dict['mae_before']
             self.mae_after = self.instance_values_dict['mae_after']
             self.mse_before = self.instance_values_dict['mse_before']
@@ -48,7 +48,7 @@ class AugmentationInstance:
 
         # if the augmentation instance needs to be composed with a candidate dataset, and the prediction metrics
         # need to be computed with a learning model, such metrics are not present
-        elif len(instance_values.keys()) == NUMBER_OF_FIELDS_IN_TEST_AUGMENTATION_INSTANCE:
+        else:
             self.mae_before = np.nan
             self.mae_after = np.nan
             self.mse_before = np.nan

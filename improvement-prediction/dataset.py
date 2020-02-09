@@ -76,6 +76,7 @@ class Dataset:
         new_data_.columns = self.data.columns
         new_data_.index = self.data.index
         self.data = new_data_
+        self.column_names = self.data.columns
 
     def _determine_correct_column_names(self, column_names, possible_suffix):
         """Given column names, this method returns their corresponding actual names, which can either be the column 
