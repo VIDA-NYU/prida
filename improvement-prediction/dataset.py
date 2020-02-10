@@ -86,7 +86,7 @@ class Dataset:
         for cn in column_names:
             if cn in self.column_names:
                 correct_column_names.append(cn)
-            else:
+            elif cn + possible_suffix in self.column_names:
                 correct_column_names.append(cn + possible_suffix)
         return correct_column_names
 
