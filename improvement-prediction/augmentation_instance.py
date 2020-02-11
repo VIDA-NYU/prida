@@ -68,9 +68,11 @@ class AugmentationInstance:
                 hdfs_user,
                 key=self.instance_values_dict['query_key']
             )
+            self.containment_score = self.get_key_ratio_between_query_and_candidate_datasets(use_join=True)
             self.joined_dataset.handle_missing_values(self.imputation_strategy)
         else:
             self.joined_dataset = self.join_query_and_candidate_datasets()
+            self.containment_score = self.get_key_ratio_between_query_and_candidate_datasets()
         
     def get_query_dataset(self):
         """Returns the query dataset of the augmentation instance (Dataset class)
@@ -137,10 +139,15 @@ class AugmentationInstance:
         return self.target_name
 
     # TODO maybe move method below back to feature factory
-    def get_key_ratio_between_query_and_candidate_datasets(self):
+    def get_key_ratio_between_query_and_candidate_datasets(self, use_join=False):
         """Computes the ratio between the keys that are common for both query and candidate 
         datasets over all keys in the query dataset
         """
+        if use_join:
+            common_columns = list(set(self.joined_dataset.get_data().columns).intersection(set(self.candidate_dataset.get_data().columns)))
+            query_size = self.joined_dataset.get_data().shape[0]
+            intersection_size = self.joined_dataset.get_data()[self.joined_dataset.get_data()[common_columns].notna().any(1)].shape[0]
+            return intersection_size/query_size
         query_data_keys = self.query_dataset.get_keys()
         candidate_data_keys = self.candidate_dataset.get_keys()
         intersection_size = len(query_data_keys & candidate_data_keys)
@@ -200,7 +207,8 @@ class AugmentationInstance:
         pearson_difference_wrt_target = feature_factory_candidate_with_target.compute_difference_in_pearsons_wrt_target(feature_factory_query.get_max_pearson_wrt_target(self.target_name), self.target_name)
 
         # computing (4)
-        key_ratio = self.get_key_ratio_between_query_and_candidate_datasets()
+        # key_ratio = self.get_key_ratio_between_query_and_candidate_datasets()
+        key_ratio = self.containment_score
         
         return query_features_with_target + candidate_features_with_target + [pearson_difference_wrt_target] + [key_ratio]
         
