@@ -257,7 +257,7 @@ class FeatureFactory:
         and the target column, and the maximum pearson correlation (in modulus) between the numerical columns of 
         another dataset and the same target column, this method returns their difference 
         """
-        return self.get_max_pearson_wrt_target(target_name) - max_in_modulus_pearson
+        return np.fabs(self.get_max_pearson_wrt_target(target_name) - max_in_modulus_pearson)
 
     def get_spearman_correlations_with_target(self, target_name):
         """For every numerical column of the dataset, this method computes its spearman correlation 
