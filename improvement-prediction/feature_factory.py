@@ -7,7 +7,7 @@ from constants import *
 from util.misc import *
 
 def max_in_modulus(values):
-    return max(values, key=abs)
+    return np.fabs(max(values, key=abs))
     
 # reference document: https://arxiv.org/pdf/1810.03548.pdf
 class FeatureFactory:

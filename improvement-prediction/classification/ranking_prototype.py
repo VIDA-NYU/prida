@@ -57,7 +57,7 @@ def generate_predictions(training, test, alpha, features):
   X_test = test[features]
   y_test = test['class']
 
-  clf = RandomForestClassifier(random_state=42)
+  clf = RandomForestClassifier(random_state=20)
   clf.fit(X_train, y_train)  
   test['pred'] = clf.predict(X_test)
   print(classification_report(y_test, test['pred']))
@@ -153,7 +153,7 @@ def build_regressor_for_ranking_positive_class(dataset, alpha, features, regress
   positive_examples = dataset.loc[dataset[TARGET_COLUMN] > alpha]
   X = positive_examples[features]
   y = positive_examples[regression_target]
-  regressor = RandomForestRegressor(random_state=42)
+  regressor = RandomForestRegressor(random_state=20)
   regressor.fit(X, y)
   return regressor
 
@@ -278,7 +278,8 @@ if __name__ == '__main__':
   training_data = pd.read_csv(training_filename)
   test_data = pd.read_csv(test_filename)
   test_with_predictions = generate_predictions(training_data, test_data, alpha, features)
+  analyze_predictions(test_with_predictions, alpha)
   regressor = build_regressor_for_ranking_positive_class(training_data, alpha, features)
   rank_candidates_classified_as_positive(test_with_predictions, regressor, features)
   
-  #analyze_predictions(test_with_predictions, alpha)
+  

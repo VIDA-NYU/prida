@@ -23,7 +23,7 @@ def predict_class(alpha, training_filename, test_filename, feature_vector=FEATUR
     training_data['class'] = ['good_gain' if row[gain_column] > alpha else 'loss' for index, row in training_data.iterrows()]
     X_train = training_data[feature_vector]
     y_train = training_data['class']
-    clf = RandomForestClassifier(random_state=42)
+    clf = RandomForestClassifier(n_estimators=100, random_state=42)
     clf.fit(X_train, y_train)
 
     test_data = pd.read_csv(test_filename)
