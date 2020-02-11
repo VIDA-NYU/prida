@@ -3,12 +3,6 @@ from augmentation_instance import *
 from constants import *
 import os
 
-def get_prefix_of_training_files(filename):
-    """Given a filename in the format of a path, e.g., /home/alibezz/foo, 
-    returns its prefix. In this example, it would be /home/alibezz
-    """
-    return os.path.join(os.path.split(filename)[0], 'files')
-    
 def parse_augmentation_instances(training_data_filename):
     """If spark is not being used, this method reads every line of 
     the training data (training_data_filename) and invokes their 
@@ -23,9 +17,12 @@ def parse_augmentation_instances(training_data_filename):
 def parse_augmentation_instance(prefix, file_record, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """Parses file_record, a JSON instance of the training data in the format
     {'query_dataset': query_dataset,
+     'query_key': query_key
      'target': target,
      'candidate_dataset': candidate_dataset,
+     'candidate_key': candidate_key,
      'imputation_strategy': imputation_strategy,
+     'joined_dataset': joined_dataset,
      'mean_absolute_error': [mae_before, mae_after],
      'mean_squared_error': [mse_before, mse_after],
      'median_absolute_error': [med_ae_before, med_ae_after],
@@ -36,15 +33,21 @@ def parse_augmentation_instance(prefix, file_record, hdfs_client=None, use_hdfs=
     #TODO standardize the use of words dataset and filename
     
     fields = {'query_filename': os.path.join(prefix, file_record['query_dataset']),
+              'query_key': file_record.get('query_key', None), 
               'target_name': file_record['target'],
               'candidate_filename': os.path.join(prefix, file_record['candidate_dataset']),
+              'candidate_key': file_record.get('candidate_key', None),
               'imputation_strategy': file_record['imputation_strategy'], 
-              'mae_before': file_record['mean_absolute_error'][0],
-              'mae_after': file_record['mean_absolute_error'][1],
-              'mse_before': file_record['mean_squared_error'][0],
-              'mse_after': file_record['mean_squared_error'][1],
-              'med_ae_before': file_record['median_absolute_error'][0],
-              'med_ae_after': file_record['median_absolute_error'][1],
-              'r2_score_before': file_record['r2_score'][0],
-              'r2_score_after': file_record['r2_score'][1]}
+              'joined_dataset': None}
+    if 'joined_dataset' in file_record:
+        fields['joined_dataset'] = os.path.join(prefix, file_record['joined_dataset'])
+    if 'mean_absolute_error' in file_record:
+        fields['mae_before'] = file_record['mean_absolute_error'][0]
+        fields['mae_after'] = file_record['mean_absolute_error'][1]
+        fields['mse_before'] = file_record['mean_squared_error'][0]
+        fields['mse_after'] = file_record['mean_squared_error'][1]
+        fields['med_ae_before'] = file_record['median_absolute_error'][0]
+        fields['med_ae_after'] = file_record['median_absolute_error'][1]
+        fields['r2_score_before'] = file_record['r2_score'][0]
+        fields['r2_score_after'] = file_record['r2_score'][1]
     return AugmentationInstance(fields, hdfs_client, use_hdfs, hdfs_address, hdfs_user)

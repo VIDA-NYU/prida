@@ -53,6 +53,7 @@ if __name__ == '__main__':
     # parameters
     params = json.load(open('.params_feature_generation.json'))
     learning_data_filename = params['learning_data_filename']
+    file_dir = params['file_dir']
     augmentation_learning_data_filename = params['augmentation_learning_data_filename']
     cluster_execution = params['cluster']
     hdfs_address = params['hdfs_address']
@@ -71,7 +72,7 @@ if __name__ == '__main__':
 
     # generating learning instances
     learning_instances = learning_data.flatMap(
-        lambda x: generate_learning_instance(get_prefix_of_training_files(learning_data_filename), json.loads(x), params)
+        lambda x: generate_learning_instance(file_dir, json.loads(x), params)
     ).map(
         lambda x: ','.join([str(item) for item in x])
     )

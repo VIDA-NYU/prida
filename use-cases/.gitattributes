@@ -1,3 +1,4 @@
 data/training-for-model.csv filter=lfs diff=lfs merge=lfs -text
 data/ny-taxi-demand/join.csv filter=lfs diff=lfs merge=lfs -text
 data/ny-taxi-demand/yellow-taxi-2017-v2.csv filter=lfs diff=lfs merge=lfs -text
+datamart-data/index.tar.gz filter=lfs diff=lfs merge=lfs -text
