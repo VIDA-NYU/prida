@@ -57,8 +57,8 @@ def generate_predictions(training, test, alpha, features):
   X_test = test[features]
   y_test = test['class']
 
-  clf = RandomForestClassifier(random_state=20)
-  clf.fit(X_train, y_train)  
+  clf = RandomForestClassifier(random_state=42, n_estimators=100)
+  clf.fit(X_train, y_train)
   test['pred'] = clf.predict(X_test)
   print(classification_report(y_test, test['pred']))
   test['prob_positive_class'] = [i[0] for i in clf.predict_proba(X_test)]
