@@ -185,6 +185,14 @@ class AugmentationInstance:
             return compute_r2_gain(self.r2_score_before, self.r2_score_after)
         return np.nan
 
+    def get_before_and_after_r2_scores(self):
+        """Returns r2_score_before and r2_score_after
+        if they are defined
+        """
+        if self.r2_score_before and self.r2_score_after:
+            return self.r2_score_before, self.r2_score_after
+        return np.nan, np.nan
+    
     def compute_pairwise_features(self):
         """Given the joined query+candidate dataset, this method computes pairwise features considering:
         (1) - the joined query+candidate dataset, considering just the candidate columns and the target
