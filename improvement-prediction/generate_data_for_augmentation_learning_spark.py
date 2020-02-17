@@ -33,13 +33,13 @@ def generate_learning_instance(prefix, learning_data_record, params):
     target_mse_decrease = augmentation_instance.compute_decrease_in_mean_squared_error()
     target_med_ae_decrease = augmentation_instance.compute_decrease_in_median_absolute_error()
     target_r2_gain = augmentation_instance.compute_gain_in_r2_score()
-    r2_scores_before_after = augmentation_instance.get_before_and_after_r2_scores()
+    r2_score_before, r2_score_after = augmentation_instance.get_before_and_after_r2_scores()
     # query and candidate information
     query_dataset = augmentation_instance.get_query_filename()
     candidate_dataset = augmentation_instance.get_candidate_filename()
     target = augmentation_instance.get_target_name()
 
-    return [[query_dataset, target, candidate_dataset] + list(features) + [target_mae_decrease, target_mse_decrease, target_med_ae_decrease, target_r2_gain, r2_scores_before_after]]
+    return [[query_dataset, target, candidate_dataset] + list(features) + [target_mae_decrease, target_mse_decrease, target_med_ae_decrease, target_r2_gain, r2_score_before, r2_score_after]]
 
 
 if __name__ == '__main__':
