@@ -1,6 +1,5 @@
 """ Given (1) two files (one with training and one with test data; both with headers), 
-          (2) a threshold alpha above which a gain in R2 squared should correspond to class GOOD GAIN, and 
-          (3) a file with the features that should be used for learning, 
+          (2) a file with the features that should be used for learning
 
           this script explores different ways of combining classification results with other sources of info 
           in order to recommend useful datasets for augmentation. 
@@ -20,6 +19,7 @@ TARGET_COLUMN = 'gain_in_r2_score'
 POSITIVE_CLASS = 'good_gain'
 NEGATIVE_CLASS = 'loss'
 KEY_SEPARATOR = '*'
+ALPHA = 0
 
 def downsample_data(dataset):
   """This function downsamples the number of instances of a class that is over-represented in the dataset.
@@ -35,23 +35,23 @@ def downsample_data(dataset):
   frames = [negative, positive]
   return shuffle(pd.concat(frames), random_state=0)
 
-def determine_classes_based_on_gain_in_r2_score(dataset, alpha, downsample=False):
+def determine_classes_based_on_gain_in_r2_score(dataset, downsample=False):
   """This function determines the class of each row in the dataset based on the value 
   of TARGET_COLUMN
   """
   gains = dataset[TARGET_COLUMN]
-  classes = [POSITIVE_CLASS if i > alpha else NEGATIVE_CLASS for i in gains]
+  classes = [POSITIVE_CLASS if i > ALPHA else NEGATIVE_CLASS for i in gains]
   dataset['class'] = classes
   if downsample:
     return downsample_data(dataset)
   return dataset
 
-def generate_predictions(training, test, alpha, features):
+def generate_predictions(training, test, features):
   """This function creates a random forest classifier and generates 
   predictions for the test data
   """
-  training = determine_classes_based_on_gain_in_r2_score(training, alpha)
-  test = determine_classes_based_on_gain_in_r2_score(test, alpha)
+  training = determine_classes_based_on_gain_in_r2_score(training)
+  test = determine_classes_based_on_gain_in_r2_score(test)
   X_train = training[features]
   y_train = training['class']
   X_test = test[features]
@@ -88,7 +88,7 @@ def compute_correlation_prob_class_target(candidates_per_query_target):
     gains_per_query_target += tmp_gains
   return pearsonr(probs_per_query_target, gains_per_query_target)
 
-def compute_precision_per_query_target(candidates_per_query_target, alpha):
+def compute_precision_per_query_target(candidates_per_query_target):
   """This function computes the precision for the positive class for each query-target
   """
   precs = []
@@ -105,7 +105,7 @@ def compute_precision_per_query_target(candidates_per_query_target, alpha):
       precs.append(predicted_positive/real_positive)
   return precs
 
-def compute_recall_for_top_k_candidates(candidates_per_query_target, alpha, k):
+def compute_recall_for_top_k_candidates(candidates_per_query_target, k):
   """This function computes how many of the top k candidates we efficiently retrieve
   """
   top_recall = []
@@ -117,7 +117,7 @@ def compute_recall_for_top_k_candidates(candidates_per_query_target, alpha, k):
     gains = []
     for candidate in candidates:
       gains.append((candidates_per_query_target[key][candidate][TARGET_COLUMN], candidates_per_query_target[key][candidate]['pred']))
-    relevant_gains = [i for i in sorted(gains)[-k:] if i[0] > alpha]
+    relevant_gains = [i for i in sorted(gains)[-k:] if i[0] > ALPHA]
     positive_right = 0
     for (gain, class_) in relevant_gains:
       if class_ == POSITIVE_CLASS:
@@ -129,20 +129,20 @@ def compute_recall_for_top_k_candidates(candidates_per_query_target, alpha, k):
   print('avg and median num of candidates per query-target pair', np.mean(num_cands), np.median(num_cands))
   return top_recall
     
-def analyze_predictions(test_with_preds, alpha):
+def analyze_predictions(test_with_preds):
   """This function separates all candidates for each 
   query-target pair and then analyzes how well the classification worked in 
   each case
   """
   candidates_per_query_target = parse_rows(test_with_preds)
   print('correlation between the probability of being in the positive class and the actual gains', compute_correlation_prob_class_target(candidates_per_query_target))
-  print('What is the average precision for positive class per query-target?', np.mean(compute_precision_per_query_target(candidates_per_query_target, alpha)))
-  print('What is the average recall for the top-5 candidates?', np.mean(compute_recall_for_top_k_candidates(candidates_per_query_target, alpha, 5)))
-  print('What is the average recall for the top-1 candidates?', np.mean(compute_recall_for_top_k_candidates(candidates_per_query_target, alpha, 1)))
-  print('What is the average recall for the top-3 candidates?', np.mean(compute_recall_for_top_k_candidates(candidates_per_query_target, alpha, 3)))
+  print('What is the average precision for positive class per query-target?', np.mean(compute_precision_per_query_target(candidates_per_query_target)))
+  print('What is the average recall for the top-5 candidates?', np.mean(compute_recall_for_top_k_candidates(candidates_per_query_target, 5)))
+  print('What is the average recall for the top-1 candidates?', np.mean(compute_recall_for_top_k_candidates(candidates_per_query_target, 1)))
+  print('What is the average recall for the top-3 candidates?', np.mean(compute_recall_for_top_k_candidates(candidates_per_query_target, 3)))
 
 
-def build_regressor_for_ranking_positive_class(dataset, alpha, features, regression_target=TARGET_COLUMN):
+def build_regressor_for_ranking_positive_class(dataset, features, regression_target=TARGET_COLUMN):
   """This function builds a regressor based exclusively on positive class' 
   examples present in the dataset
   """
@@ -150,7 +150,7 @@ def build_regressor_for_ranking_positive_class(dataset, alpha, features, regress
     print('The target for the regression task cannot be one of the features')
     return
   
-  positive_examples = dataset.loc[dataset[TARGET_COLUMN] > alpha]
+  positive_examples = dataset.loc[dataset[TARGET_COLUMN] > ALPHA]
   X = positive_examples[features]
   y = positive_examples[regression_target]
   regressor = RandomForestRegressor(random_state=20)
@@ -240,12 +240,11 @@ def rank_candidates_classified_as_positive(test_with_preds, regressor, features)
   ndcgs_containment = []
   avg_precs_containment = []
   numbers_of_retrieved_candidates = []
+  number_of_instances = 0
   for key in candidates_per_query_target.keys():
     query, target = key.split(KEY_SEPARATOR)
-    instances = test_with_preds.loc[(test_with_preds['query'] == query) & (test_with_preds['target'] == target) & (test_with_preds['pred'] == POSITIVE_CLASS)]
-    #print('predictions', [(candidate, predicted_gain) for candidate, predicted_gain in zip(instances['candidate'], regressor.predict(instances[features]))])
-    #print('actual gains', instances[['candidate', TARGET_COLUMN]].values.tolist())
-    #TODO compare predicted gains with ALL positive actual gains ('class' == POSITIVE_CLASS instead of 'pred' == POSITIVE_CLASS)
+    instances = test_with_preds.loc[(test_with_preds['query'] == query) & (test_with_preds['target'] == target) & (test_with_preds['class'] == POSITIVE_CLASS)]
+    number_of_instances += instances.shape[0]
     try:
       predicted_gains = [(candidate, predicted_gain) for candidate, predicted_gain in zip(instances['candidate'], regressor.predict(instances[features]))]
       real_gains = instances[['candidate', TARGET_COLUMN]].values.tolist()
@@ -257,29 +256,23 @@ def rank_candidates_classified_as_positive(test_with_preds, regressor, features)
       numbers_of_retrieved_candidates.append(instances.shape[0])
     except ValueError:
       continue
-    #break
+  print('total number of instances', number_of_instances)
   print('average number of candidates per query-target (predicted as positive)', np.mean(numbers_of_retrieved_candidates))
   print('MAP:', np.mean(avg_precs))
   print('NDCGs:', np.mean(ndcgs))
   print('MAP - Containment baseline:', np.mean(avg_precs_containment))
   print('NDCGs - Containment baseline:', np.mean(ndcgs_containment))
   
-    # gains = []
-    # for candidate in candidates:
-    #   gains.append((candidates_per_query_target[key][candidate][TARGET_COLUMN], candidates_per_query_target[key][candidate]['pred']))
-    # relevant_gains = [i for i in sorted(gains)[-k:] if i[0] > alpha]
-  
 if __name__ == '__main__':
   training_filename = sys.argv[1]
   test_filename = sys.argv[2]
-  alpha = float(sys.argv[3])
-  features = eval(open(sys.argv[4]).readline())
+  features = eval(open(sys.argv[3]).readline())
   
   training_data = pd.read_csv(training_filename)
   test_data = pd.read_csv(test_filename)
-  test_with_predictions = generate_predictions(training_data, test_data, alpha, features)
-  analyze_predictions(test_with_predictions, alpha)
-  regressor = build_regressor_for_ranking_positive_class(training_data, alpha, features)
+  test_with_predictions = generate_predictions(training_data, test_data, features)
+  #analyze_predictions(test_with_predictions)
+  regressor = build_regressor_for_ranking_positive_class(training_data, features)
   rank_candidates_classified_as_positive(test_with_predictions, regressor, features)
   
   

@@ -104,9 +104,11 @@ def rank_candidates_per_query(test_with_estimates, target_column_name):
   ndcgs_containment = []
   avg_precs_containment = []
   numbers_of_retrieved_candidates = []
+  number_of_instances = 0
   for key in candidates_per_query_target.keys():
     query, target = key.split(KEY_SEPARATOR)
-    instances = test_with_estimates.loc[(test_with_estimates['query'] == query) & (test_with_estimates['target'] == target)]
+    instances = test_with_estimates.loc[(test_with_estimates['query'] == query) & (test_with_estimates['target'] == target) & (test_with_estimates[target_column_name] > 0)]
+    number_of_instances += instances.shape[0]  
     try:
       estimated_gains = instances[['candidate', 'estimate']].values.tolist()
       real_gains = instances[['candidate', target_column_name]].values.tolist()
@@ -118,7 +120,7 @@ def rank_candidates_per_query(test_with_estimates, target_column_name):
       numbers_of_retrieved_candidates.append(instances.shape[0])
     except ValueError:
       continue
-    #break
+  print('total number of instances', number_of_instances)
   print('average number of candidates per query-target (predicted as positive)', np.mean(numbers_of_retrieved_candidates))
   print('MAP:', np.mean(avg_precs))
   print('NDCGs:', np.mean(ndcgs))
