@@ -27,7 +27,7 @@ def determine_classes_based_on_gain_in_r2_score(dataset):
   gains = dataset['gain_in_r2_score']
   classes = ['good_gain' if i > 0 else 'loss' for i in gains]
   dataset['classes'] = classes
-
+  return dataset
 
 if __name__ == '__main__':
   
@@ -48,16 +48,17 @@ if __name__ == '__main__':
   y_probs = clf.predict_proba(X_test)
   fscore = -1
   chosen_beta = None
-  for beta in intervals:
+  for beta in INTERVALS:
     tmp_test = []
     tmp_preds = []
     for real, pred, prob in zip(y_test, y_pred, y_probs):
+      #print('prob', prob, 'beta', beta)
       if prob[0] < beta[0] or prob[0] > beta[1]:
         tmp_test.append(real)
         tmp_preds.append(pred)
     tmp_fscore = f1_score(tmp_test, tmp_preds, pos_label='good_gain')
     if tmp_fscore > fscore:
-      fscore = tmp_score
+      fscore = tmp_fscore
       chosen_beta = beta
   print('chose beta', chosen_beta, 'with fscore', fscore)   
     

@@ -33,13 +33,25 @@ def generate_learning_instance(prefix, learning_data_record, params):
     target_mse_decrease = augmentation_instance.compute_decrease_in_mean_squared_error()
     target_med_ae_decrease = augmentation_instance.compute_decrease_in_median_absolute_error()
     target_r2_gain = augmentation_instance.compute_gain_in_r2_score()
-
+    r2_score_before, r2_score_after = augmentation_instance.get_before_and_after_r2_scores()
     # query and candidate information
     query_dataset = augmentation_instance.get_query_filename()
     candidate_dataset = augmentation_instance.get_candidate_filename()
     target = augmentation_instance.get_target_name()
 
-    return [[query_dataset, target, candidate_dataset] + list(features) + [target_mae_decrease, target_mse_decrease, target_med_ae_decrease, target_r2_gain]]
+    return [[query_dataset, target, candidate_dataset] + list(features) + [target_mae_decrease, target_mse_decrease, target_med_ae_decrease, target_r2_gain, r2_score_before, r2_score_after]]
+
+
+def feature_array_to_string(feature_array):
+    """Transforms feature array into a single string.
+    """
+
+    feature_array_str = [str(x) for x in feature_array]
+    feature_array_str[0] = "\"" + feature_array_str[0] + "\""  # query
+    feature_array_str[1] = "\"" + feature_array_str[1] + "\""  # target
+    feature_array_str[2] = "\"" + feature_array_str[2] + "\""  # candidate
+
+    return ','.join(feature_array_str)
 
 
 if __name__ == '__main__':
@@ -74,7 +86,7 @@ if __name__ == '__main__':
     learning_instances = learning_data.flatMap(
         lambda x: generate_learning_instance(file_dir, json.loads(x), params)
     ).map(
-        lambda x: ','.join([str(item) for item in x])
+        lambda x: feature_array_to_string(x)
     )
 
     #learning_instances.saveAsTextFile(augmentation_learning_data_filename)
