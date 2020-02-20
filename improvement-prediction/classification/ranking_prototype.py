@@ -1,5 +1,6 @@
 """ Given (1) two files (one with training and one with test data; both with headers), 
-          (2) a file with the features that should be used for learning
+          (2) a file with the features that should be used for learning, and
+          (3) a compatible regression model, saved with pickle, to be used as a baseline
 
           this script explores different ways of combining classification results with other sources of info 
           in order to recommend useful datasets for augmentation. 
@@ -13,7 +14,7 @@ from sklearn.utils import shuffle
 from sklearn.metrics import f1_score, classification_report
 from scipy.stats import pearsonr, kendalltau
 import numpy as np
-
+import pickle
 
 TARGET_COLUMN = 'gain_in_r2_score'
 POSITIVE_CLASS = 'good_gain'
@@ -157,122 +158,231 @@ def build_regressor_for_ranking_positive_class(dataset, features, regression_tar
   regressor.fit(X, y)
   return regressor
 
-def compute_ndcg_at_k(real_gains, predicted_gains, k=5, use_gains_as_relevance_weights=False):
-    """Given real gains and predicted gains, computes the ndcg between them for the first k positions of 
-    the ranking. The relevance weights can be the real relative gains or numbers indicating their rank 
-    positions
-    """
-    real_ranking = sorted(real_gains, key = lambda x:x[1], reverse=True)[:k]
-    if use_gains_as_relevance_weights:
-        real_relevances = [(tuple[0], tuple[1]) if tuple[1] > 0 else (tuple[0],0.0) for index, tuple in enumerate(real_ranking)]
-        real_relevances = dict(real_relevances)
-    else:
-        real_relevances = {tuple[0]:len(real_ranking)-index for index, tuple in enumerate(real_ranking)}
-    predicted_ranking = sorted(predicted_gains, key = lambda x:x[1], reverse=True)
-    #print('real gains', real_gains, 'predicted gains', predicted_gains)
-    #print('real relevances', real_relevances, 'predicted relevances', predicted_ranking)
-    real_relevances_of_predicted_items = [real_relevances[i[0]] if i[0] in real_relevances else 0 for i in predicted_ranking]
-    #print('real_relevances_of_predicted_items', real_relevances_of_predicted_items)
-    numerator = np.sum(np.asfarray(real_relevances_of_predicted_items)/np.log2(np.arange(2, np.asfarray(real_relevances_of_predicted_items).size + 2)))
-    sorted_real_relevances_of_predicted_items = sorted(real_relevances_of_predicted_items, reverse=True)
-    denominator = np.sum(np.asfarray(sorted_real_relevances_of_predicted_items)/np.log2(np.arange(2, np.asfarray(sorted_real_relevances_of_predicted_items).size + 2)))
-    return numerator/denominator 
+def compute_r_precision(real_gains, predicted_gains, k=5, positive_only=True):
+  """This function computes R-precision, which is the ratio between all the relevant documents 
+  retrieved until the rank that equals the number of relevant documents you have in your collection in total (r), 
+  to the total number of relevant documents in your collection R.
+  
+  In this setting, if positive_only == True, relevant documents correspond exclusively to candidates associated to real positive 
+  gains. If there are no relevant documents in this case, this function returns 'nan'. Alternatively, if positive_only == False 
+  we consider that the relevant documents are the k highest ranked candidates in real_gains.
+  """
+  
+  if positive_only:
+    relevant_documents = [elem[0] for elem in sorted(real_gains, key = lambda x:x[1], reverse=True) if elem[1] > 0][:k]
+    #print('real gains in compute_r_precision', real_gains)
+    #print('relevant documents (positive only)', relevant_documents)
+    predicted_ranking = [elem[0] for elem in sorted(predicted_gains, key = lambda x:x[1], reverse=True)][:len(relevant_documents)]
+    if relevant_documents and predicted_ranking:
+      return len(set(relevant_documents) & set(predicted_ranking))/len(relevant_documents)
+    return float('nan')
+  
+  #positive_only == False
+  real_ranking = [elem[0] for elem in sorted(real_gains, key = lambda x:x[1], reverse=True)][:k]
+  predicted_ranking = [elem[0] for elem in sorted(predicted_gains, key = lambda x:x[1], reverse=True)][:k]
+  return len(set(real_ranking) & set(predicted_ranking))/k
 
-def compute_kendall_tau(real_gains, predicted_gains):
-    """Given real gains and predicted gains, computes the kendall-tau distance between them. 
-    The higher the real gain, the higher its position in the ranking
-    """
-    ranked_candidates = [i[0] for i in sorted(real_gains, key = lambda x:x[1], reverse=True)]
-    predicted_candidates = [i[0] for i in sorted(predicted_gains, key = lambda x:x[1], reverse=True)]
-    return kendalltau(ranked_candidates, predicted_candidates)
-
-def compute_mean_reciprocal_rank_for_single_sample(real_gains, predicted_gains):
-    """Given real gains and predicted gains, computes the mean reciprocal rank (MRR) between them.
-    Ideally, this metric should be used over large lists (multiple samples) of real gains and 
-    predicted gains
-    """
-    real_ranking = sorted(real_gains, key = lambda x:x[1], reverse=True)
-    real_best_candidate = real_ranking[0][0]
-    predicted_ranking = sorted(predicted_gains, key = lambda x:x[1], reverse=True)
-    for index, elem in enumerate(predicted_ranking):
-        if real_best_candidate == elem[0]:
-            return 1/(index + 1)
-    return 0
-
-def compute_r_precision(real_gains, predicted_gains, k=5, positive_only=False):
-    """This function computes R-precision, which is the ratio between all the relevant documents 
-    retrieved until the rank that equals the number of relevant documents you have in your collection in total (r), 
-    to the total number of relevant documents in your collection R.
-    
-    In this setting, if positive_only == True, relevant documents correspond exclusively to candidates associated to positive 
-    gains. If there are no relevant documents in this case, this function returns 'nan'. Alternatively, if positive_only == False 
-    we consider that the relevant documents are the k highest ranked candidates in real_gains (it basically turns into precision at k).
-    """
-
-    if positive_only:
-        relevant_documents = [elem[0] for elem in real_gains if elem[1] > 0]
-        predicted_ranking = [elem[0] for elem in sorted(predicted_gains, key = lambda x:x[1], reverse=True)[:len(relevant_documents)]]
-        if not relevant_documents or not predicted_ranking:
-            return float('nan')
-        return len(set(relevant_documents) & set(predicted_ranking))/len(relevant_documents)
-
-    #positive_only == False
-    real_ranking = [elem[0] for elem in sorted(real_gains, key = lambda x:x[1], reverse=True)[:k]]
-    predicted_ranking = [elem[0] for elem in sorted(predicted_gains, key = lambda x:x[1], reverse=True)[:k]]
-    return len(set(real_ranking) & set(predicted_ranking))/k
-
+def compute_r_recall(real_gains, predicted_gains, k=5, positive_only=True):
+  """This function computes 'R-recall' (does it exist officially?), defined as the ratio between all the top-k relevant documents 
+  retrieved until the rank k and the total number of retrieved documents (should be k).
+  
+  In this setting, if positive_only == True, relevant documents correspond exclusively to candidates associated to real positive 
+  gains. If there are no relevant documents in this case, this function returns 'nan'. Alternatively, if positive_only == False 
+  we consider that the relevant documents are the k highest ranked candidates in real_gains.
+  """
+  ranking = [elem[0] for elem in sorted(predicted_gains, key = lambda x:x[1], reverse=True)][:k]
+  if positive_only:
+    top_k_relevant_documents = [elem[0] for elem in sorted(real_gains, key = lambda x:x[1], reverse=True) if elem[1] > 0][:k]
+  else:
+    top_k_relevant_documents = [elem[0] for elem in sorted(real_gains, key = lambda x:x[1], reverse=True)][:k]
+  if top_k_relevant_documents and ranking:
+    return len(set(top_k_relevant_documents) & set(ranking))/len(ranking)
+  return float('nan')
+  
 def compute_average_precision(real_gains, predicted_gains):
-    """This function computes average precision, which is the average of precision at k values for k=1..len(real_gains).
-    Average precision values can later be used for the computation of MAP (Mean Average Precision)
-    """
-    precs = [compute_r_precision(real_gains, predicted_gains, k=x+1) for x in range(len(real_gains))]
-    if not precs:
-        return 0.
-    return np.mean(precs)
+  """This function computes average precision, which is the average of precision at k values for k=1..len(real_gains).
+  Average precision values can later be used for the computation of MAP (Mean Average Precision)
+  """
+  precs = [compute_r_precision(real_gains, predicted_gains, k=x+1) for x in range(len(real_gains))]
+  if not precs:
+    return 0.
+  return np.mean(precs)
 
-def rank_candidates_classified_as_positive(test_with_preds, regressor, features):
+def compute_precision_at_k(real_gains, predicted_gains, k=5):
+  """This function computes precision-at-k, i.e. the proportion of recommended items in the top-k set 
+  that are relevant (belong to real_gains).
+
+  NOTE THAT IT IS NOT AS STRICT AS compute_r_precision!
+  """
+  relevant_documents = [elem[0] for elem in real_gains]
+  retrieved_documents = [elem[0] for elem in sorted(predicted_gains, key = lambda x:x[1], reverse=True)][:k]
+  if relevant_documents and retrieved_documents:
+    return len(set(relevant_documents) & set(retrieved_documents))/len(retrieved_documents)
+  return float('nan')
+
+def compute_recall_at_k(real_gains, predicted_gains, k=5):
+  """This function computes recall-at-k, i.e. the proportion of relevant items found in the top-k 
+  recommendations.
+  """
+  relevant_documents = [elem[0] for elem in real_gains]
+  retrieved_documents = [elem[0] for elem in sorted(predicted_gains, key = lambda x:x[1], reverse=True)][:k]
+  if relevant_documents and retrieved_documents:
+    return len(set(relevant_documents) & set(retrieved_documents))/len(relevant_documents)
+  return float('nan')
+
+
+def rank_candidates_classified_as_positive(test_with_preds, regressor, features, baseline_regressor):
   """This function gets all candidates for each (query, target) tuple, selects those that were classified as positive, and 
   uses a regressor to rank them.
   """
   candidates_per_query_target = parse_rows(test_with_preds)
-  ndcgs = []
   avg_precs = []
-  ndcgs_containment = []
+  avg_precs_certain = []
   avg_precs_containment = []
+  avg_precs_baseline_regressor = []
+  avg_precs_classif_containment = []
+  avg_precs_classif_certain_containment = []
+  avg_precs_classif_pearson = []
+  avg_precs_classif_certain_pearson = []
+
+  avg_recs = []
+  avg_recs_certain = []
+  avg_recs_containment = []
+  avg_recs_baseline_regressor = []
+  avg_recs_classif_containment = []
+  avg_recs_classif_certain_containment = []
+  avg_recs_classif_pearson = []
+  avg_recs_classif_certain_pearson = []
+  
+  avg_strict_r_precisions = []
+  avg_strict_r_precisions_certain = []
+  avg_strict_r_precisions_containment = []
+  avg_strict_r_precisions_baseline_regressor = []
+  avg_strict_r_precisions_classif_containment = []
+  avg_strict_r_precisions_classif_certain_containment = []
+  avg_strict_r_precisions_classif_pearson = []
+  avg_strict_r_precisions_classif_certain_pearson = []
+
+  avg_strict_r_recalls = []
+  avg_strict_r_recalls_certain = []
+  avg_strict_r_recalls_containment = []
+  avg_strict_r_recalls_baseline_regressor = []
+  avg_strict_r_recalls_classif_containment = []
+  avg_strict_r_recalls_classif_certain_containment = []
+  avg_strict_r_recalls_classif_pearson = []
+  avg_strict_r_recalls_classif_certain_pearson = []
+  
   numbers_of_retrieved_candidates = []
-  number_of_instances = 0
   for key in candidates_per_query_target.keys():
     query, target = key.split(KEY_SEPARATOR)
-    instances = test_with_preds.loc[(test_with_preds['query'] == query) & (test_with_preds['target'] == target) & (test_with_preds['class'] == POSITIVE_CLASS)]
-    number_of_instances += instances.shape[0]
-    try:
-      predicted_gains = [(candidate, predicted_gain) for candidate, predicted_gain in zip(instances['candidate'], regressor.predict(instances[features]))]
-      real_gains = instances[['candidate', TARGET_COLUMN]].values.tolist()
-      containment_baseline = instances[['candidate', 'containment_fraction']].values.tolist()
-      avg_precs.append(compute_average_precision(real_gains, predicted_gains))
-      ndcgs.append(compute_ndcg_at_k(real_gains, predicted_gains))
-      avg_precs_containment.append(compute_average_precision(real_gains, containment_baseline))
-      ndcgs_containment.append(compute_ndcg_at_k(real_gains,containment_baseline))
-      numbers_of_retrieved_candidates.append(instances.shape[0])
-    except ValueError:
-      continue
-  print('total number of instances', number_of_instances)
+
+    instances = test_with_preds.loc[(test_with_preds['query'] == query) & (test_with_preds['target'] == target)]
+    truly_positive = instances.loc[test_with_preds['class'] == POSITIVE_CLASS]
+    predicted_positive_certain = instances.loc[(test_with_preds['pred'] == POSITIVE_CLASS) & (test_with_preds['prob_positive_class'] > 0.6)]
+    predicted_positive = instances.loc[test_with_preds['pred'] == POSITIVE_CLASS]
+    if truly_positive.shape[0] and predicted_positive.shape[0] and predicted_positive_certain.shape[0]:
+      real_gains = truly_positive[['candidate', TARGET_COLUMN]].values.tolist()
+      
+      classifier_and_regressor_gains = [[candidate, estimated_gain] for candidate, estimated_gain in zip(predicted_positive['candidate'], regressor.predict(predicted_positive[features]))]
+      classifier_certain_and_regressor_gains = [[candidate, estimated_gain] for candidate, estimated_gain in zip(predicted_positive_certain['candidate'], regressor.predict(predicted_positive_certain[features]))]
+      
+      classifier_and_containment_gains = predicted_positive[['candidate', 'containment_fraction']].values.tolist()
+      classifier_certain_and_containment_gains = predicted_positive_certain[['candidate', 'containment_fraction']].values.tolist()
+
+      classifier_and_max_pearson_diff_gains = predicted_positive[['candidate', 'max_pearson_difference']].values.tolist()
+      classifier_certain_and_max_pearson_diff_gains = predicted_positive_certain[['candidate', 'max_pearson_difference']].values.tolist()
+      
+      containment_baseline_gains = instances[['candidate', 'containment_fraction']].values.tolist()
+      max_pearson_diff_baseline_gains = instances[['candidate', 'max_pearson_difference']].values.tolist()
+      baseline_regressor_gains = [[candidate, baseline_gain] for candidate, baseline_gain in zip(instances['candidate'], regressor.predict(instances[features]))]
+      
+      avg_precs.append(compute_precision_at_k(real_gains, classifier_and_regressor_gains))
+      avg_precs_certain.append(compute_precision_at_k(real_gains, classifier_certain_and_regressor_gains))
+      avg_precs_classif_containment.append(compute_precision_at_k(real_gains, classifier_and_containment_gains))
+      avg_precs_classif_certain_containment.append(compute_precision_at_k(real_gains, classifier_certain_and_containment_gains))
+      avg_precs_classif_pearson.append(compute_precision_at_k(real_gains, classifier_and_max_pearson_diff_gains))
+      avg_precs_classif_certain_pearson.append(compute_precision_at_k(real_gains, classifier_certain_and_max_pearson_diff_gains))
+      avg_precs_containment.append(compute_precision_at_k(real_gains, containment_baseline_gains))
+      avg_precs_baseline_regressor.append(compute_precision_at_k(real_gains, baseline_regressor_gains))
+      
+      avg_recs.append(compute_recall_at_k(real_gains, classifier_and_regressor_gains))
+      avg_recs_certain.append(compute_recall_at_k(real_gains, classifier_certain_and_regressor_gains))
+      avg_recs_classif_containment.append(compute_recall_at_k(real_gains, classifier_and_containment_gains))
+      avg_recs_classif_certain_containment.append(compute_recall_at_k(real_gains, classifier_certain_and_containment_gains))
+      avg_recs_classif_pearson.append(compute_recall_at_k(real_gains, classifier_and_max_pearson_diff_gains))
+      avg_recs_classif_certain_pearson.append(compute_recall_at_k(real_gains, classifier_certain_and_max_pearson_diff_gains))
+      avg_recs_containment.append(compute_recall_at_k(real_gains, containment_baseline_gains))
+      avg_recs_baseline_regressor.append(compute_recall_at_k(real_gains, baseline_regressor_gains))
+
+      avg_strict_r_precisions.append(compute_r_precision(real_gains, classifier_and_regressor_gains))
+      avg_strict_r_precisions_certain.append(compute_r_precision(real_gains, classifier_certain_and_regressor_gains))
+      avg_strict_r_precisions_classif_containment.append(compute_r_precision(real_gains, classifier_and_containment_gains))
+      avg_strict_r_precisions_classif_certain_containment.append(compute_r_precision(real_gains, classifier_certain_and_containment_gains))
+      avg_strict_r_precisions_classif_pearson.append(compute_r_precision(real_gains, classifier_and_max_pearson_diff_gains))
+      avg_strict_r_precisions_classif_certain_pearson.append(compute_r_precision(real_gains, classifier_certain_and_max_pearson_diff_gains))
+      avg_strict_r_precisions_containment.append(compute_r_precision(real_gains, containment_baseline_gains))
+      avg_strict_r_precisions_baseline_regressor.append(compute_r_precision(real_gains, baseline_regressor_gains))
+
+      avg_strict_r_recalls.append(compute_r_recall(real_gains, classifier_and_regressor_gains))
+      avg_strict_r_recalls_certain.append(compute_r_recall(real_gains, classifier_certain_and_regressor_gains))
+      avg_strict_r_recalls_classif_containment.append(compute_r_recall(real_gains, classifier_and_containment_gains))
+      avg_strict_r_recalls_classif_certain_containment.append(compute_r_recall(real_gains, classifier_certain_and_containment_gains))
+      avg_strict_r_recalls_classif_pearson.append(compute_r_recall(real_gains, classifier_and_max_pearson_diff_gains))
+      avg_strict_r_recalls_classif_certain_pearson.append(compute_r_recall(real_gains, classifier_certain_and_max_pearson_diff_gains))
+      avg_strict_r_recalls_containment.append(compute_r_recall(real_gains, containment_baseline_gains))
+      avg_strict_r_recalls_baseline_regressor.append(compute_r_recall(real_gains, baseline_regressor_gains))
+
+      numbers_of_retrieved_candidates.append(predicted_positive.shape[0])
+  
   print('average number of candidates per query-target (predicted as positive)', np.mean(numbers_of_retrieved_candidates))
-  print('MAP:', np.mean(avg_precs))
-  print('NDCGs:', np.mean(ndcgs))
-  print('MAP - Containment baseline:', np.mean(avg_precs_containment))
-  print('NDCGs - Containment baseline:', np.mean(ndcgs_containment))
+  print('Prec@5 - Classifier + Regressor:', np.mean(avg_precs))
+  print('Prec@5 - Classifier (certain) + Regressor:', np.mean(avg_precs))
+  print('Prec@5 - Classifier + Containment:', np.mean(avg_precs_classif_containment))
+  print('Prec@5 - Classifier (certain) + Containment:', np.mean(avg_precs_classif_certain_containment))
+  print('Prec@5 - Classifier + Max-Pearson-Diff:', np.mean(avg_precs_classif_pearson))
+  print('Prec@5 - Classifier (certain) + Max-Pearson-Diff:', np.mean(avg_precs_classif_certain_pearson))  
+  print('Prec@5 - Containment baseline:', np.mean(avg_precs_containment))
+  print('Prec@5 - Regression baseline:', np.mean(avg_precs_baseline_regressor))
+  
+  print('Rec@5 - Classifier + Regressor:', np.mean(avg_recs))
+  print('Rec@5 - Classifier (certain) + Regressor:', np.mean(avg_recs))
+  print('Rec@5 - Classifier + Containment:', np.mean(avg_recs_classif_containment))
+  print('Rec@5 - Classifier (certain) + Containment:', np.mean(avg_recs_classif_certain_containment))
+  print('Rec@5 - Classifier + Max-Pearson-Diff:', np.mean(avg_recs_classif_pearson))
+  print('Rec@5 - Classifier (certain) + Max-Pearson-Diff:', np.mean(avg_recs_classif_certain_pearson))
+  print('Rec@5 - Containment baseline:', np.mean(avg_recs_containment))
+  print('Rec@5 - Regression baseline:', np.mean(avg_recs_baseline_regressor))
+  
+  print('Strict R-Precision (k=5) - Classifier + Regressor:', np.mean(avg_strict_r_precisions))
+  print('Strict R-Precision (k=5) - Classifier (certain) + Regressor:', np.mean(avg_strict_r_precisions))
+  print('Strict R-Precision (k=5) - Classifier + Containment:', np.mean(avg_strict_r_precisions_classif_containment))
+  print('Strict R-Precision (k=5) - Classifier (certain) + Containment:', np.mean(avg_strict_r_precisions_classif_certain_containment))
+  print('Strict R-Precision (k=5) - Classifier + Max-Pearson-Diff:', np.mean(avg_strict_r_precisions_classif_pearson))
+  print('Strict R-Precision (k=5) - Classifier (certain) + Max-Pearson-Diff:', np.mean(avg_strict_r_precisions_classif_certain_pearson))
+  print('Strict R-Precision (k=5) - Containment baseline:', np.mean(avg_strict_r_precisions_containment))
+  print('Strict R-Precision (k=5) - Regression baseline:', np.mean(avg_strict_r_precisions_baseline_regressor))
+
+  print('Strict R-Recall (k=5) - Classifier + Regressor:', np.mean(avg_strict_r_recalls))
+  print('Strict R-Recall (k=5) - Classifier (certain) + Regressor:', np.mean(avg_strict_r_recalls))
+  print('Strict R-Recall (k=5) - Classifier + Containment:', np.mean(avg_strict_r_recalls_classif_containment))
+  print('Strict R-Recall (k=5) - Classifier (certain) + Containment:', np.mean(avg_strict_r_recalls_classif_certain_containment))
+  print('Strict R-Recall (k=5) - Classifier + Max-Pearson-Diff:', np.mean(avg_strict_r_recalls_classif_pearson))
+  print('Strict R-Recall (k=5) - Classifier (certain) + Max-Pearson-Diff:', np.mean(avg_strict_r_recalls_classif_certain_pearson))
+  print('Strict R-Recall (k=5) - Containment baseline:', np.mean(avg_strict_r_recalls_containment))
+  print('Strict R-Recall (k=5) - Regression baseline:', np.mean(avg_strict_r_recalls_baseline_regressor))
+
   
 if __name__ == '__main__':
   training_filename = sys.argv[1]
   test_filename = sys.argv[2]
   features = eval(open(sys.argv[3]).readline())
+  baseline_regressor = pickle.load(open(sys.argv[4], 'rb'))
   
   training_data = pd.read_csv(training_filename)
   test_data = pd.read_csv(test_filename)
   test_with_predictions = generate_predictions(training_data, test_data, features)
   #analyze_predictions(test_with_predictions)
   regressor = build_regressor_for_ranking_positive_class(training_data, features)
-  rank_candidates_classified_as_positive(test_with_predictions, regressor, features)
+  rank_candidates_classified_as_positive(test_with_predictions, regressor, features, baseline_regressor)
   
   
