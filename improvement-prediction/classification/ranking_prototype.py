@@ -158,29 +158,21 @@ def build_regressor_for_ranking_positive_class(dataset, features, regression_tar
   regressor.fit(X, y)
   return regressor
 
-def compute_r_precision(real_gains, predicted_gains, k=5, positive_only=True):
+def compute_modified_r_precision(real_gains, predicted_gains, k=5):
   """This function computes R-precision, which is the ratio between all the relevant documents 
   retrieved until the rank that equals the number of relevant documents you have in your collection in total (r), 
   to the total number of relevant documents in your collection R.
   
-  In this setting, if positive_only == True, relevant documents correspond exclusively to candidates associated to real positive 
-  gains. If there are no relevant documents in this case, this function returns 'nan'. Alternatively, if positive_only == False 
-  we consider that the relevant documents are the k highest ranked candidates in real_gains.
   """
-  
-  if positive_only:
-    relevant_documents = [elem[0] for elem in sorted(real_gains, key = lambda x:x[1], reverse=True) if elem[1] > 0][:k]
-    #print('real gains in compute_r_precision', real_gains)
-    #print('relevant documents (positive only)', relevant_documents)
-    predicted_ranking = [elem[0] for elem in sorted(predicted_gains, key = lambda x:x[1], reverse=True)][:len(relevant_documents)]
-    if relevant_documents and predicted_ranking:
-      return len(set(relevant_documents) & set(predicted_ranking))/len(relevant_documents)
-    return float('nan')
-  
-  #positive_only == False
-  real_ranking = [elem[0] for elem in sorted(real_gains, key = lambda x:x[1], reverse=True)][:k]
-  predicted_ranking = [elem[0] for elem in sorted(predicted_gains, key = lambda x:x[1], reverse=True)][:k]
-  return len(set(real_ranking) & set(predicted_ranking))/k
+  relevant_documents = [elem[0] for elem in sorted(real_gains, key = lambda x:x[1], reverse=True) if elem[1] > 1][:k]
+  #print('real gains in compute_r_precision', real_gains)
+  #print('relevant documents (positive only)', relevant_documents)
+  predicted_ranking = [elem[0] for elem in sorted(predicted_gains, key = lambda x:x[1], reverse=True)][:len(relevant_documents)]
+  #print('predicted gains in compute_r_precision', predicted_gains)
+  #print('relevant documents (positive only)', predicted_ranking)
+  if relevant_documents and predicted_ranking:
+    return len(set(relevant_documents) & set(predicted_ranking))/len(predicted_ranking)
+  return float('nan')
 
 def compute_r_recall(real_gains, predicted_gains, k=5, positive_only=True):
   """This function computes 'R-recall' (does it exist officially?), defined as the ratio between all the top-k relevant documents 
@@ -236,41 +228,41 @@ def rank_candidates_classified_as_positive(test_with_preds, regressor, features,
   uses a regressor to rank them.
   """
   candidates_per_query_target = parse_rows(test_with_preds)
-  avg_precs = []
-  avg_precs_certain = []
-  avg_precs_containment = []
-  avg_precs_baseline_regressor = []
-  avg_precs_classif_containment = []
-  avg_precs_classif_certain_containment = []
-  avg_precs_classif_pearson = []
-  avg_precs_classif_certain_pearson = []
+  avg_precs = [[] for i in range(51)]
+  avg_precs_certain = [[] for i in range(51)]
+  avg_precs_containment = [[] for i in range(51)]
+  avg_precs_baseline_regressor = [[] for i in range(51)]
+  avg_precs_classif_containment = [[] for i in range(51)]
+  avg_precs_classif_certain_containment = [[] for i in range(51)]
+  avg_precs_classif_pearson = [[] for i in range(51)]
+  avg_precs_classif_certain_pearson = [[] for i in range(51)]
 
-  avg_recs = []
-  avg_recs_certain = []
-  avg_recs_containment = []
-  avg_recs_baseline_regressor = []
-  avg_recs_classif_containment = []
-  avg_recs_classif_certain_containment = []
-  avg_recs_classif_pearson = []
-  avg_recs_classif_certain_pearson = []
+  avg_recs = [[] for i in range(51)]
+  avg_recs_certain = [[] for i in range(51)]
+  avg_recs_containment = [[] for i in range(51)]
+  avg_recs_baseline_regressor = [[] for i in range(51)]
+  avg_recs_classif_containment = [[] for i in range(51)]
+  avg_recs_classif_certain_containment = [[] for i in range(51)]
+  avg_recs_classif_pearson = [[] for i in range(51)]
+  avg_recs_classif_certain_pearson = [[] for i in range(51)]
   
-  avg_strict_r_precisions = []
-  avg_strict_r_precisions_certain = []
-  avg_strict_r_precisions_containment = []
-  avg_strict_r_precisions_baseline_regressor = []
-  avg_strict_r_precisions_classif_containment = []
-  avg_strict_r_precisions_classif_certain_containment = []
-  avg_strict_r_precisions_classif_pearson = []
-  avg_strict_r_precisions_classif_certain_pearson = []
+  avg_strict_r_precisions = [[] for i in range(51)]
+  avg_strict_r_precisions_certain = [[] for i in range(51)]
+  avg_strict_r_precisions_containment = [[] for i in range(51)]
+  avg_strict_r_precisions_baseline_regressor = [[] for i in range(51)]
+  avg_strict_r_precisions_classif_containment = [[] for i in range(51)]
+  avg_strict_r_precisions_classif_certain_containment = [[] for i in range(51)]
+  avg_strict_r_precisions_classif_pearson = [[] for i in range(51)]
+  avg_strict_r_precisions_classif_certain_pearson = [[] for i in range(51)]
 
-  avg_strict_r_recalls = []
-  avg_strict_r_recalls_certain = []
-  avg_strict_r_recalls_containment = []
-  avg_strict_r_recalls_baseline_regressor = []
-  avg_strict_r_recalls_classif_containment = []
-  avg_strict_r_recalls_classif_certain_containment = []
-  avg_strict_r_recalls_classif_pearson = []
-  avg_strict_r_recalls_classif_certain_pearson = []
+  avg_strict_r_recalls = [[] for i in range(51)]
+  avg_strict_r_recalls_certain = [[] for i in range(51)]
+  avg_strict_r_recalls_containment = [[] for i in range(51)]
+  avg_strict_r_recalls_baseline_regressor = [[] for i in range(51)]
+  avg_strict_r_recalls_classif_containment = [[] for i in range(51)]
+  avg_strict_r_recalls_classif_certain_containment = [[] for i in range(51)]
+  avg_strict_r_recalls_classif_pearson = [[] for i in range(51)]
+  avg_strict_r_recalls_classif_certain_pearson = [[] for i in range(51)]
   
   numbers_of_retrieved_candidates = []
   for key in candidates_per_query_target.keys():
@@ -296,80 +288,81 @@ def rank_candidates_classified_as_positive(test_with_preds, regressor, features,
       max_pearson_diff_baseline_gains = instances[['candidate', 'max_pearson_difference']].values.tolist()
       baseline_regressor_gains = [[candidate, baseline_gain] for candidate, baseline_gain in zip(instances['candidate'], regressor.predict(instances[features]))]
       
-      avg_precs.append(compute_precision_at_k(real_gains, classifier_and_regressor_gains))
-      avg_precs_certain.append(compute_precision_at_k(real_gains, classifier_certain_and_regressor_gains))
-      avg_precs_classif_containment.append(compute_precision_at_k(real_gains, classifier_and_containment_gains))
-      avg_precs_classif_certain_containment.append(compute_precision_at_k(real_gains, classifier_certain_and_containment_gains))
-      avg_precs_classif_pearson.append(compute_precision_at_k(real_gains, classifier_and_max_pearson_diff_gains))
-      avg_precs_classif_certain_pearson.append(compute_precision_at_k(real_gains, classifier_certain_and_max_pearson_diff_gains))
-      avg_precs_containment.append(compute_precision_at_k(real_gains, containment_baseline_gains))
-      avg_precs_baseline_regressor.append(compute_precision_at_k(real_gains, baseline_regressor_gains))
-      
-      avg_recs.append(compute_recall_at_k(real_gains, classifier_and_regressor_gains))
-      avg_recs_certain.append(compute_recall_at_k(real_gains, classifier_certain_and_regressor_gains))
-      avg_recs_classif_containment.append(compute_recall_at_k(real_gains, classifier_and_containment_gains))
-      avg_recs_classif_certain_containment.append(compute_recall_at_k(real_gains, classifier_certain_and_containment_gains))
-      avg_recs_classif_pearson.append(compute_recall_at_k(real_gains, classifier_and_max_pearson_diff_gains))
-      avg_recs_classif_certain_pearson.append(compute_recall_at_k(real_gains, classifier_certain_and_max_pearson_diff_gains))
-      avg_recs_containment.append(compute_recall_at_k(real_gains, containment_baseline_gains))
-      avg_recs_baseline_regressor.append(compute_recall_at_k(real_gains, baseline_regressor_gains))
-
-      avg_strict_r_precisions.append(compute_r_precision(real_gains, classifier_and_regressor_gains))
-      avg_strict_r_precisions_certain.append(compute_r_precision(real_gains, classifier_certain_and_regressor_gains))
-      avg_strict_r_precisions_classif_containment.append(compute_r_precision(real_gains, classifier_and_containment_gains))
-      avg_strict_r_precisions_classif_certain_containment.append(compute_r_precision(real_gains, classifier_certain_and_containment_gains))
-      avg_strict_r_precisions_classif_pearson.append(compute_r_precision(real_gains, classifier_and_max_pearson_diff_gains))
-      avg_strict_r_precisions_classif_certain_pearson.append(compute_r_precision(real_gains, classifier_certain_and_max_pearson_diff_gains))
-      avg_strict_r_precisions_containment.append(compute_r_precision(real_gains, containment_baseline_gains))
-      avg_strict_r_precisions_baseline_regressor.append(compute_r_precision(real_gains, baseline_regressor_gains))
-
-      avg_strict_r_recalls.append(compute_r_recall(real_gains, classifier_and_regressor_gains))
-      avg_strict_r_recalls_certain.append(compute_r_recall(real_gains, classifier_certain_and_regressor_gains))
-      avg_strict_r_recalls_classif_containment.append(compute_r_recall(real_gains, classifier_and_containment_gains))
-      avg_strict_r_recalls_classif_certain_containment.append(compute_r_recall(real_gains, classifier_certain_and_containment_gains))
-      avg_strict_r_recalls_classif_pearson.append(compute_r_recall(real_gains, classifier_and_max_pearson_diff_gains))
-      avg_strict_r_recalls_classif_certain_pearson.append(compute_r_recall(real_gains, classifier_certain_and_max_pearson_diff_gains))
-      avg_strict_r_recalls_containment.append(compute_r_recall(real_gains, containment_baseline_gains))
-      avg_strict_r_recalls_baseline_regressor.append(compute_r_recall(real_gains, baseline_regressor_gains))
-
+      for index in range(51):      
+        avg_precs[index].append(compute_precision_at_k(real_gains, classifier_and_regressor_gains, k=index))
+        avg_precs_certain[index].append(compute_precision_at_k(real_gains, classifier_certain_and_regressor_gains, k=index))
+        avg_precs_classif_containment[index].append(compute_precision_at_k(real_gains, classifier_and_containment_gains, k=index))
+        avg_precs_classif_certain_containment[index].append(compute_precision_at_k(real_gains, classifier_certain_and_containment_gains, k=index))
+        avg_precs_classif_pearson[index].append(compute_precision_at_k(real_gains, classifier_and_max_pearson_diff_gains, k=index))
+        avg_precs_classif_certain_pearson[index].append(compute_precision_at_k(real_gains, classifier_certain_and_max_pearson_diff_gains, k=index))
+        avg_precs_containment[index].append(compute_precision_at_k(real_gains, containment_baseline_gains, k=index))
+        avg_precs_baseline_regressor[index].append(compute_precision_at_k(real_gains, baseline_regressor_gains, k=index))
+        
+        avg_recs[index].append(compute_recall_at_k(real_gains, classifier_and_regressor_gains, k=index))
+        avg_recs_certain[index].append(compute_recall_at_k(real_gains, classifier_certain_and_regressor_gains, k=index))
+        avg_recs_classif_containment[index].append(compute_recall_at_k(real_gains, classifier_and_containment_gains, k=index))
+        avg_recs_classif_certain_containment[index].append(compute_recall_at_k(real_gains, classifier_certain_and_containment_gains, k=index))
+        avg_recs_classif_pearson[index].append(compute_recall_at_k(real_gains, classifier_and_max_pearson_diff_gains, k=index))
+        avg_recs_classif_certain_pearson[index].append(compute_recall_at_k(real_gains, classifier_certain_and_max_pearson_diff_gains, k=index))
+        avg_recs_containment[index].append(compute_recall_at_k(real_gains, containment_baseline_gains, k=index))
+        avg_recs_baseline_regressor[index].append(compute_recall_at_k(real_gains, baseline_regressor_gains, k=index))
+        
+        avg_strict_r_precisions[index].append(compute_modified_r_precision(real_gains, classifier_and_regressor_gains, k=index))
+        avg_strict_r_precisions_certain[index].append(compute_modified_r_precision(real_gains, classifier_certain_and_regressor_gains, k=index))
+        avg_strict_r_precisions_classif_containment[index].append(compute_modified_r_precision(real_gains, classifier_and_containment_gains, k=index))
+        avg_strict_r_precisions_classif_certain_containment[index].append(compute_modified_r_precision(real_gains, classifier_certain_and_containment_gains, k=index))
+        avg_strict_r_precisions_classif_pearson[index].append(compute_modified_r_precision(real_gains, classifier_and_max_pearson_diff_gains, k=index))
+        avg_strict_r_precisions_classif_certain_pearson[index].append(compute_modified_r_precision(real_gains, classifier_certain_and_max_pearson_diff_gains, k=index))
+        avg_strict_r_precisions_containment[index].append(compute_modified_r_precision(real_gains, containment_baseline_gains, k=index))
+        avg_strict_r_precisions_baseline_regressor[index].append(compute_modified_r_precision(real_gains, baseline_regressor_gains, k=index))
+        
+        avg_strict_r_recalls[index].append(compute_r_recall(real_gains, classifier_and_regressor_gains, k=index))
+        avg_strict_r_recalls_certain[index].append(compute_r_recall(real_gains, classifier_certain_and_regressor_gains, k=index))
+        avg_strict_r_recalls_classif_containment[index].append(compute_r_recall(real_gains, classifier_and_containment_gains, k=index))
+        avg_strict_r_recalls_classif_certain_containment[index].append(compute_r_recall(real_gains, classifier_certain_and_containment_gains, k=index))
+        avg_strict_r_recalls_classif_pearson[index].append(compute_r_recall(real_gains, classifier_and_max_pearson_diff_gains, k=index))
+        avg_strict_r_recalls_classif_certain_pearson[index].append(compute_r_recall(real_gains, classifier_certain_and_max_pearson_diff_gains, k=index))
+        avg_strict_r_recalls_containment[index].append(compute_r_recall(real_gains, containment_baseline_gains, k=index))
+        avg_strict_r_recalls_baseline_regressor[index].append(compute_r_recall(real_gains, baseline_regressor_gains, k=index))
+      #break
       numbers_of_retrieved_candidates.append(predicted_positive.shape[0])
   
   print('average number of candidates per query-target (predicted as positive)', np.mean(numbers_of_retrieved_candidates))
-  print('Prec@5 - Classifier + Regressor:', np.mean(avg_precs))
-  print('Prec@5 - Classifier (certain) + Regressor:', np.mean(avg_precs))
-  print('Prec@5 - Classifier + Containment:', np.mean(avg_precs_classif_containment))
-  print('Prec@5 - Classifier (certain) + Containment:', np.mean(avg_precs_classif_certain_containment))
-  print('Prec@5 - Classifier + Max-Pearson-Diff:', np.mean(avg_precs_classif_pearson))
-  print('Prec@5 - Classifier (certain) + Max-Pearson-Diff:', np.mean(avg_precs_classif_certain_pearson))  
-  print('Prec@5 - Containment baseline:', np.mean(avg_precs_containment))
-  print('Prec@5 - Regression baseline:', np.mean(avg_precs_baseline_regressor))
-  
-  print('Rec@5 - Classifier + Regressor:', np.mean(avg_recs))
-  print('Rec@5 - Classifier (certain) + Regressor:', np.mean(avg_recs))
-  print('Rec@5 - Classifier + Containment:', np.mean(avg_recs_classif_containment))
-  print('Rec@5 - Classifier (certain) + Containment:', np.mean(avg_recs_classif_certain_containment))
-  print('Rec@5 - Classifier + Max-Pearson-Diff:', np.mean(avg_recs_classif_pearson))
-  print('Rec@5 - Classifier (certain) + Max-Pearson-Diff:', np.mean(avg_recs_classif_certain_pearson))
-  print('Rec@5 - Containment baseline:', np.mean(avg_recs_containment))
-  print('Rec@5 - Regression baseline:', np.mean(avg_recs_baseline_regressor))
-  
-  print('Strict R-Precision (k=5) - Classifier + Regressor:', np.mean(avg_strict_r_precisions))
-  print('Strict R-Precision (k=5) - Classifier (certain) + Regressor:', np.mean(avg_strict_r_precisions))
-  print('Strict R-Precision (k=5) - Classifier + Containment:', np.mean(avg_strict_r_precisions_classif_containment))
-  print('Strict R-Precision (k=5) - Classifier (certain) + Containment:', np.mean(avg_strict_r_precisions_classif_certain_containment))
-  print('Strict R-Precision (k=5) - Classifier + Max-Pearson-Diff:', np.mean(avg_strict_r_precisions_classif_pearson))
-  print('Strict R-Precision (k=5) - Classifier (certain) + Max-Pearson-Diff:', np.mean(avg_strict_r_precisions_classif_certain_pearson))
-  print('Strict R-Precision (k=5) - Containment baseline:', np.mean(avg_strict_r_precisions_containment))
-  print('Strict R-Precision (k=5) - Regression baseline:', np.mean(avg_strict_r_precisions_baseline_regressor))
-
-  print('Strict R-Recall (k=5) - Classifier + Regressor:', np.mean(avg_strict_r_recalls))
-  print('Strict R-Recall (k=5) - Classifier (certain) + Regressor:', np.mean(avg_strict_r_recalls))
-  print('Strict R-Recall (k=5) - Classifier + Containment:', np.mean(avg_strict_r_recalls_classif_containment))
-  print('Strict R-Recall (k=5) - Classifier (certain) + Containment:', np.mean(avg_strict_r_recalls_classif_certain_containment))
-  print('Strict R-Recall (k=5) - Classifier + Max-Pearson-Diff:', np.mean(avg_strict_r_recalls_classif_pearson))
-  print('Strict R-Recall (k=5) - Classifier (certain) + Max-Pearson-Diff:', np.mean(avg_strict_r_recalls_classif_certain_pearson))
-  print('Strict R-Recall (k=5) - Containment baseline:', np.mean(avg_strict_r_recalls_containment))
-  print('Strict R-Recall (k=5) - Regression baseline:', np.mean(avg_strict_r_recalls_baseline_regressor))
+  for index in range(51):
+    # print('Prec@' + str(index) +  ' - Classifier + Regressor:', np.mean(avg_precs[index]))
+    # print('Prec@' + str(index) +  ' - Classifier (certain) + Regressor:', np.mean(avg_precs[index]))
+    # print('Prec@' + str(index) +  ' - Classifier + Containment:', np.mean(avg_precs_classif_containment[index]))
+    # print('Prec@' + str(index) +  ' - Classifier (certain) + Containment:', np.mean(avg_precs_classif_certain_containment[index]))
+    # print('Prec@' + str(index) +  ' - Classifier + Max-Pearson-Diff:', np.mean(avg_precs_classif_pearson[index]))
+    # print('Prec@' + str(index) +  ' - Classifier (certain) + Max-Pearson-Diff:', np.mean(avg_precs_classif_certain_pearson[index]))  
+    # print('Prec@' + str(index) +  ' - Containment baseline:', np.mean(avg_precs_containment[index]))
+    # print('Prec@' + str(index) +  ' - Regression baseline:', np.mean(avg_precs_baseline_regressor[index]))
+    
+    # print('Rec@' + str(index) +  ' - Classifier + Regressor:', np.mean(avg_recs[index]))
+    # print('Rec@' + str(index) +  ' - Classifier (certain) + Regressor:', np.mean(avg_recs[index]))
+    # print('Rec@' + str(index) +  ' - Classifier + Containment:', np.mean(avg_recs_classif_containment[index]))
+    # print('Rec@' + str(index) +  ' - Classifier (certain) + Containment:', np.mean(avg_recs_classif_certain_containment[index]))
+    # print('Rec@' + str(index) +  ' - Classifier + Max-Pearson-Diff:', np.mean(avg_recs_classif_pearson[index]))
+    # print('Rec@' + str(index) +  ' - Classifier (certain) + Max-Pearson-Diff:', np.mean(avg_recs_classif_certain_pearson[index]))
+    # print('Rec@' + str(index) +  ' - Containment baseline:', np.mean(avg_recs_containment[index]))
+    # print('Rec@' + str(index) +  ' - Regression baseline:', np.mean(avg_recs_baseline_regressor[index]))
+    print('Strict R-Precision (k=' + str(index) + ') - Classifier + Regressor:', np.mean([elem for elem in avg_strict_r_precisions[index] if not np.isnan(elem)]))
+    print('Strict R-Precision (k=' + str(index) + ') - Classifier (certain) + Regressor:', np.mean([elem for elem in avg_strict_r_precisions_certain[index] if not np.isnan(elem)]))
+    print('Strict R-Precision (k=' + str(index) + ') - Classifier + Containment:', np.mean([elem for elem in avg_strict_r_precisions_classif_containment[index] if not np.isnan(elem)]))
+    print('Strict R-Precision (k=' + str(index) + ') - Classifier (certain) + Containment:', np.mean([elem for elem in avg_strict_r_precisions_classif_certain_containment[index] if not np.isnan(elem)]))
+    print('Strict R-Precision (k=' + str(index) + ') - Classifier + Max-Pearson-Diff:', np.mean([elem for elem in avg_strict_r_precisions_classif_pearson[index] if not np.isnan(elem)]))
+    print('Strict R-Precision (k=' + str(index) + ') - Classifier (certain) + Max-Pearson-Diff:', np.mean([elem for elem in avg_strict_r_precisions_classif_certain_pearson[index] if not np.isnan(elem)]))
+    print('Strict R-Precision (k=' + str(index) + ') - Containment baseline:', np.mean([elem for elem in avg_strict_r_precisions_containment[index] if not np.isnan(elem)]))
+    print('Strict R-Precision (k=' + str(index) + ') - Regression baseline:', np.mean([elem for elem in avg_strict_r_precisions_baseline_regressor[index] if not np.isnan(elem)]))
+    
+    # print('Strict R-Recall (k=' + str(index) + ') - Classifier + Regressor:', np.mean(avg_strict_r_recalls[index]))
+    # print('Strict R-Recall (k=' + str(index) + ') - Classifier (certain) + Regressor:', np.mean(avg_strict_r_recalls[index]))
+    # print('Strict R-Recall (k=' + str(index) + ') - Classifier + Containment:', np.mean(avg_strict_r_recalls_classif_containment[index]))
+    # print('Strict R-Recall (k=' + str(index) + ') - Classifier (certain) + Containment:', np.mean(avg_strict_r_recalls_classif_certain_containment[index]))
+    # print('Strict R-Recall (k=' + str(index) + ') - Classifier + Max-Pearson-Diff:', np.mean(avg_strict_r_recalls_classif_pearson[index]))
+    # print('Strict R-Recall (k=' + str(index) + ') - Classifier (certain) + Max-Pearson-Diff:', np.mean(avg_strict_r_recalls_classif_certain_pearson[index]))
+    # print('Strict R-Recall (k=' + str(index) + ') - Containment baseline:', np.mean(avg_strict_r_recalls_containment[index]))
+    # print('Strict R-Recall (k=' + str(index) + ') - Regression baseline:', np.mean(avg_strict_r_recalls_baseline_regressor[index]))
 
   
 if __name__ == '__main__':
