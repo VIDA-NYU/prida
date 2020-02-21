@@ -63,6 +63,10 @@ def generate_predictions(training, test, features):
   test['pred'] = clf.predict(X_test)
   print(classification_report(y_test, test['pred']))
   test['prob_positive_class'] = [i[0] for i in clf.predict_proba(X_test)]
+  
+  model_filename = 'classifier-training-dataset-50-percent.sav'
+  pickle.dump(clf, open(model_filename, 'wb'))
+  
   return test
 
 def parse_rows(dataset_with_predictions):
