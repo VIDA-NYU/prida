@@ -71,9 +71,9 @@ def get_performance_scores(data, target_variable_name, missing_value_imputation)
 
 def break_companion_and_join_datasets_per_record(record, dir_):
 
-	output = list()
+    output = list()
 
-	test_record = json.loads(record)
+    test_record = json.loads(record)
         
     query_dataset = test_record['query_dataset']
     query_key = test_record['query_key']
@@ -146,21 +146,21 @@ def break_companion_and_join_datasets_per_record(record, dir_):
         # saving datasets
         if not os.path.exists(candidate_path):
             try:
-            	lock.acquire()
+                lock.acquire()
                 single_column_data.to_csv(candidate_path, index=False)
             except:
                 continue
             finally:
-            	lock.release()
+                lock.release()
         new_record['candidate_dataset'] = os.path.abspath(candidate_path)
         if not os.path.exists(join_path):
             try:
-            	lock.acquire()
+                lock.acquire()
                 single_column_joined_data.to_csv(join_path, index=False)
             except:
                 continue
             finally:
-            	lock.release()
+                lock.release()
         new_record['joined_dataset'] = os.path.abspath(join_path)
 
         # scores after augmentation
@@ -195,8 +195,8 @@ def break_companion_and_join_datasets(path_to_datamart_records, dir_):
     l = multiprocessing.Lock()
     p = multiprocessing.Pool(initializer=pool_init, initargs=(l,) processes=multiprocessing.cpu_count())
     new_records = p.starmap(
-    	break_companion_and_join_datasets_per_record,
-    	[(record, dir_) for record in records]
+        break_companion_and_join_datasets_per_record,
+        [(record, dir_) for record in records]
     )
             
     return new_records
