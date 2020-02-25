@@ -74,6 +74,18 @@ def break_companion_and_join_datasets_per_record(record, dir_):
     output = list()
 
     test_record = json.loads(record)
+    test_record['query_dataset'] = test_record['query_dataset'].replace(
+        '/Users/fchirigati/projects/',
+        '/vida/work/dataset-ranking/git/'
+    )
+    test_record['candidate_dataset'] = test_record['candidate_dataset'].replace(
+        '/Users/fchirigati/projects/',
+        '/vida/work/dataset-ranking/git/'
+    )
+    test_record['joined_dataset'] = test_record['joined_dataset'].replace(
+        '/Users/fchirigati/projects/',
+        '/vida/work/dataset-ranking/git/'
+    )
         
     query_dataset = test_record['query_dataset']
     query_key = test_record['query_key']
@@ -95,7 +107,7 @@ def break_companion_and_join_datasets_per_record(record, dir_):
     candidate_data = candidate_data.select_dtypes(exclude=['bool'])
     
     if len(candidate_data.columns) < 2:
-        continue
+        return output
     
     # reading joined dataset
     joined_data = pd.read_csv(joined_dataset)
@@ -191,9 +203,11 @@ def pool_init(l):
 
 def break_companion_and_join_datasets(path_to_datamart_records, dir_):
     
+    # multiprocessing.set_start_method('forkserver')
+
     records = open(path_to_datamart_records).readlines()
     l = multiprocessing.Lock()
-    p = multiprocessing.Pool(initializer=pool_init, initargs=(l,) processes=multiprocessing.cpu_count())
+    p = multiprocessing.Pool(initializer=pool_init, initargs=(l,), processes=int(multiprocessing.cpu_count()/2))
     new_records = p.starmap(
         break_companion_and_join_datasets_per_record,
         [(record, dir_) for record in records]
@@ -202,22 +216,25 @@ def break_companion_and_join_datasets(path_to_datamart_records, dir_):
     return new_records
 
 
-# creating directories
-if not os.path.exists('companion-datasets-single-column'):
-    os.mkdir('companion-datasets-single-column')
-for p in ['taxi-vehicle-collision', 'ny-taxi-demand', 'college-debt', 'poverty-estimation']:
-    if not os.path.exists('companion-datasets-single-column/%s'%p):
-        os.mkdir('companion-datasets-single-column/%s'%p)
+if __name__ == '__main__':
+    multiprocessing.set_start_method('forkserver')
 
-## NY Taxi and Vehicle Collision Problem
+    # creating directories
+    if not os.path.exists('companion-datasets-single-column'):
+        os.mkdir('companion-datasets-single-column')
+    for p in ['taxi-vehicle-collision', 'ny-taxi-demand', 'college-debt', 'poverty-estimation']:
+        if not os.path.exists('companion-datasets-single-column/%s'%p):
+            os.mkdir('companion-datasets-single-column/%s'%p)
 
-taxi_records = break_companion_and_join_datasets(
-    'taxi-vehicle-collision-datamart-records/datamart-records',
-    'companion-datasets-single-column/taxi-vehicle-collision/'
-)
+    ## NY Taxi and Vehicle Collision Problem
 
-print(len(taxi_records))
-print(len(taxi_records[0]))
+    taxi_records = break_companion_and_join_datasets(
+        'taxi-vehicle-collision-datamart-records/datamart-records',
+        'companion-datasets-single-column/taxi-vehicle-collision/'
+    )
+
+    print(len(taxi_records))
+    print(len(taxi_records[0]))
 
 # if os.path.exists('taxi-vehicle-collision-datamart-records-single-column/'):
 #     shutil.rmtree('taxi-vehicle-collision-datamart-records-single-column/')
