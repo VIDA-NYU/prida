@@ -1,8 +1,8 @@
 import copy
 import csv
 import pandas as pd
-import multiprocessing
 import numpy as np
+import random
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import mean_absolute_error, mean_squared_error, \
@@ -12,6 +12,7 @@ from sklearn.preprocessing import StandardScaler
 import os
 import shutil
 import json
+
 
 def train_and_test_model(data, target_variable_name):
     """Builds a model using data to predict the target variable.
@@ -158,21 +159,15 @@ def break_companion_and_join_datasets_per_record(record, dir_):
         # saving datasets
         if not os.path.exists(candidate_path):
             try:
-                lock.acquire()
                 single_column_data.to_csv(candidate_path, index=False)
             except:
                 continue
-            finally:
-                lock.release()
         new_record['candidate_dataset'] = os.path.abspath(candidate_path)
         if not os.path.exists(join_path):
             try:
-                lock.acquire()
                 single_column_joined_data.to_csv(join_path, index=False)
             except:
                 continue
-            finally:
-                lock.release()
         new_record['joined_dataset'] = os.path.abspath(join_path)
 
         # scores after augmentation
@@ -196,83 +191,74 @@ def break_companion_and_join_datasets_per_record(record, dir_):
     return output
 
 
-def pool_init(l):
-    global lock
-    lock = l
-
-
-def break_companion_and_join_datasets(path_to_datamart_records, dir_):
+def break_companion_and_join_datasets(path_to_datamart_records, dir_, sample=False):
     
     # multiprocessing.set_start_method('forkserver')
 
     records = open(path_to_datamart_records).readlines()
-    l = multiprocessing.Lock()
-    p = multiprocessing.Pool(initializer=pool_init, initargs=(l,), processes=int(multiprocessing.cpu_count()/2))
-    new_records = p.starmap(
-        break_companion_and_join_datasets_per_record,
-        [(record, dir_) for record in records]
-    )
+    new_records = list()
+
+    if sample:
+        records = random.sample(records, int(len(records)*0.1))
+    
+    for record in records:
+        new_records += break_companion_and_join_datasets_per_record(record, dir_)
             
     return new_records
 
 
-if __name__ == '__main__':
-    multiprocessing.set_start_method('forkserver')
+# creating directories
+if not os.path.exists('companion-datasets-single-column'):
+    os.mkdir('companion-datasets-single-column')
+for p in ['taxi-vehicle-collision', 'ny-taxi-demand', 'college-debt', 'poverty-estimation']:
+    if not os.path.exists('companion-datasets-single-column/%s'%p):
+        os.mkdir('companion-datasets-single-column/%s'%p)
 
-    # creating directories
-    if not os.path.exists('companion-datasets-single-column'):
-        os.mkdir('companion-datasets-single-column')
-    for p in ['taxi-vehicle-collision', 'ny-taxi-demand', 'college-debt', 'poverty-estimation']:
-        if not os.path.exists('companion-datasets-single-column/%s'%p):
-            os.mkdir('companion-datasets-single-column/%s'%p)
+## NY Taxi and Vehicle Collision Problem
 
-    ## NY Taxi and Vehicle Collision Problem
+taxi_records = break_companion_and_join_datasets(
+    'taxi-vehicle-collision-datamart-records/datamart-records',
+    'companion-datasets-single-column/taxi-vehicle-collision/'
+)
 
-    taxi_records = break_companion_and_join_datasets(
-        'taxi-vehicle-collision-datamart-records/datamart-records',
-        'companion-datasets-single-column/taxi-vehicle-collision/'
-    )
+if os.path.exists('taxi-vehicle-collision-datamart-records-single-column-vidaserver1/'):
+    shutil.rmtree('taxi-vehicle-collision-datamart-records-single-column-vidaserver1/')
+os.mkdir('taxi-vehicle-collision-datamart-records-single-column-vidaserver1/')
 
-    print(len(taxi_records))
-    print(len(taxi_records[0]))
+training_records = open('taxi-vehicle-collision-datamart-records-single-column-vidaserver1/datamart-records', 'w')
+for record in taxi_records:
+    training_records.write(record + "\n")
+training_records.close()
 
-# if os.path.exists('taxi-vehicle-collision-datamart-records-single-column/'):
-#     shutil.rmtree('taxi-vehicle-collision-datamart-records-single-column/')
-# os.mkdir('taxi-vehicle-collision-datamart-records-single-column/')
+## College Debt Problem
 
-# training_records = open('taxi-vehicle-collision-datamart-records-single-column/datamart-records', 'w')
-# for record in taxi_records:
-#     training_records.write(record + "\n")
-# training_records.close()
+college_debt_records = break_companion_and_join_datasets(
+    'college-debt-datamart-records/datamart-records',
+    'companion-datasets-single-column/college-debt/'
+)
 
-# ## College Debt Problem
+if os.path.exists('college-debt-datamart-records-single-column-vidaserver1/'):
+    shutil.rmtree('college-debt-datamart-records-single-column-vidaserver1/')
+os.mkdir('college-debt-datamart-records-single-column-vidaserver1/')
 
-# college_debt_records = break_companion_and_join_datasets(
-#     'college-debt-datamart-records/datamart-records',
-#     'companion-datasets-single-column/college-debt/'
-# )
+training_records = open('college-debt-datamart-records-single-column-vidaserver1/datamart-records', 'w')
+for record in college_debt_records:
+    training_records.write(record + "\n")
+training_records.close()
 
-# if os.path.exists('college-debt-datamart-records-single-column/'):
-#     shutil.rmtree('college-debt-datamart-records-single-column/')
-# os.mkdir('college-debt-datamart-records-single-column/')
+## Poverty Estimation
 
-# training_records = open('college-debt-datamart-records-single-column/datamart-records', 'w')
-# for record in college_debt_records:
-#     training_records.write(record + "\n")
-# training_records.close()
+poverty_estimation_records = break_companion_and_join_datasets(
+    'poverty-estimation-datamart-records/datamart-records',
+    'companion-datasets-single-column/poverty-estimation/',
+    sample=True
+)
 
-# ## Poverty Estimation
+if os.path.exists('poverty-estimation-datamart-records-single-column-vidaserver1/'):
+    shutil.rmtree('poverty-estimation-datamart-records-single-column-vidaserver1/')
+os.mkdir('poverty-estimation-datamart-records-single-column-vidaserver1/')
 
-# poverty_estimation_records = break_companion_and_join_datasets(
-#     'poverty-estimation-datamart-records/datamart-records',
-#     'companion-datasets-single-column/poverty-estimation/'
-# )
-
-# if os.path.exists('poverty-estimation-datamart-records-single-column/'):
-#     shutil.rmtree('poverty-estimation-datamart-records-single-column/')
-# os.mkdir('poverty-estimation-datamart-records-single-column/')
-
-# training_records = open('poverty-estimation-datamart-records-single-column/datamart-records', 'w')
-# for record in poverty_estimation_records:
-#     training_records.write(record + "\n")
-# training_records.close()
+training_records = open('poverty-estimation-datamart-records-single-column-vidaserver1/datamart-records', 'w')
+for record in poverty_estimation_records:
+    training_records.write(record + "\n")
+training_records.close()
