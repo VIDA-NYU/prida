@@ -146,15 +146,21 @@ def break_companion_and_join_datasets_per_record(record, dir_):
         # saving datasets
         if not os.path.exists(candidate_path):
             try:
+            	lock.acquire()
                 single_column_data.to_csv(candidate_path, index=False)
             except:
                 continue
+            finally:
+            	lock.release()
         new_record['candidate_dataset'] = os.path.abspath(candidate_path)
         if not os.path.exists(join_path):
             try:
+            	lock.acquire()
                 single_column_joined_data.to_csv(join_path, index=False)
             except:
                 continue
+            finally:
+            	lock.release()
         new_record['joined_dataset'] = os.path.abspath(join_path)
 
         # scores after augmentation
@@ -178,10 +184,16 @@ def break_companion_and_join_datasets_per_record(record, dir_):
     return output
 
 
+def pool_init(l):
+    global lock
+    lock = l
+
+
 def break_companion_and_join_datasets(path_to_datamart_records, dir_):
     
     records = open(path_to_datamart_records).readlines()
-    p = multiprocessing.Pool(multiprocessing.cpu_count())
+    l = multiprocessing.Lock()
+    p = multiprocessing.Pool(initializer=pool_init, initargs=(l,) processes=multiprocessing.cpu_count())
     new_records = p.starmap(
     	break_companion_and_join_datasets_per_record,
     	[(record, dir_) for record in records]
