@@ -60,29 +60,12 @@ def  plot_features_and_target_histograms(data, prefix):
 
 if __name__=='__main__':
   use_case_dataset = pd.read_csv(sys.argv[1])
-  plot_features_and_target_histograms(use_case_dataset, 'entire-data')
-
-  #fp = use_case_dataset.loc[use_case_dataset['eval'] == 'fp']
-  #plot_features_and_target_histograms(fp, 'fp')
-  #tp = use_case_dataset.loc[use_case_dataset['eval'] == 'tp']
-  #plot_features_and_target_histograms(tp, 'tp')
-  #fn = use_case_dataset.loc[use_case_dataset['eval'] == 'fn']
-  # plot_features_and_target_histograms(fn, 'fn')
-#   tn = use_case_dataset.loc[use_case_dataset['eval'] == 'tn']
-#   plot_features_and_target_histograms(tn, 'tn')
   
-    
-#    num_features = training.shape[1]   
-#    for i in range(num_features):
-#        plot_histogram(FEATURE_NAMES[i] + '_histograms_training_test.png', FEATURE_NAMES[i], training[:,i], test[:,i], remove_outliers_mad=True) 
-#    plot_histogram(FEATURE_NAMES[8] + '_histograms_training_test.png', FEATURE_NAMES[8], training[:,8], test[:,8])
-#    plot_histogram(FEATURE_NAMES[12] + '_histograms_training_test.png', FEATURE_NAMES[12], training[:,12], test[:,12])
-
-    # plot_histogram('gains_in_r2_score_histograms_training_test.png', 'gains_in_r2_score', training_gains, test_gains, remove_outliers_mad=True)
-
-    # num_features = training.shape[1]   
-    # for i in range(num_features):
-    #     feature_for_positive_gain, feature_for_negative_gain = separate_feature_based_on_gain_range(training[:,i], training_gains) 
-    #     plot_histogram(FEATURE_NAMES[i] + '_training_corresponding_positive_and_negative_gains.png', FEATURE_NAMES[i], feature_for_positive_gain, feature_for_negative_gain, remove_outliers_mad=True)
-    #     feature_for_positive_gain, feature_for_negative_gain = separate_feature_based_on_gain_range(test[:,i], test_gains) 
-    #     plot_histogram(FEATURE_NAMES[i] + '_test_corresponding_positive_and_negative_gains.png', FEATURE_NAMES[i], feature_for_positive_gain, feature_for_negative_gain, remove_outliers_mad=True) 
+  fp = use_case_dataset.loc[use_case_dataset['eval'] == 'fp']
+  plot_features_and_target_histograms(fp, 'fp')
+  tp = use_case_dataset.loc[use_case_dataset['eval'] == 'tp']
+  plot_features_and_target_histograms(tp, 'tp')
+  fn = use_case_dataset.loc[use_case_dataset['eval'] == 'fn']
+  plot_features_and_target_histograms(fn, 'fn')
+  tn = use_case_dataset.loc[use_case_dataset['eval'] == 'tn']
+  plot_features_and_target_histograms(tn, 'tn')

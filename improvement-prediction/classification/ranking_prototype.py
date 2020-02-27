@@ -373,13 +373,13 @@ if __name__ == '__main__':
   training_filename = sys.argv[1]
   test_filename = sys.argv[2]
   features = eval(open(sys.argv[3]).readline())
-  baseline_regressor = pickle.load(open(sys.argv[4], 'rb'))
+  #baseline_regressor = pickle.load(open(sys.argv[4], 'rb'))
   
   training_data = pd.read_csv(training_filename)
   test_data = pd.read_csv(test_filename)
   test_with_predictions = generate_predictions(training_data, test_data, features)
   #analyze_predictions(test_with_predictions)
-  regressor = build_regressor_for_ranking_positive_class(training_data, features)
-  rank_candidates_classified_as_positive(test_with_predictions, regressor, features, baseline_regressor)
+  #regressor = build_regressor_for_ranking_positive_class(training_data, features)
+  #rank_candidates_classified_as_positive(test_with_predictions, regressor, features, baseline_regressor)
   
   
