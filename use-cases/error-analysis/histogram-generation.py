@@ -6,7 +6,12 @@
 
 import sys
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import median_absolute_deviation
 
+OUTLIER_THRESHOLD_ZSCORES = 3
+OUTLIER_THRESHOLD_MAD = 2
 TARGET = 'gain_in_r2_score'
 FEATURES = ['query_num_of_columns', 'query_num_of_rows', 'query_row_column_ratio', 'query_max_skewness', 'query_max_kurtosis',
             'query_max_unique', 'candidate_num_of_columns', 'candidate_num_rows', 'candidate_row_column_ratio', 'candidate_max_skewness',
@@ -14,38 +19,56 @@ FEATURES = ['query_num_of_columns', 'query_num_of_rows', 'query_row_column_ratio
             'query_target_max_mutual_info', 'candidate_target_max_pearson', 'candidate_target_max_spearman', 'candidate_target_max_covariance',
             'candidate_target_max_mutual_info', 'max_pearson_difference', 'containment_fraction']
 
-def plot_feature_and_target_histograms(data):
-    for feature in FEATURES:
-        
-    def plot_histogram(hist_filename, feature_name, feature_training, feature_test, remove_outliers_zscores=False, remove_outliers_mad=False):
-    if remove_outliers_zscores:
-        feature_training = remove_outliers_based_on_zscores(feature_training)
-        feature_test = remove_outliers_based_on_zscores(feature_test)
-    elif remove_outliers_mad:
-        feature_training = remove_outliers_based_on_mad(feature_training)
-        feature_test = remove_outliers_based_on_mad(feature_test)
+def remove_outliers_based_on_zscores(feature):
+  mean_ = np.mean(feature)
+  std_ = np.std(feature)
+  return [i for i in feature if np.fabs((i - mean_)/std_) < OUTLIER_THRESHOLD_ZSCORES]
 
-    weights = np.ones_like(feature_training)/float(len(feature_training))
-    plt.hist(feature_training, bins=50, alpha=0.5, weights=weights, label='positive-gain')#, normed=True) #density=True, stacked=True)
+def remove_outliers_based_on_mad(feature):
+  mad = median_absolute_deviation(feature)
+  median = np.median(feature)
+  return [i for i in feature if np.fabs((i - median)/mad) < OUTLIER_THRESHOLD_MAD]
 
-    weights = np.ones_like(feature_test)/float(len(feature_test))
-    plt.hist(feature_test, bins=50, alpha=0.5, weights=weights, label='negative-gain')#, normed=True) #density=True, stacked=True) #, density=True
-         
-    plt.legend(loc='upper right')
+def  plot_features_and_target_histograms(data, prefix):
+  for feature_name in FEATURES:
+    #tmp = remove_outliers_based_on_zscores(data[feature_name])
+    #tmp = remove_outliers_based_on_mad(tmp)
+    #tmp = remove_outliers_based_on_mad(data[feature_name])
+    tmp = data[feature_name]
+
+    weights = np.ones_like(tmp)/float(len(tmp))
+    plt.hist(tmp, bins=50, alpha=0.5, weights=weights)
     plt.xlabel('Value Ranges')
     plt.ylabel('Percentages')
     plt.title(feature_name)
-    plt.savefig(hist_filename,  dpi=600)
+    plt.savefig(prefix + '-FEATURE-' + feature_name + '.png',  dpi=600)
     plt.close()
 
-if __name__=='__main__':
-    use_case_dataset = pd.read_csv(sys.argv[1])
+  #tmp = remove_outliers_based_on_zscores(data[TARGET])
+  #tmp = remove_outliers_based_on_mad(tmp)
+  #tmp = remove_outliers_based_on_mad(data[TARGET])
+  tmp = data[feature_name]
 
-    fp = use_case_dataset.loc[use_case_dataset == 'fp']
-    plot_feature_and_target_histograms(fp, 'fp')
-    tp = use_case_dataset.loc[use_case_dataset == 'tp']
-    fn = use_case_dataset.loc[use_case_dataset == 'fn']
-    tn = use_case_dataset.loc[use_case_dataset == 'tn']
+  weights = np.ones_like(tmp)/float(len(tmp))
+  plt.hist(tmp, bins=50, alpha=0.5, weights=weights)
+  plt.xlabel('Value Ranges')
+  plt.ylabel('Percentages')
+  plt.title(TARGET)
+  plt.savefig(prefix + '-TARGET-' + TARGET + '.png',  dpi=600)
+  plt.close()
+
+
+if __name__=='__main__':
+  use_case_dataset = pd.read_csv(sys.argv[1])
+  
+  fp = use_case_dataset.loc[use_case_dataset['eval'] == 'fp']
+  plot_features_and_target_histograms(fp, 'fp')
+  tp = use_case_dataset.loc[use_case_dataset['eval'] == 'tp']
+  plot_features_and_target_histograms(tp, 'tp')
+  fn = use_case_dataset.loc[use_case_dataset['eval'] == 'fn']
+  plot_features_and_target_histograms(fn, 'fn')
+  tn = use_case_dataset.loc[use_case_dataset['eval'] == 'tn']
+  plot_features_and_target_histograms(tn, 'tn')
     
 #    num_features = training.shape[1]   
 #    for i in range(num_features):
