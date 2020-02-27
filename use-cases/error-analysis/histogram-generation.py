@@ -33,8 +33,8 @@ def  plot_features_and_target_histograms(data, prefix):
   for feature_name in FEATURES:
     #tmp = remove_outliers_based_on_zscores(data[feature_name])
     #tmp = remove_outliers_based_on_mad(tmp)
-    #tmp = remove_outliers_based_on_mad(data[feature_name])
-    tmp = data[feature_name]
+    tmp = remove_outliers_based_on_mad(data[feature_name])
+    #tmp = data[feature_name]
 
     weights = np.ones_like(tmp)/float(len(tmp))
     plt.hist(tmp, bins=50, alpha=0.5, weights=weights)
@@ -60,15 +60,16 @@ def  plot_features_and_target_histograms(data, prefix):
 
 if __name__=='__main__':
   use_case_dataset = pd.read_csv(sys.argv[1])
-  
-  fp = use_case_dataset.loc[use_case_dataset['eval'] == 'fp']
-  plot_features_and_target_histograms(fp, 'fp')
-  tp = use_case_dataset.loc[use_case_dataset['eval'] == 'tp']
-  plot_features_and_target_histograms(tp, 'tp')
-  fn = use_case_dataset.loc[use_case_dataset['eval'] == 'fn']
-  plot_features_and_target_histograms(fn, 'fn')
-  tn = use_case_dataset.loc[use_case_dataset['eval'] == 'tn']
-  plot_features_and_target_histograms(tn, 'tn')
+  plot_features_and_target_histograms(use_case_dataset, 'entire-data')
+
+  #fp = use_case_dataset.loc[use_case_dataset['eval'] == 'fp']
+  #plot_features_and_target_histograms(fp, 'fp')
+  #tp = use_case_dataset.loc[use_case_dataset['eval'] == 'tp']
+  #plot_features_and_target_histograms(tp, 'tp')
+  #fn = use_case_dataset.loc[use_case_dataset['eval'] == 'fn']
+  # plot_features_and_target_histograms(fn, 'fn')
+#   tn = use_case_dataset.loc[use_case_dataset['eval'] == 'tn']
+#   plot_features_and_target_histograms(tn, 'tn')
   
     
 #    num_features = training.shape[1]   
