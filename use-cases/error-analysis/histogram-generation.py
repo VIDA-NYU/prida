@@ -73,14 +73,14 @@ def split_augmentations_into_gain_and_loss(data):
 if __name__=='__main__':
   use_case_dataset = pd.read_csv(sys.argv[1])
   
-  # fp = use_case_dataset.loc[use_case_dataset['eval'] == 'fp']
-  # plot_features_and_target_histograms(fp, 'fp')
-  # tp = use_case_dataset.loc[use_case_dataset['eval'] == 'tp']
-  # plot_features_and_target_histograms(tp, 'tp')
-  # fn = use_case_dataset.loc[use_case_dataset['eval'] == 'fn']
-  # plot_features_and_target_histograms(fn, 'fn')
-  # tn = use_case_dataset.loc[use_case_dataset['eval'] == 'tn']
-  # plot_features_and_target_histograms(tn, 'tn')
+  fp = use_case_dataset.loc[use_case_dataset['eval'] == 'fp']
+  plot_features_and_target_histograms(fp, 'fp')
+  tp = use_case_dataset.loc[use_case_dataset['eval'] == 'tp']
+  plot_features_and_target_histograms(tp, 'tp')
+  fn = use_case_dataset.loc[use_case_dataset['eval'] == 'fn']
+  plot_features_and_target_histograms(fn, 'fn')
+  tn = use_case_dataset.loc[use_case_dataset['eval'] == 'tn']
+  plot_features_and_target_histograms(tn, 'tn')
     
   gain, loss = split_augmentations_into_gain_and_loss(use_case_dataset)
   plot_features_and_target_histograms(gain, 'gain')
