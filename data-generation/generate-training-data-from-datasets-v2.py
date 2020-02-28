@@ -441,19 +441,10 @@ def generate_performance_scores(query_dataset, target_variable, candidate_datase
 
     # params
     algorithm = params['regression_algorithm']
-    cluster_execution = params['cluster']
-    hdfs_address = params['hdfs_address']
-    hdfs_user = params['hdfs_user']
     inner_join = params['inner_join']
 
-    # HDFS Client
-    hdfs_client = None
-    if cluster_execution:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
-
     # reading query dataset
-    query_data_str = read_file(query_dataset, hdfs_client, cluster_execution)
-    query_data = pd.read_csv(StringIO(query_data_str))
+    query_data = pd.read_csv(StringIO(query_dataset))
     query_data.set_index(
         'key-for-ranking',
         drop=True,
@@ -471,8 +462,7 @@ def generate_performance_scores(query_dataset, target_variable, candidate_datase
     for candidate_dataset in candidate_datasets:
 
         # reading candidate dataset
-        candidate_data_str = read_file(candidate_dataset, hdfs_client, cluster_execution)
-        candidate_data = pd.read_csv(StringIO(candidate_data_str))
+        candidate_data = pd.read_csv(StringIO(candidate_dataset))
         candidate_data.set_index(
             'key-for-ranking',
             drop=True,
@@ -570,7 +560,7 @@ def train_and_test_model(data, target_variable_name, algorithm):
             n_estimators=100,
             random_state=42,
             n_jobs=-1,
-            max_depth=len(data.columns)-1
+            # max_depth=len(data.columns)-1
         )
         forest.fit(X_train, y_train.ravel())
         yfit = forest.predict(X_test)
@@ -613,9 +603,9 @@ def generate_output_performance_data(query_dataset, target, candidate_dataset,
     """
 
     return json.dumps(dict(
-        query_dataset=os.path.sep.join(query_dataset.split(os.path.sep)[-2:]),
+        query_dataset=query_dataset,
         target=target,
-        candidate_dataset=os.path.sep.join(candidate_dataset.split(os.path.sep)[-2:]),
+        candidate_dataset=candidate_dataset,
         imputation_strategy=imputation_strategy,
         mean_absolute_error=[scores_before[0], scores_after[0]],
         mean_squared_error=[scores_before[1], scores_after[1]],
@@ -671,7 +661,7 @@ if __name__ == '__main__':
 
     # all query and candidate datasets
     #   format is the following:
-    #   (uiud, query dataset, target variable, candidate datasets)
+    #   (query dataset, target variable, candidate datasets)
     query_candidate_datasets = sc.emptyRDD()
 
     n_training_datasets = 0
@@ -864,17 +854,14 @@ if __name__ == '__main__':
 
                 # generating candidate datasets for negative examples
                 #   format is the following:
-                #   (uiud, query dataset, target variable, candidate datasets)
+                #   (query dataset, target variable, candidate datasets)
                 query_and_candidate_data_negative = query_and_candidate_data_negative_tmp.map(
-                    lambda x: (
-                        str(uuid.uuid4()),
-                        generate_candidate_datasets_negative_examples(x[0], x[1], x[2], params)
-                    )
+                    lambda x: generate_candidate_datasets_negative_examples(x[0], x[1], x[2], params)
                 )
 
                 query_candidate_datasets_tmp = sc.union([
                     query_and_candidate_data_positive_.map(
-                        lambda x: (str(uuid.uuid4()), x[1], x[0][1], x[2])
+                        lambda x: (x[1], x[0][1], x[2])
                     ),
                     query_and_candidate_data_negative
                 ]).persist(StorageLevel.MEMORY_AND_DISK)
@@ -897,8 +884,6 @@ if __name__ == '__main__':
                 sc.pickleFile(filename)
             ]).persist(StorageLevel.MEMORY_AND_DISK)
 
-    sys.exit(0)
-
     if not skip_training_data:
 
         if not skip_training_data and skip_dataset_creation:
@@ -908,7 +893,7 @@ if __name__ == '__main__':
 
             # getting performance scores
             performance_scores = query_candidate_datasets.flatMap(
-                lambda x: generate_performance_scores(x[1], x[0], x[2], params)
+                lambda x: generate_performance_scores(x[0], x[1], x[2], params)
             )
 
             # saving scores
@@ -919,7 +904,7 @@ if __name__ == '__main__':
             delete_dir(filename, hdfs_client, cluster_execution)
             if not cluster_execution:
                 filename = 'file://' + filename
-            performance_scores.saveAsTextFile(filename)
+            performance_scores.saveAsPickleFile(filename)
 
 
     print('Duration: %.4f seconds' % (time.time() - start_time))
