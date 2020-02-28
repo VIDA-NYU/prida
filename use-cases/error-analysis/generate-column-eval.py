@@ -40,7 +40,7 @@ def generate_predictions(classifier, test_data):
   eval = []
   for t, p in zip(y_test, y_pred):
       if t == POSITIVE_CLASS and p == POSITIVE_CLASS:
-          eval.append('fp')
+          eval.append('tp')
       elif t == POSITIVE_CLASS and p == NEGATIVE_CLASS:
           eval.append('fn')
       elif t == NEGATIVE_CLASS and p == POSITIVE_CLASS:

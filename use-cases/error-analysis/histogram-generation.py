@@ -1,7 +1,7 @@
 """ Given (1) a use case dataset with features FEATURES, target TARGET, and column eval indicating whether each instance/row is  a 
           false positive (FP), true positive (TP), false negative (FN), or true negative (TN) according to a certain classifier
 
-          this script generates histograms for every feature and target separated by FP, TP, FN, and TN.
+          this script generates histograms for every feature and target separated by (a) FP, TP, FN, and TN, or (b) "gain" and "loss".
 """
 
 import sys
@@ -13,6 +13,7 @@ from scipy.stats import median_absolute_deviation
 OUTLIER_THRESHOLD_ZSCORES = 3
 OUTLIER_THRESHOLD_MAD = 2
 TARGET = 'gain_in_r2_score'
+ALPHA = 0
 FEATURES = ['query_num_of_columns', 'query_num_of_rows', 'query_row_column_ratio', 'query_max_skewness', 'query_max_kurtosis',
             'query_max_unique', 'candidate_num_of_columns', 'candidate_num_rows', 'candidate_row_column_ratio', 'candidate_max_skewness',
             'candidate_max_kurtosis', 'candidate_max_unique', 'query_target_max_pearson', 'query_target_max_spearman', 'query_target_max_covariance',
@@ -57,30 +58,30 @@ def  plot_features_and_target_histograms(data, prefix):
   plt.savefig(prefix + '-TARGET-' + TARGET + '.png',  dpi=600)
   plt.close()
 
+def split_augmentations_into_gain_and_loss(data):
+  """This function splits instances into those that correspond
+  to positive augmentations (gain) and negative augmentations (loss).
 
+  The criterion is a simple, global one: if the value for column TARGET
+  is above a certain threshold ALPHA, the augmentation is positive; otherwise, it 
+  is negative
+  """
+  positive = data.loc[data[TARGET] > ALPHA]
+  negative = data.loc[data[TARGET] <= ALPHA]
+  return positive, negative
+  
 if __name__=='__main__':
   use_case_dataset = pd.read_csv(sys.argv[1])
   
-  fp = use_case_dataset.loc[use_case_dataset['eval'] == 'fp']
-  plot_features_and_target_histograms(fp, 'fp')
-  tp = use_case_dataset.loc[use_case_dataset['eval'] == 'tp']
-  plot_features_and_target_histograms(tp, 'tp')
-  fn = use_case_dataset.loc[use_case_dataset['eval'] == 'fn']
-  plot_features_and_target_histograms(fn, 'fn')
-  tn = use_case_dataset.loc[use_case_dataset['eval'] == 'tn']
-  plot_features_and_target_histograms(tn, 'tn')
+  # fp = use_case_dataset.loc[use_case_dataset['eval'] == 'fp']
+  # plot_features_and_target_histograms(fp, 'fp')
+  # tp = use_case_dataset.loc[use_case_dataset['eval'] == 'tp']
+  # plot_features_and_target_histograms(tp, 'tp')
+  # fn = use_case_dataset.loc[use_case_dataset['eval'] == 'fn']
+  # plot_features_and_target_histograms(fn, 'fn')
+  # tn = use_case_dataset.loc[use_case_dataset['eval'] == 'tn']
+  # plot_features_and_target_histograms(tn, 'tn')
     
-#    num_features = training.shape[1]   
-#    for i in range(num_features):
-#        plot_histogram(FEATURE_NAMES[i] + '_histograms_training_test.png', FEATURE_NAMES[i], training[:,i], test[:,i], remove_outliers_mad=True) 
-#    plot_histogram(FEATURE_NAMES[8] + '_histograms_training_test.png', FEATURE_NAMES[8], training[:,8], test[:,8])
-#    plot_histogram(FEATURE_NAMES[12] + '_histograms_training_test.png', FEATURE_NAMES[12], training[:,12], test[:,12])
-
-    # plot_histogram('gains_in_r2_score_histograms_training_test.png', 'gains_in_r2_score', training_gains, test_gains, remove_outliers_mad=True)
-
-    # num_features = training.shape[1]   
-    # for i in range(num_features):
-    #     feature_for_positive_gain, feature_for_negative_gain = separate_feature_based_on_gain_range(training[:,i], training_gains) 
-    #     plot_histogram(FEATURE_NAMES[i] + '_training_corresponding_positive_and_negative_gains.png', FEATURE_NAMES[i], feature_for_positive_gain, feature_for_negative_gain, remove_outliers_mad=True)
-    #     feature_for_positive_gain, feature_for_negative_gain = separate_feature_based_on_gain_range(test[:,i], test_gains) 
-    #     plot_histogram(FEATURE_NAMES[i] + '_test_corresponding_positive_and_negative_gains.png', FEATURE_NAMES[i], feature_for_positive_gain, feature_for_negative_gain, remove_outliers_mad=True) 
+  gain, loss = split_augmentations_into_gain_and_loss(use_case_dataset)
+  plot_features_and_target_histograms(gain, 'gain')
+  plot_features_and_target_histograms(loss, 'loss')
