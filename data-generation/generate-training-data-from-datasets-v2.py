@@ -48,51 +48,6 @@ def get_dataset_name(file_path, cluster_execution):
     return (dataset_name, file_name)
 
 
-def file_exists(file_path, hdfs_client=None, use_hdfs=False):
-    """Returns True if file exists.
-    """
-
-    if use_hdfs:
-        if hdfs_client.status(file_path, strict=False):
-            return True
-    else:
-        return os.path.exists(file_path)
-    return False
-
-
-def read_file(file_path, hdfs_client=None, use_hdfs=False):
-    """Opens a file for read and returns its corresponding content.
-    """
-
-    output = None
-    if use_hdfs:
-        if hdfs_client.status(file_path, strict=False):
-            with hdfs_client.read(file_path) as reader:
-                output = reader.read().decode()
-    else:
-        if os.path.exists(file_path):
-            with open(file_path) as reader:
-                output = reader.read()
-    return output
-
-
-def save_file(file_path, content, hdfs_client=None, use_hdfs=False):
-    """Opens a file for write and returns its corresponding file object.
-    """
-
-    if use_hdfs:
-        if hdfs_client.status(file_path, strict=False):
-            print('[WARNING] File already exists: %s' % file_path)
-        with hdfs_client.write(file_path) as writer:
-            writer.write(content.encode())
-    else:
-        if os.path.exists(file_path):
-            print('[WARNING] File already exists: %s' % file_path)
-        with open(file_path, 'w') as writer:
-            writer.write(content)
-    # print('[INFO] File %s saved!' % file_path)
-
-
 def delete_dir(file_path, hdfs_client=None, use_hdfs=False):
     """Deletes a directory.
     """
@@ -120,26 +75,6 @@ def create_dir(file_path, hdfs_client=None, use_hdfs=False):
             shutil.rmtree(file_path)
         os.makedirs(file_path)
     return True
-
-
-def list_dir(file_path, hdfs_client=None, use_hdfs=False):
-    """Lists all the files inside the directory specified by file_path.
-    """
-
-    if use_hdfs:
-        return hdfs_client.list(file_path)
-    return os.listdir(file_path)
-
-
-def get_file_size(file_path, hdfs_client=None, use_hdfs=False):
-    """Gets the size of the file in bytes.
-    """
-
-    if file_exists(file_path, hdfs_client, use_hdfs):
-        if use_hdfs:
-            return int(hdfs_client.content(file_path)['length'])
-        return int(os.stat(file_path).st_size)
-    return 0
 
 
 def generate_query_and_candidate_splits(input_dataset, params):
@@ -471,29 +406,29 @@ def generate_data_from_columns(original_data, columns, key_column, params, query
     # saving dataset
     datasets.append(new_data.to_csv(index=False))
 
-    # only remove records from candidate datasets
-    if not query:
+    # # only remove records from candidate datasets
+    # if not query:
 
-        # ratios of removed records
-        max_ratio_records_removed = 1.0
-        ratio_remove_record = list(np.arange(
-            0, max_ratio_records_removed, max_ratio_records_removed/(params['max_times_records_removed'] + 1))
-        )[1:]
+    #     # ratios of removed records
+    #     max_ratio_records_removed = 1.0
+    #     ratio_remove_record = list(np.arange(
+    #         0, max_ratio_records_removed, max_ratio_records_removed/(params['max_times_records_removed'] + 1))
+    #     )[1:]
 
-        for i in range(len(ratio_remove_record)):
+    #     for i in range(len(ratio_remove_record)):
 
-            # number of records to remove
-            n_records_remove = int(ratio_remove_record[i] * original_data.shape[0])
+    #         # number of records to remove
+    #         n_records_remove = int(ratio_remove_record[i] * original_data.shape[0])
 
-            # rows to remove
-            drop_indices = np.random.choice(new_data.index, n_records_remove, replace=False)
+    #         # rows to remove
+    #         drop_indices = np.random.choice(new_data.index, n_records_remove, replace=False)
 
-            # ignoring small datasets
-            if (new_data.shape[0] - len(drop_indices)) < params['min_number_records']:
-                continue
+    #         # ignoring small datasets
+    #         if (new_data.shape[0] - len(drop_indices)) < params['min_number_records']:
+    #             continue
 
-            # saving dataset
-            datasets.append(new_data.drop(drop_indices).to_csv(index=False))
+    #         # saving dataset
+    #         datasets.append(new_data.drop(drop_indices).to_csv(index=False))
 
     return datasets
 
@@ -949,11 +884,6 @@ if __name__ == '__main__':
                 if not cluster_execution:
                     filename = 'file://' + filename
                 query_candidate_datasets_tmp.saveAsPickleFile(filename)
-
-                # query_candidate_datasets = sc.union([
-                #     query_candidate_datasets,
-                #     query_candidate_datasets_tmp
-                # ]).persist(StorageLevel.MEMORY_AND_DISK)
 
     else:
 
