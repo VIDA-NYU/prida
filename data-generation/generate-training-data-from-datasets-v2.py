@@ -381,11 +381,11 @@ def generate_candidate_datasets_negative_examples(query_dataset, target_variable
             query_data_key_column[:min_size] + extra_key_column
         )
 
-        # randomly removing records from candidate dataset
-        n_records_remove = int(ratio_remove_record[i] * min_size)
-        drop_indices = np.random.choice(candidate_data.index, n_records_remove, replace=False)
-        if (candidate_data.shape[0] - len(drop_indices)) >= params['min_number_records']:
-            candidate_data = candidate_data.drop(drop_indices)
+        # # randomly removing records from candidate dataset
+        # n_records_remove = int(ratio_remove_record[i] * min_size)
+        # drop_indices = np.random.choice(candidate_data.index, n_records_remove, replace=False)
+        # if (candidate_data.shape[0] - len(drop_indices)) >= params['min_number_records']:
+        #     candidate_data = candidate_data.drop(drop_indices)
 
         new_candidate_datasets.append(candidate_data.to_csv(index=False))
 
@@ -671,7 +671,7 @@ if __name__ == '__main__':
 
     # all query and candidate datasets
     #   format is the following:
-    #   (target_variable, query_dataset_path, candidate_dataset_paths)
+    #   (uiud, query dataset, target variable, candidate datasets)
     query_candidate_datasets = sc.emptyRDD()
 
     n_training_datasets = 0
@@ -889,19 +889,15 @@ if __name__ == '__main__':
 
         # datasets previously generated
         for key in ['training', 'testing']:
-            filename = os.path.join(output_dir, '.files-%s-data/*' % key)
+            filename = os.path.join(output_dir, '.files-%s-data' % key)
             if not cluster_execution:
                 filename = 'file://' + filename
             query_candidate_datasets = sc.union([
                 query_candidate_datasets,
-                sc.textFile(filename).map(
-                    lambda x: x.split(',')
-                ).map(
-                    lambda x: (x[0], x[1], x[2:])
-            )]).persist(StorageLevel.MEMORY_AND_DISK)
+                sc.pickleFile(filename)
+            ]).persist(StorageLevel.MEMORY_AND_DISK)
 
     sys.exit(0)
-
 
     if not skip_training_data:
 
