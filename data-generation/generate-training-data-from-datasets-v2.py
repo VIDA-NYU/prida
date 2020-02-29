@@ -330,6 +330,9 @@ def generate_query_and_candidate_datasets_positive_examples(data, column_metadat
         query=True
     )[0]
 
+    # query data id
+    query_data_id = str(uuid.uuid4())
+
     # generate candidate data
     candidate_datasets = generate_data_from_columns(
         original_data=dataset,
@@ -339,10 +342,15 @@ def generate_query_and_candidate_datasets_positive_examples(data, column_metadat
         query=False
     )
 
-    return (query_dataset, candidate_datasets, len(query_columns), len(candidate_columns))
+    # candidate data id
+    candidate_data_id = list()
+    for i in range(len(candidate_datasets)):
+        candidate_data_id.append(str(uuid.uuid4()))
+
+    return (query_data_id, query_dataset, candidate_data_id, candidate_datasets, len(query_columns), len(candidate_columns))
 
 
-def generate_candidate_datasets_negative_examples(query_dataset, target_variable, candidate_datasets, params):
+def generate_candidate_datasets_negative_examples(query_dataset, candidate_datasets, params):
     """Generates candidate datasets for negative examples.
     This is necessary because query and candidate datasets must match for the join;
     therefore, we need to re-create the key column.
@@ -352,6 +360,9 @@ def generate_candidate_datasets_negative_examples(query_dataset, target_variable
 
     query_data = pd.read_csv(StringIO(query_dataset))
 
+    # query data id
+    query_data_id = str(uuid.uuid4())
+
     # key column
     query_data_key_column = list(query_data['key-for-ranking'])
 
@@ -360,6 +371,9 @@ def generate_candidate_datasets_negative_examples(query_dataset, target_variable
     ratio_remove_record = list(np.arange(
         0, max_ratio_records_removed, max_ratio_records_removed/(len(candidate_datasets) + 1))
     )[1:]
+
+    # candidate data id
+    candidate_data_id = list()
 
     for i in range(len(candidate_datasets)):
 
@@ -388,8 +402,9 @@ def generate_candidate_datasets_negative_examples(query_dataset, target_variable
         #     candidate_data = candidate_data.drop(drop_indices)
 
         new_candidate_datasets.append(candidate_data.to_csv(index=False))
+        candidate_data_id.append(str(uuid.uuid4()))
 
-    return (query_data.to_csv(index=False), target_variable, new_candidate_datasets)
+    return (query_data_id, query_data.to_csv(index=False), candidate_data_id, new_candidate_datasets)
 
 
 def generate_data_from_columns(original_data, columns, key_column, params, query=True):
@@ -730,19 +745,36 @@ if __name__ == '__main__':
 
             # creating query and candidate datasets
             #   format is the following:
-            #   ((dataset name, target variable name),
-            #    query dataset, candidate datasets, n. columns in query, n. columns in candidate)
-            query_and_candidate_data_positive = query_and_candidate_splits.map(
+            #   (dataset name, target variable name, query dataset id, query dataset,
+            #    candidate datasets ids, candidate datasets, n. columns in query, n. columns in candidate)
+            query_and_candidate_data = query_and_candidate_splits.map(
                 lambda x: (x[0], generate_query_and_candidate_datasets_positive_examples(
                     x[1], x[2], x[3][0], x[3][1], params
                 ))
             ).map(
-                lambda x: (x[0], x[1][0], x[1][1], x[1][2], x[1][3])
+                lambda x: (x[0][0], x[0][1], x[1][0], x[1][1], x[1][2], x[1][3], x[1][4], x[1][5])
             ).persist(StorageLevel.MEMORY_AND_DISK)
+
+            # combinations of query and candidate datasets for positive examples
+            #   format is the following:
+            #   (dataset name, target variable name, query dataset id, candidate datasets ids,
+            #    n. columns in query, n. columns in candidate)
+            query_and_candidate_data_positive = query_and_candidate_data.map(
+                lambda x: (x[0], x[1], x[2], x[4], x[6], x[7])
+            ).persist(StorageLevel.MEMORY_AND_DISK)
+
+            # id to dataset mapping
+            #   format is the following:
+            #   (dataset id, dataset)
+            id_to_dataset = query_and_candidate_data.flatMap(
+                lambda x: [(x[2], x[3])] + [(x[4][i], x[5][i]) for i in range(len(x[4]))]
+            ).persist(StorageLevel.MEMORY_AND_DISK)
+
+            query_and_candidate_data.unpersist()
 
             # processed datasets
             processed_datasets = list(set(query_and_candidate_data_positive.map(
-                lambda x: x[0][0]
+                lambda x: x[0]
             ).collect()))
 
             # choosing datasets for training and testing
@@ -758,10 +790,10 @@ if __name__ == '__main__':
             # filtering positive examples based on training and testing datasets
             query_and_candidate_data_positive_dict = dict()
             query_and_candidate_data_positive_dict['training'] = query_and_candidate_data_positive.filter(
-                lambda x: x[0][0] in training_datasets
+                lambda x: x[0] in training_datasets
             ).persist(StorageLevel.MEMORY_AND_DISK)
             query_and_candidate_data_positive_dict['testing'] = query_and_candidate_data_positive.filter(
-                lambda x: x[0][0] in testing_datasets
+                lambda x: x[0] in testing_datasets
             ).persist(StorageLevel.MEMORY_AND_DISK)
 
             query_and_candidate_splits.unpersist()
@@ -776,7 +808,7 @@ if __name__ == '__main__':
 
                 # total number of positive examples
                 n_positive_examples = query_and_candidate_data_positive_.map(
-                    lambda x: len(x[2])
+                    lambda x: len(x[3])
                 ).reduce(
                     lambda x, y: x + y
                 )
@@ -786,97 +818,104 @@ if __name__ == '__main__':
                 #   positive examples
                 n_random_candidates_per_query = int(n_positive_examples / n_query_datasets)
 
-                # first, we create a mapping between candidate id and dataset
-                #   format is the following:
-                #   ((dataset name, candidate id), candidate dataset)
-                candidate_id_to_dataset = query_and_candidate_data_positive_.flatMap(
-                    lambda x: [((x[0][0], candidate_id), x[2][candidate_id]) for candidate_id in range(len(x[2]))]
-                )
-                
-                # then, we replace candidate datasets for ids (index) to avoid
-                #   using too much memory
-                #   format is the following:
-                #   (dataset name, candidate id, n. columns in candidate)
-                candidate_id_positive_examples = query_and_candidate_data_positive_.flatMap(
-                    lambda x: [(x[0][0], candidate_id, x[4]) for candidate_id in range(len(x[2]))]
-                )
-
-                # then, we do the cartesian product between query_and_candidate_data_positive_ and
-                #   candidate_id_positive_examples to choose a random set of candidates
+                # we do the cartesian product between query_and_candidate_data_positive_ and
+                #   itself to choose a random set of candidates
                 #   per query dataset (that does not belong to the same dataset)
                 query_and_candidate_data_negative_tmp = query_and_candidate_data_positive_.cartesian(
-                    candidate_id_positive_examples
+                    query_and_candidate_data_positive_
                 ).filter(
                     # filtering out same dataset and by max number of columns
                     lambda x: (
-                        (x[0][0][0] != x[1][0]) and
-                        (x[0][3] + x[1][2] <= params['max_number_columns'])
+                        (x[0][0] != x[1][0]) and
+                        (x[0][4] + x[1][5] <= params['max_number_columns'])
                     )
                 ).map(
-                    # key => (dataset name, target variable name)
-                    # val => list of candidate datasets: (dataset name, candidate id) tuple
-                    lambda x: ((x[0][0]), [(x[1][0], x[1][1])])
+                    # key => (query dataset id, target variable)
+                    # val => list of candidate ids
+                    lambda x: ((x[0][2], x[0][1]), x[1][3])
                 ).reduceByKey(
                     # concatenating lists of candidate datasets
                     lambda x, y: x + y
                 ).map(
-                    # ((dataset name, target variable name), random sample of other candidate datasets)
+                    # ((query dataset id, target variable), random sample of other candidate datasets)
                     lambda x: (x[0], [x[1][i] for i in list(np.random.choice(
                         range(len(x[1])), size=min(n_random_candidates_per_query, len(x[1])), replace=False
                     ))])
-                ).flatMap(
-                    # ((dataset name, target variable name), (dataset name, candidate id))
-                    lambda x: [(x[0], candidate_pair) for candidate_pair in x[1]]
-                ).map(
-                    # then, get the candidate datasets back (instead of ids) and query datasets
-                    lambda x: (x[1], x[0])
-                ).join(
-                    candidate_id_to_dataset
-                ).map(
-                    # ((dataset name, target variable name), candidate dataset)
-                    lambda x: (x[1][0], [x[1][1]])
-                ).reduceByKey(
-                    # concatenating lists of candidate datasets
-                    lambda x, y: x + y
-                ).join(
-                    query_and_candidate_data_positive_
-                ).map(
-                    # (query dataset, target variable, candidate datasets)
-                    lambda x: (x[1][1][0], x[0][1], x[1][0])
                 ).persist(StorageLevel.MEMORY_AND_DISK)
 
                 # total number of negative examples
                 n_negative_examples = query_and_candidate_data_negative_tmp.map(
-                    lambda x: len(x[2])
+                    lambda x: len(x[1])
                 ).reduce(
                     lambda x, y: x + y
                 )
 
                 # generating candidate datasets for negative examples
                 #   format is the following:
-                #   (query dataset, target variable, candidate datasets)
+                #   (query dataset id, target variable, candidate dataset ids)
                 query_and_candidate_data_negative = query_and_candidate_data_negative_tmp.map(
-                    lambda x: generate_candidate_datasets_negative_examples(x[0], x[1], x[2], params)
-                )
+                    # first, let's use query dataset id as key
+                    lambda x: (x[0][0], (x[0][1], x[1]))
+                ).join(
+                    # we get the query datasets
+                    id_to_dataset
+                ).map(
+                    # (query dataset id, query dataset, target variable name, candidate dataset ids)
+                    lambda x: (x[0], x[1][1], x[1][0][0], x[1][0][1])
+                ).flatMap(
+                    # first, let's use each candidate dataset id as key
+                    lambda x: [(x[3][i], (x[0], x[1], x[2])) for i in range(len(x[3]))]
+                ).join(
+                    # we get the candidate datasets
+                    id_to_dataset
+                ).map(
+                    # ((query dataset id, query dataset, target variable name), [candidate dataset])
+                    lambda x: ((x[1][0][0], x[1][0][1], x[1][0][2]), [x[1][1]])
+                ).reduceByKey(
+                    # concatenating lists of candidate datasets
+                    lambda x, y: x + y
+                ).map(
+                    # generating negative data
+                    lambda x: (x[0][2], generate_candidate_datasets_negative_examples(x[0][1], x[1], params))
+                ).map(
+                    # (query dataset id, query dataset, target variable name, candidate datasets ids, candidate datasets)
+                    lambda x: (x[1][0], x[1][1], x[0], x[1][2], x[1][3])
+                ).persist(StorageLevel.MEMORY_AND_DISK)
 
+                # updating id to dataset mapping
+                id_to_dataset = sc.union([
+                    id_to_dataset,
+                    query_and_candidate_data_negative.flatMap(
+                        lambda x: [(x[0], x[1])] + [(x[3][i], x[4][i]) for i in range(len(x[3]))]
+                    )
+                ]).persist(StorageLevel.MEMORY_AND_DISK)
+
+                # (query dataset id, target variable name, candidate dataset ids)
                 query_candidate_datasets_tmp = sc.union([
                     query_and_candidate_data_positive_.map(
-                        lambda x: (x[1], x[0][1], x[2])
+                        lambda x: (x[2], x[1], x[3])
                     ),
-                    query_and_candidate_data_negative
+                    query_and_candidate_data_negative.map(
+                        lambda x: (x[0], x[2], x[3])
+                    )
                 ]).persist(StorageLevel.MEMORY_AND_DISK)
                 
-                # saving filenames
-                filename = os.path.join(output_dir, 'files-%s-data' % key)
+                # saving files
+                filename_combinations = os.path.join(output_dir, 'files-%s-data' % key)
                 if not cluster_execution:
-                    filename = 'file://' + filename
-                query_candidate_datasets_tmp.saveAsPickleFile(filename)
+                    filename_combinations = 'file://' + filename_combinations
+                query_candidate_datasets_tmp.saveAsPickleFile(filename_combinations)
+
+                filename_datasets = os.path.join(output_dir, 'datasets-%s' % key)
+                if not cluster_execution:
+                    filename_datasets = 'file://' + filename_datasets
+                id_to_dataset.saveAsPickleFile(filename_datasets)
 
     else:
 
         # datasets previously generated
         for key in ['training', 'testing']:
-            filename = os.path.join(output_dir, '.files-%s-data' % key)
+            filename = os.path.join(output_dir, 'files-%s-data' % key)
             if not cluster_execution:
                 filename = 'file://' + filename
             query_candidate_datasets = sc.union([
