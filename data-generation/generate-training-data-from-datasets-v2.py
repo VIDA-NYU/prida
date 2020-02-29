@@ -448,7 +448,8 @@ def generate_data_from_columns(original_data, columns, key_column, params, query
     return datasets
 
 
-def generate_performance_scores(query_dataset, target_variable, candidate_datasets, params):
+def generate_performance_scores(query_dataset_id, query_dataset, target_variable,
+                                candidate_datasets_ids, candidate_datasets, params):
     """Generates all the performance scores.
     """
 
@@ -474,7 +475,9 @@ def generate_performance_scores(query_dataset, target_variable, candidate_datase
         False
     )
 
-    for candidate_dataset in candidate_datasets:
+    for i in range(len(candidate_datasets)):
+
+        candidate_dataset = candidate_datasets[i]
 
         # reading candidate dataset
         candidate_data = pd.read_csv(StringIO(candidate_dataset))
@@ -505,9 +508,9 @@ def generate_performance_scores(query_dataset, target_variable, candidate_datase
 
         performance_scores.append(
             generate_output_performance_data(
-                query_dataset=query_dataset,
+                query_dataset=query_dataset_id,
                 target=target_variable,
-                candidate_dataset=candidate_dataset,
+                candidate_dataset=candidate_datasets_ids[i],
                 scores_before=scores_before,
                 scores_after=scores_after,
                 imputation_strategy=imputation_strategy
@@ -676,8 +679,13 @@ if __name__ == '__main__':
 
     # all query and candidate datasets
     #   format is the following:
-    #   (query dataset, target variable, candidate datasets)
+    #   (query dataset id, target variable name, candidate dataset ids)
     query_candidate_datasets = sc.emptyRDD()
+
+    # id to dataset mapping
+    #   format is the following:
+    #   (dataset id, dataset)
+    dataset_id_to_data = sc.emptyRDD()
 
     n_training_datasets = 0
     n_test_datasets = 0
@@ -764,9 +772,7 @@ if __name__ == '__main__':
             ).persist(StorageLevel.MEMORY_AND_DISK)
 
             # id to dataset mapping
-            #   format is the following:
-            #   (dataset id, dataset)
-            id_to_dataset = query_and_candidate_data.flatMap(
+            dataset_id_to_data = query_and_candidate_data.flatMap(
                 lambda x: [(x[2], x[3])] + [(x[4][i], x[5][i]) for i in range(len(x[4]))]
             ).persist(StorageLevel.MEMORY_AND_DISK)
 
@@ -858,7 +864,7 @@ if __name__ == '__main__':
                     lambda x: (x[0][0], (x[0][1], x[1]))
                 ).join(
                     # we get the query datasets
-                    id_to_dataset
+                    dataset_id_to_data
                 ).map(
                     # (query dataset id, query dataset, target variable name, candidate dataset ids)
                     lambda x: (x[0], x[1][1], x[1][0][0], x[1][0][1])
@@ -867,7 +873,7 @@ if __name__ == '__main__':
                     lambda x: [(x[3][i], (x[0], x[1], x[2])) for i in range(len(x[3]))]
                 ).join(
                     # we get the candidate datasets
-                    id_to_dataset
+                    dataset_id_to_data
                 ).map(
                     # ((query dataset id, query dataset, target variable name), [candidate dataset])
                     lambda x: ((x[1][0][0], x[1][0][1], x[1][0][2]), [x[1][1]])
@@ -883,8 +889,8 @@ if __name__ == '__main__':
                 ).persist(StorageLevel.MEMORY_AND_DISK)
 
                 # updating id to dataset mapping
-                id_to_dataset = sc.union([
-                    id_to_dataset,
+                dataset_id_to_data = sc.union([
+                    dataset_id_to_data,
                     query_and_candidate_data_negative.flatMap(
                         lambda x: [(x[0], x[1])] + [(x[3][i], x[4][i]) for i in range(len(x[3]))]
                     )
@@ -909,18 +915,26 @@ if __name__ == '__main__':
                 filename_datasets = os.path.join(output_dir, 'datasets-%s' % key)
                 if not cluster_execution:
                     filename_datasets = 'file://' + filename_datasets
-                id_to_dataset.saveAsPickleFile(filename_datasets)
+                dataset_id_to_data.saveAsPickleFile(filename_datasets)
 
     else:
 
         # datasets previously generated
         for key in ['training', 'testing']:
-            filename = os.path.join(output_dir, 'files-%s-data' % key)
+            filename_combinations = os.path.join(output_dir, 'files-%s-data' % key)
             if not cluster_execution:
-                filename = 'file://' + filename
+                filename_combinations = 'file://' + filename_combinations
             query_candidate_datasets = sc.union([
                 query_candidate_datasets,
-                sc.pickleFile(filename)
+                sc.pickleFile(filename_combinations)
+            ]).persist(StorageLevel.MEMORY_AND_DISK)
+
+            filename_datasets = os.path.join(output_dir, 'datasets-%s' % key)
+            if not cluster_execution:
+                filename_datasets = 'file://' + filename_datasets
+            dataset_id_to_data = sc.union([
+                dataset_id_to_data,
+                sc.pickleFile(filename_datasets)
             ]).persist(StorageLevel.MEMORY_AND_DISK)
 
     if not skip_training_data:
@@ -931,8 +945,29 @@ if __name__ == '__main__':
         if not query_candidate_datasets.isEmpty():
 
             # getting performance scores
-            performance_scores = query_candidate_datasets.flatMap(
-                lambda x: generate_performance_scores(x[0], x[1], x[2], params)
+            performance_scores = query_candidate_datasets.map(
+                # first, let's use query dataset id as key
+                lambda x: (x[0], (x[1], x[2]))
+            ).join(
+                # we get the query datasets
+                dataset_id_to_data
+            ).map(
+                # (query dataset id, query dataset, target variable name, candidate dataset ids)
+                lambda x: (x[0], x[1][1], x[1][0][0], x[1][0][1])
+            ).flatMap(
+                # then let's use each candidate dataset id as key
+                lambda x: [(x[3][i], (x[0], x[1], x[2])) for i in range(len(x[3]))]
+            ).join(
+                # we get the candidate datasets
+                dataset_id_to_data
+            ).map(
+                # ((query dataset id, query dataset, target variable name), ([candidate dataset id], [candidate dataset]))
+                lambda x: ((x[1][0][0], x[1][0][1], x[1][0][2]), ([x[0]], [x[1][1]])
+            ).reduceByKey(
+                # concatenating lists of candidate datasets
+                lambda x, y: (x[0] + y[0], x[1] + y[1])
+            ).flatMap(
+                lambda x: generate_performance_scores(x[0][0], x[0][1], x[0][2], x[1][0], x[1][1], params)
             )
 
             # saving scores
@@ -943,7 +978,7 @@ if __name__ == '__main__':
             delete_dir(filename, hdfs_client, cluster_execution)
             if not cluster_execution:
                 filename = 'file://' + filename
-            performance_scores.saveAsPickleFile(filename)
+            performance_scores.saveAsTextFile(filename)
 
 
     print('Duration: %.4f seconds' % (time.time() - start_time))
