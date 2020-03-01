@@ -912,6 +912,11 @@ if __name__ == '__main__':
                     filename_combinations = 'file://' + filename_combinations
                 query_candidate_datasets_tmp.saveAsPickleFile(filename_combinations)
 
+                query_candidate_datasets = sc.union([
+                    query_candidate_datasets,
+                    query_candidate_datasets_tmp
+                ]).persist(StorageLevel.MEMORY_AND_DISK)
+
             # saving mapping
             filename_datasets = os.path.join(output_dir, 'id-to-dataset')
             if not cluster_execution:
@@ -960,7 +965,7 @@ if __name__ == '__main__':
                 dataset_id_to_data
             ).map(
                 # ((query dataset id, query dataset, target variable name), ([candidate dataset id], [candidate dataset]))
-                lambda x: ((x[1][0][0], x[1][0][1], x[1][0][2]), ([x[0]], [x[1][1]])
+                lambda x: ((x[1][0][0], x[1][0][1], x[1][0][2]), ([x[0]], [x[1][1]]))
             ).reduceByKey(
                 # concatenating lists of candidate datasets
                 lambda x, y: (x[0] + y[0], x[1] + y[1])
