@@ -779,17 +779,17 @@ if __name__ == '__main__':
             query_and_candidate_data.unpersist()
 
             # processed datasets
-            processed_datasets = list(set(query_and_candidate_data_positive.map(
+            all_datasets = list(set(query_and_candidate_data_positive.map(
                 lambda x: x[0]
             ).collect()))
 
             # choosing datasets for training and testing
             training_datasets = list(np.random.choice(
-                processed_datasets,
-                math.floor(0.7*len(processed_datasets)),  ## 70% for training
+                all_datasets,
+                math.floor(0.7*len(all_datasets)),  ## 70% for training
                 replace=False
             ))
-            testing_datasets = list(set(processed_datasets).difference(set(training_datasets)))
+            testing_datasets = list(set(all_datasets).difference(set(training_datasets)))
             n_training_datasets = len(training_datasets)
             n_test_datasets = len(testing_datasets)
 
