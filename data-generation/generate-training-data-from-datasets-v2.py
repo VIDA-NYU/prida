@@ -912,10 +912,11 @@ if __name__ == '__main__':
                     filename_combinations = 'file://' + filename_combinations
                 query_candidate_datasets_tmp.saveAsPickleFile(filename_combinations)
 
-                filename_datasets = os.path.join(output_dir, 'datasets-%s' % key)
-                if not cluster_execution:
-                    filename_datasets = 'file://' + filename_datasets
-                dataset_id_to_data.saveAsPickleFile(filename_datasets)
+            # saving mapping
+            filename_datasets = os.path.join(output_dir, 'id-to-dataset')
+            if not cluster_execution:
+                filename_datasets = 'file://' + filename_datasets
+            dataset_id_to_data.saveAsPickleFile(filename_datasets)
 
     else:
 
@@ -929,13 +930,10 @@ if __name__ == '__main__':
                 sc.pickleFile(filename_combinations)
             ]).persist(StorageLevel.MEMORY_AND_DISK)
 
-            filename_datasets = os.path.join(output_dir, 'datasets-%s' % key)
-            if not cluster_execution:
-                filename_datasets = 'file://' + filename_datasets
-            dataset_id_to_data = sc.union([
-                dataset_id_to_data,
-                sc.pickleFile(filename_datasets)
-            ]).persist(StorageLevel.MEMORY_AND_DISK)
+        filename_datasets = os.path.join(output_dir, 'id-to-dataset')
+        if not cluster_execution:
+            filename_datasets = 'file://' + filename_datasets
+        dataset_id_to_data = sc.pickleFile(filename_datasets).persist(StorageLevel.MEMORY_AND_DISK)
 
     if not skip_training_data:
 
