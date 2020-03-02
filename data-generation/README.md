@@ -75,9 +75,9 @@ The data generation process will create all the query and candidate datasets und
 
 ```
 {
-    "query_dataset": the relative path for the query dataset
+    "query_dataset": the id of the query dataset
     "target": the name of the target variable
-    "candidate_dataset": the relative path for the candidate dataset
+    "candidate_dataset": the id of the candidate dataset
     "imputation_strategy": the missing value imputation strategy used after the join between the query and the candidate datasets, or "null" if inner join was applied instead
     "mean_absolute_error": an array where the first and second values correspond to the mean absolute error before and after augmentation, respectively
     "mean_squared_error": an array where the first and second values correspond to the mean squared error before and after augmentation, respectively
