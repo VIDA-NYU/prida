@@ -802,9 +802,6 @@ if __name__ == '__main__':
                 lambda x: x[0] in testing_datasets
             ).persist(StorageLevel.MEMORY_AND_DISK)
 
-            query_and_candidate_splits.unpersist()
-            query_and_candidate_data_positive.unpersist()
-
             for key in query_and_candidate_data_positive_dict:
 
                 query_and_candidate_data_positive_ = query_and_candidate_data_positive_dict[key]
@@ -813,16 +810,17 @@ if __name__ == '__main__':
                 n_query_datasets = query_and_candidate_data_positive_.count()
 
                 # total number of positive examples
-                n_positive_examples = query_and_candidate_data_positive_.map(
+                n_positive_examples_tmp = query_and_candidate_data_positive_.map(
                     lambda x: len(x[3])
                 ).reduce(
                     lambda x, y: x + y
                 )
+                n_positive_examples += n_positive_examples_tmp
 
                 # generating query and candidate dataset pairs for negative examples
                 #   number of negative examples should be similar to the number of
                 #   positive examples
-                n_random_candidates_per_query = int(n_positive_examples / n_query_datasets)
+                n_random_candidates_per_query = int(n_positive_examples_tmp / n_query_datasets)
 
                 # we do the cartesian product between query_and_candidate_data_positive_ and
                 #   itself to choose a random set of candidates
@@ -850,7 +848,7 @@ if __name__ == '__main__':
                 ).persist(StorageLevel.MEMORY_AND_DISK)
 
                 # total number of negative examples
-                n_negative_examples = query_and_candidate_data_negative_tmp.map(
+                n_negative_examples += query_and_candidate_data_negative_tmp.map(
                     lambda x: len(x[1])
                 ).reduce(
                     lambda x, y: x + y
