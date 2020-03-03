@@ -5,4 +5,5 @@ if test -f logs/$2.log; then
     rm logs/$2.log
 fi
 ./$1 &> logs/$2.out
+sleep 10
 yarn logs -applicationId $(python logs/capture-application-id.py logs/$2.out) > logs/$2.log
