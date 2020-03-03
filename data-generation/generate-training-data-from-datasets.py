@@ -680,7 +680,9 @@ if __name__ == '__main__':
     # all query and candidate datasets
     #   format is the following:
     #   (query dataset id, target variable name, candidate dataset ids)
-    query_candidate_datasets = sc.emptyRDD()
+    query_candidate_datasets = dict()
+    query_candidate_datasets['training'] = sc.emptyRDD()
+    query_candidate_datasets['testing'] = sc.emptyRDD()
 
     # id to dataset mapping
     #   format is the following:
@@ -910,8 +912,8 @@ if __name__ == '__main__':
                     filename_combinations = 'file://' + filename_combinations
                 query_candidate_datasets_tmp.saveAsPickleFile(filename_combinations)
 
-                query_candidate_datasets = sc.union([
-                    query_candidate_datasets,
+                query_candidate_datasets[key] = sc.union([
+                    query_candidate_datasets[key],
                     query_candidate_datasets_tmp
                 ]).persist(StorageLevel.MEMORY_AND_DISK)
 
@@ -923,13 +925,12 @@ if __name__ == '__main__':
 
     else:
 
-        # datasets previously generated
         for key in ['training', 'testing']:
             filename_combinations = os.path.join(output_dir, 'files-%s-data' % key)
             if not cluster_execution:
                 filename_combinations = 'file://' + filename_combinations
-            query_candidate_datasets = sc.union([
-                query_candidate_datasets,
+            query_candidate_datasets[key] = sc.union([
+                query_candidate_datasets[key],
                 sc.pickleFile(filename_combinations)
             ]).persist(StorageLevel.MEMORY_AND_DISK)
 
@@ -943,43 +944,45 @@ if __name__ == '__main__':
         if not skip_training_data and skip_dataset_creation:
             start_time = time.time()
 
-        if not query_candidate_datasets.isEmpty():
+        for key in ['training', 'testing']:
 
-            # getting performance scores
-            performance_scores = query_candidate_datasets.map(
-                # first, let's use query dataset id as key
-                lambda x: (x[0], (x[1], x[2]))
-            ).join(
-                # we get the query datasets
-                dataset_id_to_data
-            ).map(
-                # (query dataset id, query dataset, target variable name, candidate dataset ids)
-                lambda x: (x[0], x[1][1], x[1][0][0], x[1][0][1])
-            ).flatMap(
-                # then let's use each candidate dataset id as key
-                lambda x: [(x[3][i], (x[0], x[1], x[2])) for i in range(len(x[3]))]
-            ).join(
-                # we get the candidate datasets
-                dataset_id_to_data
-            ).map(
-                # ((query dataset id, query dataset, target variable name), ([candidate dataset id], [candidate dataset]))
-                lambda x: ((x[1][0][0], x[1][0][1], x[1][0][2]), ([x[0]], [x[1][1]]))
-            ).reduceByKey(
-                # concatenating lists of candidate datasets
-                lambda x, y: (x[0] + y[0], x[1] + y[1])
-            ).flatMap(
-                lambda x: generate_performance_scores(x[0][0], x[0][1], x[0][2], x[1][0], x[1][1], params)
-            )
+            if not query_candidate_datasets[key].isEmpty():
 
-            # saving scores
-            algorithm_name = params['regression_algorithm']
-            if params['regression_algorithm'] == 'random forest':
-                algorithm_name = 'random-forest'
-            filename = os.path.join(output_dir, 'training-data-' + algorithm_name)
-            delete_dir(filename, hdfs_client, cluster_execution)
-            if not cluster_execution:
-                filename = 'file://' + filename
-            performance_scores.saveAsTextFile(filename)
+                # getting performance scores
+                performance_scores = query_candidate_datasets[key].map(
+                    # first, let's use query dataset id as key
+                    lambda x: (x[0], (x[1], x[2]))
+                ).join(
+                    # we get the query datasets
+                    dataset_id_to_data
+                ).map(
+                    # (query dataset id, query dataset, target variable name, candidate dataset ids)
+                    lambda x: (x[0], x[1][1], x[1][0][0], x[1][0][1])
+                ).flatMap(
+                    # then let's use each candidate dataset id as key
+                    lambda x: [(x[3][i], (x[0], x[1], x[2])) for i in range(len(x[3]))]
+                ).join(
+                    # we get the candidate datasets
+                    dataset_id_to_data
+                ).map(
+                    # ((query dataset id, query dataset, target variable name), ([candidate dataset id], [candidate dataset]))
+                    lambda x: ((x[1][0][0], x[1][0][1], x[1][0][2]), ([x[0]], [x[1][1]]))
+                ).reduceByKey(
+                    # concatenating lists of candidate datasets
+                    lambda x, y: (x[0] + y[0], x[1] + y[1])
+                ).flatMap(
+                    lambda x: generate_performance_scores(x[0][0], x[0][1], x[0][2], x[1][0], x[1][1], params)
+                )
+
+                # saving scores
+                algorithm_name = params['regression_algorithm']
+                if params['regression_algorithm'] == 'random forest':
+                    algorithm_name = 'random-forest'
+                filename = os.path.join(output_dir, '%s-data-%s' % (key, algorithm_name))
+                delete_dir(filename, hdfs_client, cluster_execution)
+                if not cluster_execution:
+                    filename = 'file://' + filename
+                performance_scores.saveAsTextFile(filename)
 
 
     print('Duration: %.4f seconds' % (time.time() - start_time))
