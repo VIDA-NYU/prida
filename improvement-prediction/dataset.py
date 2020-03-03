@@ -9,11 +9,16 @@ class Dataset:
     """This class stores and manages a certain dataset and performs join operations with other given 
     datasets
     """    
-    def initialize_from_filename(self, filename, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None, key=None):
+    def initialize_from_filename(self, filename, key=None):
         """Generates a pandas representation of a dataset read from a given filename
         """
         self.filename = filename
-        self.read_dataset(hdfs_client, use_hdfs, hdfs_address, hdfs_user, key)
+        self.read_dataset(key)
+
+    def initialize_from_data(self, data, key=None):
+        """Generates a pandas representation of a dataset read from a data object
+        """
+        self.read_data(data, key)
 
     def initialize_from_data_and_column_names(self, data):
         """Stores a pandas representation of a dataset that is passed in the parameters
@@ -22,17 +27,29 @@ class Dataset:
         self.column_names = self.data.columns
         self.keys = set(self.data.index.values)
         
-    def read_dataset(self, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None, key=None):
+    def read_dataset(self, key=None):
         """Reads lines from self.filename, storing in a pandas dataframe
         """
         try:
-          self.data = pd.read_csv(StringIO(read_file(self.filename, hdfs_client, use_hdfs, hdfs_address, hdfs_user)))
+          self.data = pd.read_csv(StringIO(read_file(self.filename, None, None, None, None)))
           key_name = key if key else 'key-for-ranking'
           self.keys = set(self.data[key_name])
           self.data = self.data.set_index(keys=key_name, drop=True)
           self.column_names = self.data.columns
         except pd.errors.EmptyDataError:
           print('PANDAS ERROR FOR FILENAME', self.filename)
+
+    def read_data(self, data, key=None):
+        """Reads lines data, storing in a pandas dataframe
+        """
+        try:
+          self.data = pd.read_csv(StringIO(data))
+          key_name = key if key else 'key-for-ranking'
+          self.keys = set(self.data[key_name])
+          self.data = self.data.set_index(keys=key_name, drop=True)
+          self.column_names = self.data.columns
+        except pd.errors.EmptyDataError:
+          print('PANDAS ERROR FOR DATA')
 
     def get_data(self):
         """Returns the dataset (a pandas dataframe)

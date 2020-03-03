@@ -17,10 +17,9 @@ To predict the improvement in the prediction of a target variable after performi
 ```
 {
   "learning_data_filename": reference to file that stores information about the learning task
-	"augmentation_learning_data_filename": reference to file that stores all features, and improvements obtained via data augmentation according to different metrics 
-	"n_splits": number of folds for cross-validation when evaluating machine learning models that predict data augmentation improvements 
-	"output_filename": output filename where all predictions, along with original lines in learning_data_file, are saved
-	"cluster": false,
+  "augmentation_learning_data_filename": reference to file that stores all features, and improvements obtained via data augmentation according to different metrics 
+  "file_mapping": file that contains the mapping between id and dataset
+  "cluster": false,
   "hdfs_address": "http://gray01.poly.edu:50070",
   "hdfs_user": "fsc234"
 }

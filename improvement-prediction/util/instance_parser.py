@@ -14,12 +14,14 @@ def parse_augmentation_instances(training_data_filename):
             augmentation_instances.append(parse_augmentation_instance(line))
         return augmentation_instances
 
-def parse_augmentation_instance(prefix, file_record, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+def parse_augmentation_instance(file_record):
     """Parses file_record, a JSON instance of the training data in the format
-    {'query_dataset': query_dataset,
+    {'query_data': query_data,
+     'query_dataset_id': query_dataset,
      'query_key': query_key
      'target': target,
-     'candidate_dataset': candidate_dataset,
+     'candidate_data': candidate_data,
+     'candidate_dataset_id': candidate_dataset,
      'candidate_key': candidate_key,
      'imputation_strategy': imputation_strategy,
      'joined_dataset': joined_dataset,
@@ -32,10 +34,12 @@ def parse_augmentation_instance(prefix, file_record, hdfs_client=None, use_hdfs=
     """
     #TODO standardize the use of words dataset and filename
     
-    fields = {'query_filename': os.path.join(prefix, file_record['query_dataset']),
+    fields = {'query_data': file_record['query_data'],
+              'query_dataset_id': file_record['query_dataset'],
               'query_key': file_record.get('query_key', None), 
               'target_name': file_record['target'],
-              'candidate_filename': os.path.join(prefix, file_record['candidate_dataset']),
+              'candidate_data': file_record['candidate_data'],
+              'candidate_dataset_id': file_record['candidate_dataset'],
               'candidate_key': file_record.get('candidate_key', None),
               'imputation_strategy': file_record['imputation_strategy'], 
               'joined_dataset': None}
@@ -50,4 +54,4 @@ def parse_augmentation_instance(prefix, file_record, hdfs_client=None, use_hdfs=
         fields['med_ae_after'] = file_record['median_absolute_error'][1]
         fields['r2_score_before'] = file_record['r2_score'][0]
         fields['r2_score_after'] = file_record['r2_score'][1]
-    return AugmentationInstance(fields, hdfs_client, use_hdfs, hdfs_address, hdfs_user)
+    return AugmentationInstance(fields)
