@@ -48,40 +48,10 @@ def add_data_to_json(json_obj, query_data, candidate_data):
     return json_obj
 
 
-if __name__ == '__main__':
+def generate_learning_instances(learning_data, dataset_id_to_data):
+    """Preprocess the data and generates features from the records.
+    """
 
-    start_time = time.time()
-
-    # Spark context
-    conf = SparkConf().setAppName('Feature Generation')
-    sc = SparkContext(conf=conf)
-
-    # parameters
-    params = json.load(open('.params_feature_generation.json'))
-    learning_data_filename = params['learning_data_filename']
-    id_to_dataset_file = params['file_mapping']
-    augmentation_learning_data_filename = params['augmentation_learning_data_filename']
-    cluster_execution = params['cluster']
-    hdfs_address = params['hdfs_address']
-    hdfs_user = params['hdfs_user']
-
-    # opening training data file
-    learning_data_filename_for_spark = learning_data_filename
-    if not cluster_execution:
-        learning_data_filename_for_spark = 'file://' + learning_data_filename
-    # line below works for 2019-10-28 data
-    #learning_data = sc.textFile(learning_data_filename_for_spark).repartition(NUMBER_OF_SPARK_REPARTITIONS)
-    # lne below works for 2019-11-08 data
-    learning_data = sc.textFile(learning_data_filename_for_spark + '/*').persist(StorageLevel.MEMORY_AND_DISK)
-
-    # opening id to dataset mapping
-    #   format is the following:
-    #   (dataset id, dataset)
-    if not cluster_execution:
-        id_to_dataset_file = 'file://' + id_to_dataset_file
-    id_to_dataset = sc.pickleFile(id_to_dataset_file).persist(StorageLevel.MEMORY_AND_DISK)
-
-    # generating learning instances
     learning_instances = learning_data.map(
         lambda x: json.loads(x)
     ).map(
@@ -105,14 +75,71 @@ if __name__ == '__main__':
         lambda x: feature_array_to_string(x)
     )
 
-    #learning_instances.saveAsTextFile(augmentation_learning_data_filename)
+    return learning_instances
 
-    # creating a hdfs client for reading purposes
+
+if __name__ == '__main__':
+
+    start_time = time.time()
+
+    # Spark context
+    conf = SparkConf().setAppName('Feature Generation')
+    sc = SparkContext(conf=conf)
+
+    # parameters
+    params = json.load(open('.params_feature_generation.json'))
+    learning_data_filename_training = params['learning_data_training']
+    learning_data_filename_test = params['learning_data_test']
+    id_to_dataset_filename_training = params['id_to_dataset_training']
+    id_to_dataset_filename_test = params['id_to_dataset_test']
+    augmentation_learning_data_filename = params['augmentation_learning_data_filename']
+    cluster_execution = params['cluster']
+    hdfs_address = params['hdfs_address']
+    hdfs_user = params['hdfs_user']
+
+    # creating a hdfs client for writing purposes
     hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
+
+    # opening training and test data files
+    if not cluster_execution:
+        learning_data_filename_training = 'file://' + learning_data_filename_training
+        learning_data_filename_test = 'file://' + learning_data_filename_test
+        id_to_dataset_filename_training = 'file://' + id_to_dataset_filename_training
+        id_to_dataset_filename_test = 'file://' + id_to_dataset_filename_test
     
+    learning_data_training = sc.textFile(learning_data_filename_training + '/*').persist(StorageLevel.MEMORY_AND_DISK)
+    learning_data_test = sc.textFile(learning_data_filename_test + '/*').persist(StorageLevel.MEMORY_AND_DISK)
+    id_to_dataset_training = sc.pickleFile(id_to_dataset_filename_training).persist(StorageLevel.MEMORY_AND_DISK)
+    id_to_dataset_test = sc.pickleFile(id_to_dataset_filename_test).persist(StorageLevel.MEMORY_AND_DISK)
+
+    # generating learning instances for training
+    learning_instances_training = generate_learning_instances(
+        learning_data_training,
+        id_to_dataset_training
+    )
+
     save_file(
-        augmentation_learning_data_filename,
-        '\n'.join(learning_instances.collect()),
+        augmentation_learning_data_filename + '-training',
+        '\n'.join(learning_instances_training.collect()),
+        hdfs_client, 
+        cluster_execution,
+        hdfs_address,
+        hdfs_user
+    )
+
+    # freeing some memory
+    learning_data_training.unpersist()
+    id_to_dataset_training.unpersist()
+
+    # generating learning instances for test
+    learning_instances_test = generate_learning_instances(
+        learning_data_test,
+        id_to_dataset_test
+    )
+
+    save_file(
+        augmentation_learning_data_filename + '-test',
+        '\n'.join(learning_instances_test.collect()),
         hdfs_client, 
         cluster_execution,
         hdfs_address,

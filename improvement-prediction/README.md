@@ -16,9 +16,11 @@ To predict the improvement in the prediction of a target variable after performi
 
 ```
 {
-  "learning_data_filename": reference to file that stores information about the learning task
+  "learning_data_training": reference to file that stores information about the learning task for training
+  "learning_data_test": reference to file that stores information about the learning task for test
+  "id_to_dataset_training": reference to file that stores all the datasets used for training
+  "id_to_dataset_test": reference to file that stores all the datasets used for test
   "augmentation_learning_data_filename": reference to file that stores all features, and improvements obtained via data augmentation according to different metrics 
-  "file_mapping": file that contains the mapping between id and dataset
   "cluster": false,
   "hdfs_address": "http://gray01.poly.edu:50070",
   "hdfs_user": "fsc234"
