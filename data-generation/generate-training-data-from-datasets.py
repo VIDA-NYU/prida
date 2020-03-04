@@ -778,8 +778,6 @@ if __name__ == '__main__':
                 lambda x: [(x[2], x[3])] + [(x[4][i], x[5][i]) for i in range(len(x[4]))]
             ).persist(StorageLevel.MEMORY_AND_DISK)
 
-            query_and_candidate_data.unpersist()
-
             # processed datasets
             all_datasets = list(set(query_and_candidate_data_positive.map(
                 lambda x: x[0]
