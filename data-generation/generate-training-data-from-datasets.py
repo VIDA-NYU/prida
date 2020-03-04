@@ -1039,6 +1039,9 @@ if __name__ == '__main__':
                 filename = 'file://' + filename
             performance_scores_training.saveAsTextFile(filename)
 
+        query_candidate_datasets_training.unpersist()
+        dataset_id_to_data_training.unpersist()
+
         # test
         if not query_candidate_datasets_test.isEmpty():
             performance_scores_test = join_data_and_generate_performance_scores(
