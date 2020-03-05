@@ -5,30 +5,22 @@ from util.metrics import *
 from constants import *
 
 class AugmentationInstance:
-    def __init__(self, instance_values, hdfs_client=None, use_hdfs=False, hdfs_address=None, hdfs_user=None):
+    def __init__(self, instance_values):
         """This class concerns augmentation instances --- each composed of a query dataset,
         a target variable/column, a candidate dataset for augmentation, and optional metrics regarding 
         the quality of the target prediction before and after augmentation
         """
         self.instance_values_dict = instance_values
-        self.query_filename = self.instance_values_dict['query_filename']
+        self.query_filename = self.instance_values_dict['query_dataset_id']
         self.query_dataset = Dataset()
-        self.query_dataset.initialize_from_filename(
-            self.query_filename,
-            hdfs_client,
-            use_hdfs,
-            hdfs_address,
-            hdfs_user,
+        self.query_dataset.initialize_from_data(
+            self.instance_values_dict['query_data'],
             key=self.instance_values_dict['query_key']
         )
-        self.candidate_filename = self.instance_values_dict['candidate_filename']
+        self.candidate_filename = self.instance_values_dict['candidate_dataset_id']
         self.candidate_dataset = Dataset()
-        self.candidate_dataset.initialize_from_filename(
-            self.candidate_filename,
-            hdfs_client,
-            use_hdfs,
-            hdfs_address,
-            hdfs_user,
+        self.candidate_dataset.initialize_from_data(
+            self.instance_values_dict['candidate_data'],
             key=self.instance_values_dict['candidate_key']
         )
         self.target_name = self.instance_values_dict['target_name']
@@ -62,10 +54,6 @@ class AugmentationInstance:
             self.joined_dataset = Dataset()
             self.joined_dataset.initialize_from_filename(
                 self.instance_values_dict['joined_dataset'],
-                hdfs_client,
-                use_hdfs,
-                hdfs_address,
-                hdfs_user,
                 key=self.instance_values_dict['query_key']
             )
             self.containment_score = self.get_key_ratio_between_query_and_candidate_datasets(use_join=True)
