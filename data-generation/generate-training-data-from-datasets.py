@@ -520,6 +520,70 @@ def generate_performance_scores(query_dataset_id, query_dataset, target_variable
     return performance_scores
 
 
+def generate_performance_scores_single_candidate_dataset(query_dataset_id, query_dataset, target_variable,
+                                                         candidate_dataset_id, candidate_dataset, params):
+    """Generates all the performance scores.
+    """
+
+    performance_scores = list()
+
+    # params
+    algorithm = params['regression_algorithm']
+    inner_join = params['inner_join']
+
+    # reading query dataset
+    query_data = pd.read_csv(StringIO(query_dataset))
+    query_data.set_index(
+        'key-for-ranking',
+        drop=True,
+        inplace=True
+    )
+
+    # build model on query data only
+    _, scores_before = get_performance_scores(
+        query_data,
+        target_variable,
+        algorithm,
+        False
+    )
+
+    # reading candidate dataset
+    candidate_data = pd.read_csv(StringIO(candidate_dataset))
+    candidate_data.set_index(
+        'key-for-ranking',
+        drop=True,
+        inplace=True
+    )
+
+    # join dataset
+    join_ = query_data.join(
+        candidate_data,
+        how='left',
+        rsuffix='_r'
+    )
+    if inner_join:
+        join_.dropna(inplace=True)
+
+    # build model on joined data
+    # print('[INFO] Generating performance scores for query dataset %s and candidate dataset %s ...' % (query_dataset, candidate_dataset))
+    imputation_strategy, scores_after = get_performance_scores(
+        join_,
+        target_variable,
+        algorithm,
+        not(inner_join)
+    )
+    # print('[INFO] Performance scores for query dataset %s and candidate dataset %s done!' % (query_dataset, candidate_dataset))
+
+    return generate_output_performance_data(
+        query_dataset=query_dataset_id,
+        target=target_variable,
+        candidate_dataset=candidate_dataset_id,
+        scores_before=scores_before,
+        scores_after=scores_after,
+        imputation_strategy=imputation_strategy
+    )
+
+
 def get_performance_scores(data, target_variable_name, algorithm, missing_value_imputation):
     """Builds a model using data to predict the target variable,
     returning different performance metrics.
@@ -775,14 +839,22 @@ def join_data_and_generate_performance_scores(query_candidate_datasets, dataset_
         # we get the candidate datasets
         dataset_id_to_data
     ).map(
-        # ((query dataset id, query dataset, target variable name), ([candidate dataset id], [candidate dataset]))
-        lambda x: ((x[1][0][0], x[1][0][1], x[1][0][2]), ([x[0]], [x[1][1]]))
-    ).reduceByKey(
-        # concatenating lists of candidate datasets
-        lambda x, y: (x[0] + y[0], x[1] + y[1])
-    ).flatMap(
-        lambda x: generate_performance_scores(x[0][0], x[0][1], x[0][2], x[1][0], x[1][1], params)
+        lambda x: generate_performance_scores_single_candidate_dataset(
+            x[1][0][0],  # query dataset id
+            x[1][0][1],  # query dataset
+            x[1][0][2],  # target variable
+            x[0],        # candidate dataset id
+            x[1][1],     # candidate dataset
+            params
+        )
     ).persist(StorageLevel.MEMORY_AND_DISK)
+
+    # .reduceByKey(
+    #     # concatenating lists of candidate datasets
+    #     lambda x, y: (x[0] + y[0], x[1] + y[1])
+    # ).flatMap(
+    #     lambda x: generate_performance_scores(x[0][0], x[0][1], x[0][2], x[1][0], x[1][1], params)
+    # ).persist(StorageLevel.MEMORY_AND_DISK)
 
     return performance_scores
     
