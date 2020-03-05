@@ -164,8 +164,14 @@ if __name__ == '__main__':
             if algorithm_name not in algorithms:
                 algorithms[algorithm_name] = dict(
                     n_records=0,
-                    before_lte_after=0,
-                    before_gt_after=0,
+                    before_mae_lte_after=0,
+                    before_mae_gt_after=0,
+                    before_mse_lte_after=0,
+                    before_mse_gt_after=0,
+                    before_mdae_lte_after=0,
+                    before_mdae_gt_after=0,
+                    before_r2_lte_after=0,
+                    before_r2_gt_after=0,
                     imputation_strategies=dict()
                 )
             filename = os.path.join(output_dir, file_ + '/*')
