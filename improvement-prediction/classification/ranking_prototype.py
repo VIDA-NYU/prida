@@ -16,18 +16,19 @@ from scipy.stats import pearsonr, kendalltau
 import numpy as np
 import pickle
 
+GLOBAL_COLUMN_NAME = 'class'
 TARGET_COLUMN = 'gain_in_r2_score'
 POSITIVE_CLASS = 'good_gain'
 NEGATIVE_CLASS = 'loss'
 KEY_SEPARATOR = '*'
 ALPHA = 0
 
-def downsample_data(dataset):
+def downsample_data(dataset, class_column):
   """This function downsamples the number of instances of a class that is over-represented in the dataset.
   It's important to keep the learning 'fair'
   """
-  negative =  dataset.loc[dataset['class'] == NEGATIVE_CLASS]
-  positive = dataset.loc[dataset['class'] == POSITIVE_CLASS]
+  negative =  dataset.loc[dataset[class_column] == NEGATIVE_CLASS]
+  positive = dataset.loc[dataset[class_column] == POSITIVE_CLASS]
   
   sample_size = min([negative.shape[0], positive.shape[0]])
   negative = negative.sample(n=sample_size, random_state=42)
@@ -41,42 +42,45 @@ def determine_classes_based_on_gain_in_r2_score(dataset, downsample=False):
   of TARGET_COLUMN
   """
   gains = dataset[TARGET_COLUMN]
-  classes = [POSITIVE_CLASS if i > ALPHA else NEGATIVE_CLASS for i in gains]
-  dataset['class'] = classes
+  dataset[GLOBAL_COLUMN_NAME] = [POSITIVE_CLASS if i > ALPHA else NEGATIVE_CLASS for i in gains]
   if downsample:
-    return downsample_data(dataset)
+    return downsample_data(dataset, GLOBAL_COLUMN_NAME)
   return dataset
 
-def generate_predictions(training, test, features):
+def generate_predictions(training, test, features, class_column=None):
   """This function creates a random forest classifier and generates 
   predictions for the test data
   """
-  training = determine_classes_based_on_gain_in_r2_score(training)
-  test = determine_classes_based_on_gain_in_r2_score(test)
+
+  if not class_column:
+    class_column = GLOBAL_COLUMN_NAME
+    training = determine_classes_based_on_gain_in_r2_score(training)
+    test = determine_classes_based_on_gain_in_r2_score(test)  
+
   X_train = training[features]
-  y_train = training['class']
   X_test = test[features]
-  y_test = test['class']
+  y_train = training[class_column]
+  y_test = test[class_column]
 
   clf = RandomForestClassifier(random_state=42, n_estimators=100)
   clf.fit(X_train, y_train)
-  test['pred'] = clf.predict(X_test)
-  print(classification_report(y_test, test['pred']))
-  test['prob_positive_class'] = [i[0] for i in clf.predict_proba(X_test)]
+  test['pred_' + class_column] = clf.predict(X_test)
+  print(classification_report(y_test, test['pred_' + class_column]))
+  test['prob_positive_' + class_column] = [i[0] for i in clf.predict_proba(X_test)]
   
-  model_filename = 'classifier-training-dataset-50-percent.sav'
+  model_filename = 'classifier-training-dataset-50-percent-class-column-' + class_column + '.sav'
   pickle.dump(clf, open(model_filename, 'wb'))
   
   return test
 
-def parse_rows(dataset_with_predictions):
+def parse_rows(dataset_with_predictions, class_column):
   """This function extracts different features for combinations of 
   query, target, and candidate
   """
   candidates_per_query_target = {str(row['query']) + KEY_SEPARATOR + str(row['target']): {} for index, row in dataset_with_predictions.iterrows()}
   for index, row in dataset_with_predictions.iterrows():
     key = str(row['query']) + KEY_SEPARATOR + str(row['target'])
-    candidates_per_query_target[key][row['candidate']] = {TARGET_COLUMN: row[TARGET_COLUMN], 'class': row['class'], 'pred': row['pred'], 'pred_prob': row['prob_positive_class']}
+    candidates_per_query_target[key][row['candidate']] = {TARGET_COLUMN: row[TARGET_COLUMN], class_column: row[class_column], 'pred': row['pred'], 'pred_prob': row['prob_positive_'+ class_column]}
   return candidates_per_query_target
 
 def compute_correlation_prob_class_target(candidates_per_query_target):
@@ -102,7 +106,7 @@ def compute_precision_per_query_target(candidates_per_query_target):
     predicted_positive = 0
     real_positive = 0
     for candidate in candidates:
-      if candidates_per_query_target[key][candidate]['class'] == POSITIVE_CLASS:
+      if candidates_per_query_target[key][candidate][class_column] == POSITIVE_CLASS:
         real_positive += 1
         if candidates_per_query_target[key][candidate]['pred'] == POSITIVE_CLASS:
           predicted_positive += 1
@@ -273,7 +277,7 @@ def rank_candidates_classified_as_positive(test_with_preds, regressor, features,
     query, target = key.split(KEY_SEPARATOR)
 
     instances = test_with_preds.loc[(test_with_preds['query'] == query) & (test_with_preds['target'] == target)]
-    truly_positive = instances.loc[test_with_preds['class'] == POSITIVE_CLASS]
+    truly_positive = instances.loc[test_with_preds[class_column] == POSITIVE_CLASS]
     predicted_positive_certain = instances.loc[(test_with_preds['pred'] == POSITIVE_CLASS) & (test_with_preds['prob_positive_class'] > 0.6)]
     predicted_positive = instances.loc[test_with_preds['pred'] == POSITIVE_CLASS]
     if truly_positive.shape[0] and predicted_positive.shape[0] and predicted_positive_certain.shape[0]:
@@ -377,7 +381,8 @@ if __name__ == '__main__':
   
   training_data = pd.read_csv(training_filename)
   test_data = pd.read_csv(test_filename)
-  test_with_predictions = generate_predictions(training_data, test_data, features)
+  test_with_predictions = generate_predictions(training_data, test_data, features, class_column='mean_based_class') #median-based, 'personalized' approach for class
+  
   #analyze_predictions(test_with_predictions)
   #regressor = build_regressor_for_ranking_positive_class(training_data, features)
   #rank_candidates_classified_as_positive(test_with_predictions, regressor, features, baseline_regressor)

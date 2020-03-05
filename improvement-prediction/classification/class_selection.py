@@ -9,14 +9,27 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import f1_score, classification_report
 from sklearn.utils import shuffle
 
-ALPHA_GRID = [0.1 * x for x in range(10)]
+ALPHA_GRID = [0.1 * x for x in range(50)]
+FEATURES = ['query_num_of_columns', 'query_num_of_rows', 'query_row_column_ratio',
+       'query_max_mean', 'query_max_outlier_percentage', 'query_max_skewness',
+       'query_max_kurtosis', 'query_max_unique', 'candidate_num_of_columns',
+       'candidate_num_rows', 'candidate_row_column_ratio',
+       'candidate_max_mean', 'candidate_max_outlier_percentage',
+       'candidate_max_skewness', 'candidate_max_kurtosis',
+       'candidate_max_unique', 'query_target_max_pearson',
+       'query_target_max_spearman', 'query_target_max_covariance',
+       'query_target_max_mutual_info', 'candidate_target_max_pearson',
+       'candidate_target_max_spearman', 'candidate_target_max_covariance',
+       'candidate_target_max_mutual_info', 'max_pearson_difference',
+       'containment_fraction']
+TARGET = 'class'
 
 def downsample_data(dataset):
   """This function downsamples the number of instances of a class that is over-represented in the dataset.
   It's important to keep the learning 'fair'
   """
-  loss =  dataset.loc[dataset['classes'] == 'loss']
-  good_gain = dataset.loc[dataset['classes'] == 'good_gain']
+  loss =  dataset.loc[dataset[TARGET] == 'loss']
+  good_gain = dataset.loc[dataset[TARGET] == 'good_gain']
   
   sample_size = min([loss.shape[0], good_gain.shape[0]])
   loss = loss.sample(n=sample_size, random_state=42)
@@ -32,7 +45,7 @@ def determine_classes_based_on_gain_in_r2_score(dataset, alpha, downsample=True)
   """
   gains = dataset['gain_in_r2_score']
   classes = ['good_gain' if i > alpha else 'loss' for i in gains]
-  dataset['classes'] = classes
+  dataset[TARGET] = classes
   if downsample:
     return downsample_data(dataset)
   return dataset
@@ -51,35 +64,13 @@ if __name__ == '__main__':
     tmp_training = determine_classes_based_on_gain_in_r2_score(training, alpha, downsample=False)
     tmp_validation = determine_classes_based_on_gain_in_r2_score(validation, alpha, downsample=False)
 
-    X_train = tmp_training[['query_num_of_columns', 'query_num_of_rows', 'query_row_column_ratio',
-       'query_max_mean', 'query_max_outlier_percentage', 'query_max_skewness',
-       'query_max_kurtosis', 'query_max_unique', 'candidate_num_of_columns',
-       'candidate_num_rows', 'candidate_row_column_ratio',
-       'candidate_max_mean', 'candidate_max_outlier_percentage',
-       'candidate_max_skewness', 'candidate_max_kurtosis',
-       'candidate_max_unique', 'query_target_max_pearson',
-       'query_target_max_spearman', 'query_target_max_covariance',
-       'query_target_max_mutual_info', 'candidate_target_max_pearson',
-       'candidate_target_max_spearman', 'candidate_target_max_covariance',
-       'candidate_target_max_mutual_info', 'max_pearson_difference',
-       'containment_fraction']]
-    y_train = tmp_training['classes']
+    X_train = tmp_training[FEATURES]
+    y_train = tmp_training[TARGET]
 
-    X_test = tmp_validation[['query_num_of_columns', 'query_num_of_rows', 'query_row_column_ratio',
-       'query_max_mean', 'query_max_outlier_percentage', 'query_max_skewness',
-       'query_max_kurtosis', 'query_max_unique', 'candidate_num_of_columns',
-       'candidate_num_rows', 'candidate_row_column_ratio',
-       'candidate_max_mean', 'candidate_max_outlier_percentage',
-       'candidate_max_skewness', 'candidate_max_kurtosis',
-       'candidate_max_unique', 'query_target_max_pearson',
-       'query_target_max_spearman', 'query_target_max_covariance',
-       'query_target_max_mutual_info', 'candidate_target_max_pearson',
-       'candidate_target_max_spearman', 'candidate_target_max_covariance',
-       'candidate_target_max_mutual_info', 'max_pearson_difference',
-       'containment_fraction']]
-    y_test = tmp_validation['classes']
+    X_test = tmp_validation[FEATURES]
+    y_test = tmp_validation[TARGET]
 
-    clf = RandomForestClassifier(random_state=42)
+    clf = RandomForestClassifier(random_state=42, n_estimators=100)
     clf.fit(X_train, y_train)
     y_pred = clf.predict(X_test)
     f1score = f1_score(y_test, y_pred, pos_label='good_gain')

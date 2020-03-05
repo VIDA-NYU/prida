@@ -19,6 +19,10 @@ FEATURES = ['query_num_of_columns', 'query_num_of_rows', 'query_row_column_ratio
             'candidate_max_kurtosis', 'candidate_max_unique', 'query_target_max_pearson', 'query_target_max_spearman', 'query_target_max_covariance',
             'query_target_max_mutual_info', 'candidate_target_max_pearson', 'candidate_target_max_spearman', 'candidate_target_max_covariance',
             'candidate_target_max_mutual_info', 'max_pearson_difference', 'containment_fraction']
+EVAL_COLUMN = 'eval_mean_based_class'
+POSITIVE_CLASS = 'good_gain'
+NEGATIVE_CLASS = 'loss'
+CLASS_COLUMN = 'mean_based_class'
 
 def remove_outliers_based_on_zscores(feature):
   mean_ = np.mean(feature)
@@ -69,19 +73,31 @@ def split_augmentations_into_gain_and_loss(data):
   positive = data.loc[data[TARGET] > ALPHA]
   negative = data.loc[data[TARGET] <= ALPHA]
   return positive, negative
+
+def split_augmentations_into_positive_and_negative_class(data):
+  """This function splits instances into those that correspond
+  to positive class and negative class wrt a certain CLASS_COLUMN
+  """
+  positive = data.loc[data[CLASS_COLUMN] == POSITIVE_CLASS]
+  negative = data.loc[data[CLASS_COLUMN] == NEGATIVE_CLASS]
+  return positive, negative
   
 if __name__=='__main__':
   use_case_dataset = pd.read_csv(sys.argv[1])
   
-  fp = use_case_dataset.loc[use_case_dataset['eval'] == 'fp']
+  fp = use_case_dataset.loc[use_case_dataset[EVAL_COLUMN] == 'fp']
   plot_features_and_target_histograms(fp, 'fp')
-  tp = use_case_dataset.loc[use_case_dataset['eval'] == 'tp']
+  tp = use_case_dataset.loc[use_case_dataset[EVAL_COLUMN] == 'tp']
   plot_features_and_target_histograms(tp, 'tp')
-  fn = use_case_dataset.loc[use_case_dataset['eval'] == 'fn']
+  fn = use_case_dataset.loc[use_case_dataset[EVAL_COLUMN] == 'fn']
   plot_features_and_target_histograms(fn, 'fn')
-  tn = use_case_dataset.loc[use_case_dataset['eval'] == 'tn']
+  tn = use_case_dataset.loc[use_case_dataset[EVAL_COLUMN] == 'tn']
   plot_features_and_target_histograms(tn, 'tn')
     
-  gain, loss = split_augmentations_into_gain_and_loss(use_case_dataset)
-  plot_features_and_target_histograms(gain, 'gain')
-  plot_features_and_target_histograms(loss, 'loss')
+  # gain, loss = split_augmentations_into_gain_and_loss(use_case_dataset)
+  # plot_features_and_target_histograms(gain, 'gain')
+  # plot_features_and_target_histograms(loss, 'loss')
+
+  # positive, negative = split_augmentations_into_positive_and_negative_class(use_case_dataset)
+  # plot_features_and_target_histograms(positive, 'positive class')
+  # plot_features_and_target_histograms(negative, 'negative class')
