@@ -200,13 +200,13 @@ if __name__ == '__main__':
                 ).join(
                     # we get the candidate datasets
                     id_to_dataset[key]
-                ).map(
+                ).repartition(372).map(
                     lambda x: add_data_to_json(x[1][0][1], x[1][0][0], x[1][1])
                 ).map(
                     lambda x: generate_stats_from_record(x, load_dataframes)
                 ).persist(StorageLevel.MEMORY_AND_DISK)
             else:
-                stats = sc.textFile(filename).map(
+                stats = sc.textFile(filename).repartition(372).map(
                     lambda x: add_data_to_json(json.loads(x), None, None)
                 ).map(
                     lambda x: generate_stats_from_record(x, load_dataframes)
