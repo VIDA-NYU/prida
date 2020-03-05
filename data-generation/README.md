@@ -71,13 +71,13 @@ You may need to set some parameters for `spark-submit` depending on the cluster 
 
 ### Output
 
-The data generation process will create all the query and candidate datasets under `new_datasets_directory` (if `skip_dataset_creation=false`), as well as a training data file (`training-data-*`) that contains multiple JSON objects of the following format:
+The data generation process will create all the query and candidate datasets under `new_datasets_directory` (if `skip_dataset_creation=false`), as well as a training and test data files (`training-data-*` and `test-data-*`) that contains multiple JSON objects of the following format:
 
 ```
 {
-    "query_dataset": the relative path for the query dataset
+    "query_dataset": the id of the query dataset
     "target": the name of the target variable
-    "candidate_dataset": the relative path for the candidate dataset
+    "candidate_dataset": the id of the candidate dataset
     "imputation_strategy": the missing value imputation strategy used after the join between the query and the candidate datasets, or "null" if inner join was applied instead
     "mean_absolute_error": an array where the first and second values correspond to the mean absolute error before and after augmentation, respectively
     "mean_squared_error": an array where the first and second values correspond to the mean squared error before and after augmentation, respectively
@@ -86,7 +86,7 @@ The data generation process will create all the query and candidate datasets und
 }
 ```
 
-Note that one training data file is generated for each regression algorithm chosen.
+Note that one training and one test data files are generated for each regression algorithm chosen.
 
 ### Logs from Apache YARN
 

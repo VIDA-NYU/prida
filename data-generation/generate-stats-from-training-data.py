@@ -9,32 +9,16 @@ from pyspark import SparkConf, SparkContext, StorageLevel
 import sys
 
 
-def read_file(file_path, hdfs_client=None, use_hdfs=False):
-    """Opens a file for read and returns its corresponding content.
-    """
-
-    output = None
-    if use_hdfs:
-        if hdfs_client.status(file_path, strict=False):
-            with hdfs_client.read(file_path) as reader:
-                output = reader.read().decode()
-    else:
-        if os.path.exists(file_path):
-            with open(file_path) as reader:
-                output = reader.read()
-    return output
-
-
-def get_file_size(file_path, hdfs_client=None, use_hdfs=False):
-    """Gets the size of the file in bytes.
+def list_dir(file_path, hdfs_client=None, use_hdfs=False):
+    """Lists all the files inside the directory specified by file_path.
     """
 
     if use_hdfs:
-        return int(hdfs_client.content(file_path)['length'])
-    return int(os.stat(file_path).st_size)
+        return hdfs_client.list(file_path)
+    return os.listdir(file_path)
 
 
-def generate_stats_from_record(record, load_dataframes, params):
+def generate_stats_from_record(record, load_dataframes):
     """Computes some statistics related to the training data record.
     """
 
@@ -50,19 +34,11 @@ def generate_stats_from_record(record, load_dataframes, params):
     global query_size_lte_candidate_size
     global query_size_gt_candidate_size
 
-    # File system information
-    cluster_execution = params['cluster']
-    hdfs_address = params['hdfs_address']
-    hdfs_user = params['hdfs_user']
-
-    # HDFS Client
-    hdfs_client = None
-    if cluster_execution:
-        hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
-
     query = record['query_dataset']
+    query_data_obj = record['query_data']
     target = record['target']
     candidate = record['candidate_dataset']
+    candidate_data_obj = record['candidate_data']
     imputation_strategy = record['imputation_strategy']
     mae_before = record['mean_absolute_error'][0]
     mae_after = record['mean_absolute_error'][1]
@@ -72,12 +48,6 @@ def generate_stats_from_record(record, load_dataframes, params):
     mdae_after = record['median_absolute_error'][1]
     r2_before = record['r2_score'][0]
     r2_after = record['r2_score'][1]
-
-    # parameters
-    output_dir = params['new_datasets_directory']
-    cluster_execution = params['cluster']
-    hdfs_address = params['hdfs_address']
-    hdfs_user = params['hdfs_user']
 
     # incrementing number of records
     n_records += 1
@@ -103,20 +73,8 @@ def generate_stats_from_record(record, load_dataframes, params):
     # dataframes
     if load_dataframes:
 
-        query_data_path = os.path.join(output_dir, 'files', query)
-        query_data = pd.read_csv(StringIO(
-            read_file(
-                query_data_path,
-                hdfs_client,
-                cluster_execution)
-        ))
-        candidate_data_path = os.path.join(output_dir, 'files', candidate)
-        candidate_data = pd.read_csv(StringIO(
-            read_file(
-                candidate_data_path,
-                hdfs_client,
-                cluster_execution)
-        ))
+        query_data = pd.read_csv(StringIO(query_data_obj))
+        candidate_data = pd.read_csv(StringIO(candidate_data_obj))
 
         # dataframe sizes
         if query_data.shape[0] <= candidate_data.shape[0]:
@@ -135,19 +93,18 @@ def generate_stats_from_record(record, load_dataframes, params):
 
         return (imputation_strategy, query_intersection_size, candidate_intersection_size,
                 query_data.shape[0], query_data.shape[1], candidate_data.shape[0], candidate_data.shape[1],
-                get_file_size(query_data_path, hdfs_client, cluster_execution),
-                get_file_size(candidate_data_path, hdfs_client, cluster_execution))
+                len(query_data_obj.encode('utf-8')), len(candidate_data_obj.encode('utf-8')))
 
     return (imputation_strategy, None, None, None, None, None, None, None, None)
 
 
-def list_dir(file_path, hdfs_client=None, use_hdfs=False):
-    """Lists all the files inside the directory specified by file_path.
+def add_data_to_json(json_obj, query_data, candidate_data):
+    """Adds query and candidate datasets to json object.
     """
 
-    if use_hdfs:
-        return hdfs_client.list(file_path)
-    return os.listdir(file_path)
+    json_obj['query_data'] = query_data
+    json_obj['candidate_data'] = candidate_data
+    return json_obj
     
 
 if __name__ == '__main__':
@@ -181,87 +138,138 @@ if __name__ == '__main__':
     if cluster_execution:
         hdfs_client = InsecureClient(hdfs_address, user=hdfs_user)
 
+    # dataset mappings
+    id_to_dataset_filename_training = os.path.join(output_dir, 'id-to-dataset-training')
+    id_to_dataset_filename_test = os.path.join(output_dir, 'id-to-dataset-test')
+    if not cluster_execution:
+        id_to_dataset_filename_training = 'file://' + id_to_dataset_filename_training
+        id_to_dataset_filename_test = 'file://' + id_to_dataset_filename_test
+
+    id_to_dataset = dict()
+    id_to_dataset['training'] = sc.pickleFile(
+        id_to_dataset_filename_training
+    ).persist(StorageLevel.MEMORY_AND_DISK)
+    id_to_dataset['test'] = sc.pickleFile(
+        id_to_dataset_filename_test
+    ).persist(StorageLevel.MEMORY_AND_DISK)
+
     # searching for training data
     algorithms = dict()
-    load_dataframes = True
-    for file_ in list_dir(output_dir, hdfs_client, cluster_execution):
-        if 'training-data-' not in file_:
-            continue
-        algorithm_name = ' '.join(file_.replace('training-data-', '').split('-'))
-        algorithms[algorithm_name] = dict(
-            n_records=0,
-            before_lte_after=0,
-            before_gt_after=0,
-            imputation_strategies=list()
-        )
-        filename = os.path.join(output_dir, file_ + '/*')
-        if not cluster_execution:
-            filename = 'file://' + filename
+    for key in ['training', 'test']:
+        load_dataframes = True
+        for file_ in list_dir(output_dir, hdfs_client, cluster_execution):
+            if '%s-data-'%key not in file_:
+                continue
+            algorithm_name = ' '.join(file_.replace('%s-data-'%key, '').split('-'))
+            if algorithm_name not in algorithms:
+                algorithms[algorithm_name] = dict(
+                    n_records=0,
+                    before_mae_lte_after=0,
+                    before_mae_gt_after=0,
+                    before_mse_lte_after=0,
+                    before_mse_gt_after=0,
+                    before_mdae_lte_after=0,
+                    before_mdae_gt_after=0,
+                    before_r2_lte_after=0,
+                    before_r2_gt_after=0,
+                    imputation_strategies=dict()
+                )
+            filename = os.path.join(output_dir, file_ + '/*')
+            if not cluster_execution:
+                filename = 'file://' + filename
 
-        # accumulators
-        n_records = sc.accumulator(0)
-        before_mae_lte_after = sc.accumulator(0)
-        before_mae_gt_after = sc.accumulator(0)
-        before_mse_lte_after = sc.accumulator(0)
-        before_mse_gt_after = sc.accumulator(0)
-        before_mdae_lte_after = sc.accumulator(0)
-        before_mdae_gt_after = sc.accumulator(0)
-        before_r2_lte_after = sc.accumulator(0)
-        before_r2_gt_after = sc.accumulator(0)
+            # accumulators
+            n_records = sc.accumulator(0)
+            before_mae_lte_after = sc.accumulator(0)
+            before_mae_gt_after = sc.accumulator(0)
+            before_mse_lte_after = sc.accumulator(0)
+            before_mse_gt_after = sc.accumulator(0)
+            before_mdae_lte_after = sc.accumulator(0)
+            before_mdae_gt_after = sc.accumulator(0)
+            before_r2_lte_after = sc.accumulator(0)
+            before_r2_gt_after = sc.accumulator(0)
 
-        stats = sc.textFile(filename).map(
-            lambda x: generate_stats_from_record(json.loads(x), load_dataframes, params)
-        ).persist(StorageLevel.MEMORY_AND_DISK)
+            stats = sc.emptyRDD()
+            if load_dataframes:
+                stats = sc.textFile(filename).map(
+                    lambda x: json.loads(x)
+                ).map(
+                    # first, let's use query dataset id as key
+                    # (query dataset id, (candidate dataset id, dict))
+                    lambda x: (x['query_dataset'], (x['candidate_dataset'], x))
+                ).join(
+                    # we get the query datasets
+                    id_to_dataset[key]
+                ).map(
+                    # (candidate dataset id, (query dataset, dict))
+                    lambda x: (x[1][0][0], (x[1][1], x[1][0][1]))
+                ).join(
+                    # we get the candidate datasets
+                    id_to_dataset[key]
+                ).repartition(372).map(
+                    lambda x: add_data_to_json(x[1][0][1], x[1][0][0], x[1][1])
+                ).map(
+                    lambda x: generate_stats_from_record(x, load_dataframes)
+                ).persist(StorageLevel.MEMORY_AND_DISK)
+            else:
+                stats = sc.textFile(filename).repartition(372).map(
+                    lambda x: add_data_to_json(json.loads(x), None, None)
+                ).map(
+                    lambda x: generate_stats_from_record(x, load_dataframes)
+                ).persist(StorageLevel.MEMORY_AND_DISK)
 
-        imputation_strategies = sorted(stats.map(
-            lambda x: (x[0], 1)
-        ).reduceByKey(add).collect(), key=lambda x: x[1], reverse=True)
+            imputation_strategies = stats.map(
+                lambda x: (x[0], 1)
+            ).reduceByKey(add).collect()
 
-        intersection_sizes = stats.filter(
-            lambda x: x[1] != None and x[2] != None
-        ).map(
-            lambda x: (x[1], x[2])
-        ).collect()
+            intersection_sizes = stats.filter(
+                lambda x: x[1] != None and x[2] != None
+            ).map(
+                lambda x: (x[1], x[2])
+            ).collect()
 
-        n_rows_columns = stats.filter(
-            lambda x: x[1] != None and x[2] != None
-        ).map(
-            lambda x: (x[3], x[4], x[5], x[6])
-        ).collect()
+            n_rows_columns = stats.filter(
+                lambda x: x[1] != None and x[2] != None
+            ).map(
+                lambda x: (x[3], x[4], x[5], x[6])
+            ).collect()
 
-        size_bytes = stats.filter(
-            lambda x: x[1] != None and x[2] != None
-        ).map(
-            lambda x: (x[7], x[8])
-        ).collect()
+            size_bytes = stats.filter(
+                lambda x: x[1] != None and x[2] != None
+            ).map(
+                lambda x: (x[7], x[8])
+            ).collect()
 
-        if len(intersection_sizes) > 0:
-            query_intersection_sizes += [x for (x, y) in intersection_sizes]
-            candidate_intersection_sizes += [y for (x, y) in intersection_sizes]
+            if len(intersection_sizes) > 0:
+                query_intersection_sizes += [x for (x, y) in intersection_sizes]
+                candidate_intersection_sizes += [y for (x, y) in intersection_sizes]
 
-        if len(n_rows_columns) > 0:
-            query_n_rows += [x for (x, y, w, z) in n_rows_columns]
-            query_n_columns += [y for (x, y, w, z) in n_rows_columns]
-            candidate_n_rows += [w for (x, y, w, z) in n_rows_columns]
-            candidate_n_columns += [z for (x, y, w, z) in n_rows_columns]
-            query_candidate_size += [y + z - 1 for (x, y, w, z) in n_rows_columns]
+            if len(n_rows_columns) > 0:
+                query_n_rows += [x for (x, y, w, z) in n_rows_columns]
+                query_n_columns += [y for (x, y, w, z) in n_rows_columns]
+                candidate_n_rows += [w for (x, y, w, z) in n_rows_columns]
+                candidate_n_columns += [z for (x, y, w, z) in n_rows_columns]
+                query_candidate_size += [y + z - 1 for (x, y, w, z) in n_rows_columns]
 
-        if len(size_bytes) > 0:
-            query_size_bytes += [x for (x, y) in size_bytes]
-            candidate_size_bytes += [y for (x, y) in size_bytes]
+            if len(size_bytes) > 0:
+                query_size_bytes += [x for (x, y) in size_bytes]
+                candidate_size_bytes += [y for (x, y) in size_bytes]
 
-        algorithms[algorithm_name]['n_records'] = n_records.value
-        algorithms[algorithm_name]['before_mae_lte_after'] = before_mae_lte_after.value
-        algorithms[algorithm_name]['before_mae_gt_after'] = before_mae_gt_after.value
-        algorithms[algorithm_name]['before_mse_lte_after'] = before_mse_lte_after.value
-        algorithms[algorithm_name]['before_mse_gt_after'] = before_mse_gt_after.value
-        algorithms[algorithm_name]['before_mdae_lte_after'] = before_mdae_lte_after.value
-        algorithms[algorithm_name]['before_mdae_gt_after'] = before_mdae_gt_after.value
-        algorithms[algorithm_name]['before_r2_lte_after'] = before_r2_lte_after.value
-        algorithms[algorithm_name]['before_r2_gt_after'] = before_r2_gt_after.value
-        algorithms[algorithm_name]['imputation_strategies'] = imputation_strategies
+            algorithms[algorithm_name]['n_records'] += n_records.value
+            algorithms[algorithm_name]['before_mae_lte_after'] += before_mae_lte_after.value
+            algorithms[algorithm_name]['before_mae_gt_after'] += before_mae_gt_after.value
+            algorithms[algorithm_name]['before_mse_lte_after'] += before_mse_lte_after.value
+            algorithms[algorithm_name]['before_mse_gt_after'] += before_mse_gt_after.value
+            algorithms[algorithm_name]['before_mdae_lte_after'] += before_mdae_lte_after.value
+            algorithms[algorithm_name]['before_mdae_gt_after'] += before_mdae_gt_after.value
+            algorithms[algorithm_name]['before_r2_lte_after'] += before_r2_lte_after.value
+            algorithms[algorithm_name]['before_r2_gt_after'] += before_r2_gt_after.value
+            for (k, v) in imputation_strategies:
+                if k not in algorithms[algorithm_name]['imputation_strategies']:
+                    algorithms[algorithm_name]['imputation_strategies'][k] = 0
+                algorithms[algorithm_name]['imputation_strategies'][k] += v
 
-        load_dataframes = False
+            load_dataframes = False
 
     print('')
     for algorithm in algorithms:
@@ -300,7 +308,7 @@ if __name__ == '__main__':
             (100 * algorithms[algorithm]['before_r2_lte_after']) / algorithms[algorithm]['n_records']
         ))
         print(' -- Missing value imputation strategies:')
-        for (strategy, count) in algorithms[algorithm]['imputation_strategies']:
+        for (strategy, count) in sorted(algorithms[algorithm]['imputation_strategies'].items(), key=lambda x: x[1], reverse=True):
             print('    . %s\t%d' % (strategy, count))
         print('')
 
