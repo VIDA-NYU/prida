@@ -21,3 +21,11 @@ false positives, false negatives, true positives, and true negatives. You can ex
 
 Note that this script depends on the existence of column 'eval', so make sure that you executed script [`generate-column-eval.py`](generate-column-eval.py)
 as described in step 1.
+
+
+## 3. Generation of TSNE plots
+
+Use script [`tsne-plot-generation.py`](tsne-plot-generation.py) to generate tsne-based, two-dimension plots, that aim to show how separable instances from 
+different classes are. You can execute this script as follows:
+
+    $ python tsne-plot-generation.py <use case dataset with a class column> <name of class column>
