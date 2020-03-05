@@ -308,7 +308,7 @@ if __name__ == '__main__':
             (100 * algorithms[algorithm]['before_r2_lte_after']) / algorithms[algorithm]['n_records']
         ))
         print(' -- Missing value imputation strategies:')
-        for (strategy, count) in sorted(algorithms[algorithm]['imputation_strategies'], key=lambda x: x[1], reverse=True):
+        for (strategy, count) in sorted(algorithms[algorithm]['imputation_strategies'].items(), key=lambda x: x[1], reverse=True):
             print('    . %s\t%d' % (strategy, count))
         print('')
 
