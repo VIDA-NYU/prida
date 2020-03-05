@@ -1045,23 +1045,23 @@ if __name__ == '__main__':
             filename = os.path.join(output_dir, 'files-training-data')
             if not cluster_execution:
                 filename = 'file://' + filename
-            query_candidate_datasets_training.saveAsPickleFile(filename)
+            query_candidate_datasets_training.repartition(372).saveAsPickleFile(filename)
 
             filename = os.path.join(output_dir, 'id-to-dataset-training')
             if not cluster_execution:
                 filename = 'file://' + filename
-            dataset_id_to_data_training.saveAsPickleFile(filename)
+            dataset_id_to_data_training.repartition(372).saveAsPickleFile(filename)
 
             # saving test data
             filename = os.path.join(output_dir, 'files-test-data')
             if not cluster_execution:
                 filename = 'file://' + filename
-            query_candidate_datasets_test.saveAsPickleFile(filename)
+            query_candidate_datasets_test.repartition(372).saveAsPickleFile(filename)
 
             filename = os.path.join(output_dir, 'id-to-dataset-test')
             if not cluster_execution:
                 filename = 'file://' + filename
-            dataset_id_to_data_test.saveAsPickleFile(filename)
+            dataset_id_to_data_test.repartition(372).saveAsPickleFile(filename)
 
     else:
 

@@ -61,9 +61,10 @@ You may need to set some parameters for `spark-submit` depending on your environ
 The easiest way to run the generation of features and prediction improvements in a cluster is by using [Anaconda](https://www.anaconda.com/) to package the python dependencies. First,
 install Anaconda and initialize it by using the `conda init` command. Then, run the following:
 
+    $ mkdir data/
     $ conda create -y -n feature-and-target-generation -c conda-forge python=3.6.9 numpy pandas scikit-learn python-hdfs 
     $ cd <env_dir>
-    $ zip -r <feature-and-target-generation-dir>/feature-and-target-generation-environment.zip feature-and-target-generation/
+    $ zip -r <feature-and-target-generation-dir>/data/feature-and-target-generation-environment.zip feature-and-target-generation/
 
 where `<env_dir>` is the location for Anaconda environments (e.g., <path_to_anaconda3>/anaconda3/envs/), and `<feature-and-target-generation-dir>` is the location for this directory. The
 `feature-and-target-generation-environment.zip` file will contain all the packages necessary to run the feature and target generation script, making sure that all of the cluster nodes have
