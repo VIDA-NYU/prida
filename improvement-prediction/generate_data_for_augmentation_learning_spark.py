@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from augmentation_instance import *
 import json
-from pyspark import SparkConf, SparkContext
+from pyspark import SparkConf, SparkContext, StorageLevel
 import time
 from util.file_manager import *
 from util.instance_parser import *
@@ -67,7 +67,7 @@ def generate_learning_instances(learning_data, dataset_id_to_data):
     ).join(
         # we get the candidate datasets
         dataset_id_to_data
-    ).map(
+    ).repartition(372).map(
         lambda x: add_data_to_json(x[1][0][1], x[1][0][0], x[1][1])
     ).flatMap(
         lambda x: generate_learning_instance(x)
