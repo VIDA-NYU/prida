@@ -838,7 +838,7 @@ def join_data_and_generate_performance_scores(query_candidate_datasets, dataset_
     ).join(
         # we get the candidate datasets
         dataset_id_to_data
-    ).map(
+    ).repartition(372).map(
         lambda x: generate_performance_scores_single_candidate_dataset(
             x[1][0][0],  # query dataset id
             x[1][0][1],  # query dataset
@@ -1069,23 +1069,23 @@ if __name__ == '__main__':
         filename = os.path.join(output_dir, 'files-training-data')
         if not cluster_execution:
             filename = 'file://' + filename
-        query_candidate_datasets_training = sc.pickleFile(filename).persist(StorageLevel.MEMORY_AND_DISK)
+        query_candidate_datasets_training = sc.pickleFile(filename).repartition(372).persist(StorageLevel.MEMORY_AND_DISK)
 
         filename = os.path.join(output_dir, 'id-to-dataset-training')
         if not cluster_execution:
             filename = 'file://' + filename
-        dataset_id_to_data_training = sc.pickleFile(filename).persist(StorageLevel.MEMORY_AND_DISK)
+        dataset_id_to_data_training = sc.pickleFile(filename).repartition(372).persist(StorageLevel.MEMORY_AND_DISK)
 
         # loading test data
         filename = os.path.join(output_dir, 'files-test-data')
         if not cluster_execution:
             filename = 'file://' + filename
-        query_candidate_datasets_test = sc.pickleFile(filename).persist(StorageLevel.MEMORY_AND_DISK)
+        query_candidate_datasets_test = sc.pickleFile(filename).repartition(372).persist(StorageLevel.MEMORY_AND_DISK)
 
         filename = os.path.join(output_dir, 'id-to-dataset-test')
         if not cluster_execution:
             filename = 'file://' + filename
-        dataset_id_to_data_test = sc.pickleFile(filename).persist(StorageLevel.MEMORY_AND_DISK)
+        dataset_id_to_data_test = sc.pickleFile(filename).repartition(372).persist(StorageLevel.MEMORY_AND_DISK)
 
     if not skip_training_data:
 
