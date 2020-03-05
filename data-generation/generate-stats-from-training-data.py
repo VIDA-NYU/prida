@@ -155,9 +155,9 @@ if __name__ == '__main__':
 
     # searching for training data
     algorithms = dict()
-    load_dataframes = True
-    for file_ in list_dir(output_dir, hdfs_client, cluster_execution):
-        for key in ['training', 'test']:
+    for key in ['training', 'test']:
+        load_dataframes = True
+        for file_ in list_dir(output_dir, hdfs_client, cluster_execution):
             if '%s-data-'%key not in file_:
                 continue
             algorithm_name = ' '.join(file_.replace('%s-data-'%key, '').split('-'))
