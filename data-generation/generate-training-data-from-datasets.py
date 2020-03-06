@@ -350,7 +350,7 @@ def generate_query_and_candidate_datasets_positive_examples(data, column_metadat
     return (query_data_id, query_dataset, candidate_data_id, candidate_datasets, len(query_columns), len(candidate_columns))
 
 
-def generate_candidate_datasets_negative_examples(query_dataset, candidate_datasets, params):
+def generate_candidate_datasets_negative_examples(query_dataset_id, query_dataset, candidate_datasets, params):
     """Generates candidate datasets for negative examples.
     This is necessary because query and candidate datasets must match for the join;
     therefore, we need to re-create the key column.
@@ -359,9 +359,6 @@ def generate_candidate_datasets_negative_examples(query_dataset, candidate_datas
     new_candidate_datasets = list()
 
     query_data = pd.read_csv(StringIO(query_dataset))
-
-    # query data id
-    query_data_id = str(uuid.uuid4())
 
     # key column
     query_data_key_column = list(query_data['key-for-ranking'])
@@ -404,7 +401,7 @@ def generate_candidate_datasets_negative_examples(query_dataset, candidate_datas
         new_candidate_datasets.append(candidate_data.to_csv(index=False))
         candidate_data_id.append(str(uuid.uuid4()))
 
-    return (query_data_id, query_data.to_csv(index=False), candidate_data_id, new_candidate_datasets)
+    return (query_dataset_id, query_dataset, candidate_data_id, new_candidate_datasets)
 
 
 def generate_data_from_columns(original_data, columns, key_column, params, query=True):
@@ -729,7 +726,8 @@ def generate_negative_examples_from_positive_examples(query_and_candidate_data_p
     # generating query and candidate dataset pairs for negative examples
     #   number of negative examples should be similar to the number of
     #   positive examples
-    n_random_candidates_per_query = int(n_positive / n_query_datasets)
+    # n_random_candidates_per_query = int(n_positive / n_query_datasets)
+    n_random_candidates_per_query = int(n_positive / 4)  # trying more candidate datasets per query
 
     # we do the cartesian product between query_and_candidate_data_positive_ and
     #   itself to choose a random set of candidates
@@ -781,7 +779,7 @@ def generate_negative_examples_from_positive_examples(query_and_candidate_data_p
     ).join(
         # we get the candidate datasets
         dataset_id_to_data
-    ).map(
+    ).repartition(372).map(
         # ((query dataset id, query dataset, target variable name), [candidate dataset])
         lambda x: ((x[1][0][0], x[1][0][1], x[1][0][2]), [x[1][1]])
     ).reduceByKey(
@@ -789,7 +787,7 @@ def generate_negative_examples_from_positive_examples(query_and_candidate_data_p
         lambda x, y: x + y
     ).map(
         # generating negative data
-        lambda x: (x[0][2], generate_candidate_datasets_negative_examples(x[0][1], x[1], params))
+        lambda x: (x[0][2], generate_candidate_datasets_negative_examples(x[0][0], x[0][1], x[1], params))
     ).map(
         # (query dataset id, query dataset, target variable name, candidate datasets ids, candidate datasets)
         lambda x: (x[1][0], x[1][1], x[0], x[1][2], x[1][3])
