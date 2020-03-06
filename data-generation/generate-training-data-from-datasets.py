@@ -729,7 +729,7 @@ def generate_negative_examples_from_positive_examples(query_and_candidate_data_p
     #   number of negative examples should be similar to the number of
     #   positive examples
     # n_random_candidates_per_query = int(n_positive / n_query_datasets)
-    n_random_candidates_per_query = int(n_positive / 4)  # trying more candidate datasets per query
+    n_random_candidates_per_query = int(n_positive / 10)  # trying more candidate datasets per query
 
     # we do the cartesian product between query_and_candidate_data_positive_ and
     #   itself to choose a random set of candidates
