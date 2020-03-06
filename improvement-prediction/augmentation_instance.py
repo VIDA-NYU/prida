@@ -25,6 +25,7 @@ class AugmentationInstance:
         )
         self.target_name = self.instance_values_dict['target_name']
         self.imputation_strategy = self.instance_values_dict['imputation_strategy']
+        self.mark = self.instance_values_dict['mark']
             
         # if the augmentation instance does not come from the test data, the prediction metrics before and
         # after augmentation are available
@@ -86,6 +87,12 @@ class AugmentationInstance:
         """Returns all instance values (fields) formatted as a dict
         """
         return self.instance_values_dict
+
+    def get_mark(self):
+        """Returns whether the data point is a positive example or a negative example.
+        Returns None if such information is not available.
+        """
+        return self.mark
              
     def join_query_and_candidate_datasets(self):
         """Creates a new dataset (Dataset class) by performing a join 

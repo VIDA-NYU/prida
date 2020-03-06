@@ -23,8 +23,9 @@ def generate_learning_instance(learning_data_record):
     query_dataset = augmentation_instance.get_query_filename()
     candidate_dataset = augmentation_instance.get_candidate_filename()
     target = augmentation_instance.get_target_name()
+    mark = augmentation_instance.get_mark()
 
-    return [[query_dataset, target, candidate_dataset] + list(features) + [target_mae_decrease, target_mse_decrease, target_med_ae_decrease, target_r2_gain, r2_score_before, r2_score_after]]
+    return [[query_dataset, target, candidate_dataset, mark] + list(features) + [target_mae_decrease, target_mse_decrease, target_med_ae_decrease, target_r2_gain, r2_score_before, r2_score_after]]
 
 
 def feature_array_to_string(feature_array):
@@ -35,6 +36,7 @@ def feature_array_to_string(feature_array):
     feature_array_str[0] = "\"" + feature_array_str[0] + "\""  # query
     feature_array_str[1] = "\"" + feature_array_str[1] + "\""  # target
     feature_array_str[2] = "\"" + feature_array_str[2] + "\""  # candidate
+    feature_array_str[3] = "\"" + feature_array_str[3] + "\""  # mark
 
     return ','.join(feature_array_str)
 

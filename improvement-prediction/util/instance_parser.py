@@ -42,7 +42,8 @@ def parse_augmentation_instance(file_record):
               'candidate_dataset_id': file_record['candidate_dataset'],
               'candidate_key': file_record.get('candidate_key', None),
               'imputation_strategy': file_record['imputation_strategy'], 
-              'joined_dataset': None}
+              'joined_dataset': None,
+              'mark': file_record.get('mark', None)}
     if 'joined_dataset' in file_record:
         fields['joined_dataset'] = os.path.join(prefix, file_record['joined_dataset'])
     if 'mean_absolute_error' in file_record:
