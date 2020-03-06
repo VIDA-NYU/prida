@@ -518,7 +518,7 @@ def generate_performance_scores(query_dataset_id, query_dataset, target_variable
 
 
 def generate_performance_scores_single_candidate_dataset(query_dataset_id, query_dataset, target_variable,
-                                                         candidate_dataset_id, candidate_dataset, params):
+                                                         candidate_dataset_id, candidate_dataset, mark, params):
     """Generates all the performance scores.
     """
 
@@ -577,7 +577,8 @@ def generate_performance_scores_single_candidate_dataset(query_dataset_id, query
         candidate_dataset=candidate_dataset_id,
         scores_before=scores_before,
         scores_after=scores_after,
-        imputation_strategy=imputation_strategy
+        imputation_strategy=imputation_strategy,
+        mark=mark
     )
 
 
@@ -677,7 +678,7 @@ def train_and_test_model(data, target_variable_name, algorithm):
 
 
 def generate_output_performance_data(query_dataset, target, candidate_dataset,
-                                     scores_before, scores_after, imputation_strategy=None):
+                                     scores_before, scores_after, imputation_strategy=None, mark=None):
     """Generates a training data record in JSON format.
     """
 
@@ -686,6 +687,7 @@ def generate_output_performance_data(query_dataset, target, candidate_dataset,
         target=target,
         candidate_dataset=candidate_dataset,
         imputation_strategy=imputation_strategy,
+        mark=mark,
         mean_absolute_error=[scores_before[0], scores_after[0]],
         mean_squared_error=[scores_before[1], scores_after[1]],
         median_absolute_error=[scores_before[2], scores_after[2]],
@@ -803,13 +805,13 @@ def generate_negative_examples_from_positive_examples(query_and_candidate_data_p
 
     # all query and candidate datasets
     #   format is the following:
-    #   (query dataset id, target variable name, candidate dataset ids)
+    #   (query dataset id, target variable name, candidate dataset ids, positive/negative mark)
     query_candidate_datasets = sc.union([
         query_and_candidate_data_positive.map(
-            lambda x: (x[2], x[1], x[3])
+            lambda x: (x[2], x[1], x[3], 'positive')
         ),
         query_and_candidate_data_negative.map(
-            lambda x: (x[0], x[2], x[3])
+            lambda x: (x[0], x[2], x[3], 'negative')
         )
     ]).persist(StorageLevel.MEMORY_AND_DISK)
 
@@ -823,16 +825,16 @@ def join_data_and_generate_performance_scores(query_candidate_datasets, dataset_
 
     performance_scores = query_candidate_datasets.map(
         # first, let's use query dataset id as key
-        lambda x: (x[0], (x[1], x[2]))
+        lambda x: (x[0], (x[1], x[2], x[3]))
     ).join(
         # we get the query datasets
         dataset_id_to_data
     ).map(
-        # (query dataset id, query dataset, target variable name, candidate dataset ids)
-        lambda x: (x[0], x[1][1], x[1][0][0], x[1][0][1])
+        # (query dataset id, query dataset, target variable name, candidate dataset ids, positive/negative mark)
+        lambda x: (x[0], x[1][1], x[1][0][0], x[1][0][1], x[1][0][2])
     ).flatMap(
         # then let's use each candidate dataset id as key
-        lambda x: [(x[3][i], (x[0], x[1], x[2])) for i in range(len(x[3]))]
+        lambda x: [(x[3][i], (x[0], x[1], x[2], x[4])) for i in range(len(x[3]))]
     ).join(
         # we get the candidate datasets
         dataset_id_to_data
@@ -843,6 +845,7 @@ def join_data_and_generate_performance_scores(query_candidate_datasets, dataset_
             x[1][0][2],  # target variable
             x[0],        # candidate dataset id
             x[1][1],     # candidate dataset
+            x[1][0][3],  # mark
             params
         )
     ).persist(StorageLevel.MEMORY_AND_DISK)
