@@ -729,7 +729,7 @@ def generate_negative_examples_from_positive_examples(query_and_candidate_data_p
     #   number of negative examples should be similar to the number of
     #   positive examples
     # n_random_candidates_per_query = int(n_positive / n_query_datasets)
-    n_random_candidates_per_query = int(n_positive / 10)  # trying more candidate datasets per query
+    n_random_candidates_per_query = int(n_positive / 50)  # trying more candidate datasets per query
 
     # we do the cartesian product between query_and_candidate_data_positive_ and
     #   itself to choose a random set of candidates
@@ -838,7 +838,7 @@ def join_data_and_generate_performance_scores(query_candidate_datasets, dataset_
     ).join(
         # we get the candidate datasets
         dataset_id_to_data
-    ).repartition(372).map(
+    ).repartition(1000).map(
         lambda x: generate_performance_scores_single_candidate_dataset(
             x[1][0][0],  # query dataset id
             x[1][0][1],  # query dataset

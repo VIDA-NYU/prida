@@ -69,7 +69,7 @@ def generate_learning_instances(learning_data, dataset_id_to_data):
     ).join(
         # we get the candidate datasets
         dataset_id_to_data
-    ).repartition(372).map(
+    ).repartition(1000).map(
         lambda x: add_data_to_json(x[1][0][1], x[1][0][0], x[1][1])
     ).flatMap(
         lambda x: generate_learning_instance(x)
