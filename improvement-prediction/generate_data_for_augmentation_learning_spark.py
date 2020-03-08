@@ -119,15 +119,12 @@ if __name__ == '__main__':
         learning_data_training,
         id_to_dataset_training
     )
-
-    save_file(
-        augmentation_learning_data_filename + '-training',
-        '\n'.join(learning_instances_training.collect()),
-        hdfs_client, 
-        cluster_execution,
-        hdfs_address,
-        hdfs_user
-    )
+    
+    filename = augmentation_learning_data_filename + '-training'
+    delete_dir(filename, hdfs_client, cluster_execution)
+    if not cluster_execution:
+        filename = 'file://' + filename
+    learning_instances_training.saveAsTextFile(filename)
 
     # freeing some memory
     learning_data_training.unpersist()
@@ -139,13 +136,10 @@ if __name__ == '__main__':
         id_to_dataset_test
     )
 
-    save_file(
-        augmentation_learning_data_filename + '-test',
-        '\n'.join(learning_instances_test.collect()),
-        hdfs_client, 
-        cluster_execution,
-        hdfs_address,
-        hdfs_user
-    )
+    filename = augmentation_learning_data_filename + '-test'
+    delete_dir(filename, hdfs_client, cluster_execution)
+    if not cluster_execution:
+        filename = 'file://' + filename
+    learning_instances_test.saveAsTextFile(filename)
 
     print('Duration: %.4f seconds' % (time.time() - start_time))

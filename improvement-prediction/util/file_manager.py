@@ -1,7 +1,21 @@
 #!/usr/bin/env python3
 from hdfs import InsecureClient
+import shutil
 import os
 from constants import *
+
+
+def delete_dir(file_path, hdfs_client=None, use_hdfs=False):
+    """Deletes a directory.
+    """
+
+    if use_hdfs:
+        if hdfs_client.status(file_path, strict=False):
+            hdfs_client.delete(file_path, recursive=True, skip_trash=True)
+    else:
+        if os.path.exists(file_path):
+            shutil.rmtree(file_path)
+
 
 def read_file(file_path, hdfs_client, use_hdfs=False, hdfs_address=None, hdfs_user=None):
     """Opens a file for read and returns its corresponding content.
