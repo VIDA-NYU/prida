@@ -32,6 +32,14 @@ Use the [`import-datasets-to-datamart` notebook](datamart-data/import-datasets-t
 
 Use the [`download-datamart-datasets-joinable-with-query-datasets` notebook](datamart-data/download-datamart-datasets-joinable-with-query-datasets.ipynb) to download all the potential candidate datasets for the use cases. Auctus will automatically take care of the join operations. The datasets need to be downloaded so that the learning features can be computed. In addition, this notebook also computes the real model improvement so we can have the ground truth data.
 
+## 4. Uploading Data to HDFS
+
+
+
+--------------
+
+
+
 ## 4. Generating Learning Features
 
 Use the [`generate-features-for-datamart-datasets` notebook](datamart-data/generate-features-for-datamart-datasets.ipynb) to generate the learning features from all the possible query-candidate pairs.
