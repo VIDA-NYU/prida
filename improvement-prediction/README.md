@@ -37,7 +37,7 @@ File `learning_data_file` is composed of JSON objects in the format:
     "target": the name of the target variable
     "candidate_dataset": the relative path for the candidate dataset
     "imputation_strategy": the missing value imputation strategy used after the join between the query and the candidate datasets, or "null" if inner join was applied instead
-    "mark": indicates whether the data point represents a positively-constructed example or a negatively-constructed example
+    "mark": indicates whether the data point represents a positively-constructed example or a negatively-constructed example ('n/a' if this information is not available)
     "mean_absolute_error": an array where the first and second values correspond to the mean absolute error before and after augmentation, respectively
     "mean_squared_error": an array where the first and second values correspond to the mean squared error before and after augmentation, respectively
     "median_absolute_error": an array where the first and second values correspond to the median absolute error before and after augmentation, respectively

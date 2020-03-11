@@ -41,11 +41,14 @@ def parse_augmentation_instance(file_record):
               'candidate_data': file_record['candidate_data'],
               'candidate_dataset_id': file_record['candidate_dataset'],
               'candidate_key': file_record.get('candidate_key', None),
-              'imputation_strategy': file_record['imputation_strategy'], 
-              'joined_dataset': None,
+              'joined_data': None,
+              'joined_dataset_id': None,
+              'imputation_strategy': file_record['imputation_strategy'],
               'mark': file_record.get('mark', None)}
     if 'joined_dataset' in file_record:
-        fields['joined_dataset'] = os.path.join(prefix, file_record['joined_dataset'])
+        fields['joined_dataset_id'] = file_record['joined_dataset']
+    if 'joined_data' in file_record:
+        fields['joined_data'] = file_record['joined_data']
     if 'mean_absolute_error' in file_record:
         fields['mae_before'] = file_record['mean_absolute_error'][0]
         fields['mae_after'] = file_record['mean_absolute_error'][1]
