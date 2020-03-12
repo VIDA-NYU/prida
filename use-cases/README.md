@@ -48,7 +48,7 @@ where `<hdfs-directory>` is the directory on HDFS where the datasets should be s
 
 ### 5.1. Transforming Data
 
-We run a PySpark job to save the data in the expected format for learning features. First, copy the file [`params.json`](params.json), name it as `.params.json`, and configure it appropriately. The structure of this file is the following:
+We run a PySpark job to save the data in the expected format for learning features. First, copy the file [`params.json`](datamart-data/params.json), name it as `.params.json`, and configure it appropriately. The structure of this file is the following:
 
 ```
 {
@@ -77,7 +77,7 @@ where `<env_dir>` is the location for Anaconda environments, and `<use-cases-dir
     --archives use-cases-data-generation-environment.zip#env \
     split-data-for-use-cases.py
 
-You may need to set some parameters for `spark-submit` depending on the cluster environment. For examples, you can inspect scripts [`run-split-data-for-use-cases`](run-split-data-for-use-cases).
+You may need to set some parameters for `spark-submit` depending on the cluster environment. For examples, you can inspect scripts [`run-split-data-for-use-cases`](datamart-data/run-split-data-for-use-cases).
 
 ### 5.2. Generating Features
 
