@@ -130,9 +130,7 @@ def train_and_test_model(data, target_variable_name, algorithm):
     ]
 
 
-def break_companion_and_join_datasets(query_dataset, candidate_dataset, joined_dataset, record):
-
-    new_records = list()
+def break_companion_and_join_datasets(query_dataset, candidate_dataset, candidate_column, joined_dataset, record):
         
     # record information
     query_data_name = record['query_dataset']
@@ -158,69 +156,66 @@ def break_companion_and_join_datasets(query_dataset, candidate_dataset, joined_d
     candidate_data = candidate_data.select_dtypes(exclude=['bool'])
     
     if len(candidate_data.columns) < 2:
-        return new_records
+        return list()
     
     # reading joined dataset
     joined_data = pd.read_csv(StringIO(joined_dataset))
     joined_data = joined_data.select_dtypes(exclude=['bool'])
     
-    for i in range(len(candidate_data.columns)):
-        column = list(candidate_data.columns)[i]
+    column = list(candidate_data.columns)[candidate_column]
 
-        if column == candidate_key:
-            continue
-        
-        # creating new candidate dataset
-        columns_to_drop = set(list(candidate_data.columns)).difference(
-            set([candidate_key, column])
-        )
-        single_column_data = candidate_data.drop(
-            list(columns_to_drop),
-            axis=1
-        )
-        
-        # creating new join dataset
-        columns_to_drop = set(list(joined_data.columns)).difference(
-            set(list(query_data.columns))
-        ).difference(set([column]))
-        single_column_joined_data = joined_data.drop(
-            list(columns_to_drop),
-            axis=1
-        )
-        
-        if single_column_joined_data.shape[1] == query_data.shape[1]:
-            continue  # no join was performed
+    if column == candidate_key:
+        return list()
+    
+    # creating new candidate dataset
+    columns_to_drop = set(list(candidate_data.columns)).difference(
+        set([candidate_key, column])
+    )
+    single_column_data = candidate_data.drop(
+        list(columns_to_drop),
+        axis=1
+    )
+    
+    # creating new join dataset
+    columns_to_drop = set(list(joined_data.columns)).difference(
+        set(list(query_data.columns))
+    ).difference(set([column]))
+    single_column_joined_data = joined_data.drop(
+        list(columns_to_drop),
+        axis=1
+    )
+    
+    if single_column_joined_data.shape[1] == query_data.shape[1]:
+        return list()  # no join was performed
 
-        # new test record
-        new_record = copy.deepcopy(record)
+    # new test record
+    new_record = copy.deepcopy(record)
 
-        # scores after augmentation
-        imputation_strategy, scores_after = get_performance_scores(
-            single_column_joined_data.drop([query_key], axis=1),
-            target,
-            algorithm,
-            not(inner_join)
-        )
-        
-        new_record['mean_absolute_error'] = [mean_absolute_error[0],
-                                             scores_after[0]]
-        new_record['mean_squared_error'] = [mean_squared_error[0],
-                                           scores_after[1]]
-        new_record['median_absolute_error'] = [median_absolute_error[0],
-                                               scores_after[2]]
-        new_record['r2_score'] = [r2_score[0],
-                                  scores_after[3]]
+    # scores after augmentation
+    imputation_strategy, scores_after = get_performance_scores(
+        single_column_joined_data.drop([query_key], axis=1),
+        target,
+        algorithm,
+        not(inner_join)
+    )
+    
+    new_record['mean_absolute_error'] = [mean_absolute_error[0],
+                                         scores_after[0]]
+    new_record['mean_squared_error'] = [mean_squared_error[0],
+                                       scores_after[1]]
+    new_record['median_absolute_error'] = [median_absolute_error[0],
+                                           scores_after[2]]
+    new_record['r2_score'] = [r2_score[0],
+                              scores_after[3]]
 
-        new_record['mark'] = 'n/a'
-        
-        new_records.append((
-            query_dataset,
-            single_column_data.to_csv(index=False),
-            single_column_joined_data.to_csv(index=False),
-            new_record
-        ))
-
-    return new_records
+    new_record['mark'] = 'n/a'
+    
+    return [(
+        query_dataset,
+        single_column_data.to_csv(index=False),
+        single_column_joined_data.to_csv(index=False),
+        new_record
+    )]
 
 
 def save_id_to_record(id_, record, key_name):
@@ -284,8 +279,11 @@ if __name__ == '__main__':
         # (query dataset, companion dataset, join dataset, record)
         lambda x: (x[1][0][0], x[1][0][1], x[1][1], x[1][0][2])
     ).flatMap(
+        # (query dataset, candidate dataset, candidate column, joined dataset, record)
+        lambda x: [(x[0], x[1], i, x[2], x[3]) for i in range(len(pd.read_csv(StringIO(x[1])).select_dtypes(exclude=['bool']).columns))]
+    ).flatMap(
         # (query dataset, candidate dataset, joined dataset, record)
-        lambda x: break_companion_and_join_datasets(x[0], x[1], x[2], x[3])
+        lambda x: break_companion_and_join_datasets(x[0], x[1], x[2], x[3], x[4])
     )
 
     # getting ids for query datasets
