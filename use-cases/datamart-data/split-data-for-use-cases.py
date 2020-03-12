@@ -269,7 +269,7 @@ if __name__ == '__main__':
     )
 
     # reading records and retrieving new data
-    training_records = sc.textFile(training_records_file).map(
+    training_records = sc.textFile(training_records_file).repartition(1000).map(
         lambda x: json.loads(x)
     ).map(
         # (query dataset name, record)
