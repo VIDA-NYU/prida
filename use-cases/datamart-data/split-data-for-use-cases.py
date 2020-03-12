@@ -1,9 +1,13 @@
+import copy
 from hdfs import InsecureClient
 from io import StringIO
 import json
+import math
+import numpy as np
 import os
 import pandas as pd
 from pyspark import SparkConf, SparkContext, StorageLevel
+import re
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LinearRegression, SGDRegressor
@@ -11,6 +15,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, \
     mean_squared_log_error, median_absolute_error, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+import sys
 import uuid
 import time
 from xgboost import XGBRegressor
@@ -127,19 +132,19 @@ def train_and_test_model(data, target_variable_name, algorithm):
 
 def break_companion_and_join_datasets(query_dataset, candidate_dataset, joined_dataset, record):
 
-	new_records = list()
+    new_records = list()
         
     # record information
-    query_data_name = test_record['query_dataset']
-    query_key = test_record['query_key']
-    target = test_record['target']
-    candidate_data_name = test_record['candidate_dataset']
-    candidate_key = test_record['candidate_key']
-    joined_data_name = test_record['joined_dataset']
-    mean_absolute_error = test_record['mean_absolute_error']
-    mean_squared_error = test_record['mean_squared_error']
-    median_absolute_error = test_record['median_absolute_error']
-    r2_score = test_record['r2_score']
+    query_data_name = record['query_dataset']
+    query_key = record['query_key']
+    target = record['target']
+    candidate_data_name = record['candidate_dataset']
+    candidate_key = record['candidate_key']
+    joined_data_name = record['joined_dataset']
+    mean_absolute_error = record['mean_absolute_error']
+    mean_squared_error = record['mean_squared_error']
+    median_absolute_error = record['median_absolute_error']
+    r2_score = record['r2_score']
 
     # params
     algorithm = 'random forest'
@@ -160,7 +165,7 @@ def break_companion_and_join_datasets(query_dataset, candidate_dataset, joined_d
     joined_data = joined_data.select_dtypes(exclude=['bool'])
     
     for i in range(len(candidate_data.columns)):
-    	column = list(candidate_data.columns)[i]
+        column = list(candidate_data.columns)[i]
 
         if column == candidate_key:
             continue
@@ -187,31 +192,31 @@ def break_companion_and_join_datasets(query_dataset, candidate_dataset, joined_d
             continue  # no join was performed
 
         # new test record
-        new_record = copy.deepcopy(test_record)
+        new_record = copy.deepcopy(record)
 
         # scores after augmentation
         imputation_strategy, scores_after = get_performance_scores(
-	        single_column_joined_data.drop([query_key], axis=1),
-	        target,
-	        algorithm,
-	        not(inner_join)
-	    )
+            single_column_joined_data.drop([query_key], axis=1),
+            target,
+            algorithm,
+            not(inner_join)
+        )
         
         new_record['mean_absolute_error'] = [mean_absolute_error[0],
-                                             scores_after['mean_absolute_error']]
+                                             scores_after[0]]
         new_record['mean_squared_error'] = [mean_squared_error[0],
-                                           scores_after['mean_squared_error']]
+                                           scores_after[1]]
         new_record['median_absolute_error'] = [median_absolute_error[0],
-                                               scores_after['median_absolute_error']]
+                                               scores_after[2]]
         new_record['r2_score'] = [r2_score[0],
-                                  scores_after['r2_score']]
+                                  scores_after[3]]
 
         new_record['mark'] = 'n/a'
         
         new_records.append((
             query_dataset,
-            single_column_data,
-            single_column_joined_data,
+            single_column_data.to_csv(index=False),
+            single_column_joined_data.to_csv(index=False),
             new_record
         ))
 
@@ -220,8 +225,8 @@ def break_companion_and_join_datasets(query_dataset, candidate_dataset, joined_d
 
 def save_id_to_record(id_, record, key_name):
 
-	record[key_name] = id_
-	return record
+    record[key_name] = id_
+    return record
 
 
 if __name__ == '__main__':
@@ -265,10 +270,10 @@ if __name__ == '__main__':
 
     # reading records and retrieving new data
     training_records = sc.textFile(training_records_file).map(
-    	lambda x: json.loads(x)
+        lambda x: json.loads(x)
     ).map(
         # (query dataset name, record)
-    	lambda x: (os.path.basename(x['query_dataset']), x)
+        lambda x: (os.path.basename(x['query_dataset']), x)
     ).join(query_datasets).map(
         # (companion dataset name, (query dataset, record))
         lambda x: (os.path.basename(x[1][0]['candidate_dataset']), (x[1][1], x[1][0]))
@@ -280,85 +285,85 @@ if __name__ == '__main__':
         lambda x: (x[1][0][0], x[1][0][1], x[1][1], x[1][0][2])
     ).flatMap(
         # (query dataset, candidate dataset, joined dataset, record)
-    	lambda x: break_companion_and_join_datasets(x[0], x[1], x[2], x[3])
+        lambda x: break_companion_and_join_datasets(x[0], x[1], x[2], x[3])
     )
 
     # getting ids for query datasets
 
     id_query_training_records = training_records.map(
-    	# key => query dataset
-    	lambda x: (x[0], [(x[1], x[2], x[3])])
+        # key => query dataset
+        lambda x: (x[0], [(x[1], x[2], x[3])])
     ).reduceByKey(
-    	lambda x, y: x + y
+        lambda x, y: x + y
     ).map(
-    	# generating id
-    	# ((query datase id, query dataset), list of (candidate dataset, joined dataset, record))
-    	lambda x: ((str(uuid.uuid4()), x[0]), x[1])
+        # generating id
+        # ((query datase id, query dataset), list of (candidate dataset, joined dataset, record))
+        lambda x: ((str(uuid.uuid4()), x[0]), x[1])
     ).map(
-    	# replacing query dataset name for id inside the records
-    	lambda x: (x[0], [(elem[0], elem[1], save_id_to_record(x[0][0], elem[2], 'query_dataset')) for elem in x[1]])
+        # replacing query dataset name for id inside the records
+        lambda x: (x[0], [(elem[0], elem[1], save_id_to_record(x[0][0], elem[2], 'query_dataset')) for elem in x[1]])
     ).persist(StorageLevel.MEMORY_AND_DISK)
 
     dataset_id_to_data_query = id_query_training_records.map(
-    	lambda x: x[0]
+        lambda x: x[0]
     ).persist(StorageLevel.MEMORY_AND_DISK)
 
     # getting ids for candidate datasets
 
     id_candidate_training_records = id_query_training_records.flatMap(
-    	lambda x: x[1]
+        lambda x: x[1]
     ).map(
-    	# key => candidate dataset
-    	lambda x: (x[0], [(x[1], x[2])])
+        # key => candidate dataset
+        lambda x: (x[0], [(x[1], x[2])])
     ).reduceByKey(
-    	lambda x, y: x + y
+        lambda x, y: x + y
     ).map(
-    	# generating id
-    	# ((candidate datase id, candidate dataset), list of (joined dataset, record))
-    	lambda x: ((str(uuid.uuid4()), x[0]), x[1])
+        # generating id
+        # ((candidate datase id, candidate dataset), list of (joined dataset, record))
+        lambda x: ((str(uuid.uuid4()), x[0]), x[1])
     ).map(
-    	# replacing candidate dataset name for id inside the records
-    	lambda x: (x[0], [(elem[0], save_id_to_record(x[0][0], elem[1], 'candidate_dataset')) for elem in x[1]])
+        # replacing candidate dataset name for id inside the records
+        lambda x: (x[0], [(elem[0], save_id_to_record(x[0][0], elem[1], 'candidate_dataset')) for elem in x[1]])
     ).persist(StorageLevel.MEMORY_AND_DISK)
 
     dataset_id_to_data_candidate = id_candidate_training_records.map(
-    	lambda x: x[0]
+        lambda x: x[0]
     ).persist(StorageLevel.MEMORY_AND_DISK)
 
     # getting ids for joined datasets
 
     id_joined_training_records = id_candidate_training_records.flatMap(
-    	lambda x: x[1]
+        lambda x: x[1]
     ).map(
-    	# key => joined dataset
-    	lambda x: (x[0], [x[2]])
+        # key => joined dataset
+        lambda x: (x[0], [x[1]])
     ).reduceByKey(
-    	lambda x, y: x + y
+        lambda x, y: x + y
     ).map(
-    	# generating id
-    	# ((joined datase id, joined dataset), list of (record))
-    	lambda x: ((str(uuid.uuid4()), x[0]), x[1])
+        # generating id
+        # ((joined datase id, joined dataset), list of (record))
+        lambda x: ((str(uuid.uuid4()), x[0]), x[1])
     ).map(
-    	# replacing joined dataset name for id inside the records
-    	lambda x: (x[0], [save_id_to_record(x[0][0], elem[0], 'joined_dataset') for elem in x[1]])
+        # replacing joined dataset name for id inside the records
+        lambda x: (x[0], [save_id_to_record(x[0][0], elem, 'joined_dataset') for elem in x[1]])
     ).persist(StorageLevel.MEMORY_AND_DISK)
 
     dataset_id_to_data_joined = id_joined_training_records.map(
-    	lambda x: x[0]
+        lambda x: x[0]
     ).persist(StorageLevel.MEMORY_AND_DISK)
 
     # training records
     all_training_records = id_joined_training_records.flatMap(
-    	lambda x: x[1]
+        lambda x: x[1]
     ).persist(StorageLevel.MEMORY_AND_DISK)
 
     # id to dataset mapping
     #   format is the following:
     #   (dataset id, dataset)
     dataset_id_to_data = sc.union([
-    	dataset_id_to_data_query,
-    	dataset_id_to_data_candidate,
-    	dataset_id_to_data_joined
+        dataset_id_to_data_query,
+        dataset_id_to_data_candidate,
+        dataset_id_to_data_joined
     ]).persist(StorageLevel.MEMORY_AND_DISK)
 
     # name of the ml algorithm used to generate the performance scores
@@ -367,13 +372,13 @@ if __name__ == '__main__':
     # saving files
     filename = os.path.join(output_dir, 'training-data-%s' % algorithm_name)
     all_training_records.map(
-    	lambda x: json.dumps(x)
+        lambda x: json.dumps(x)
     ).repartition(1000).saveAsTextFile(filename)
 
     filename = os.path.join(output_dir, 'id-to-dataset-training')
-	dataset_id_to_data.repartition(1000).saveAsPickleFile(filename)
+    dataset_id_to_data.repartition(1000).saveAsPickleFile(filename)
 
-	print('Duration: %.4f seconds' % (time.time() - start_time))
+    print('Duration: %.4f seconds' % (time.time() - start_time))
     print(' -- Configuration:')
     print('    . datasets_directory: %s' % params['datasets_directory'])
     print('    . new_datasets_directory: %s' % params['new_datasets_directory'])
