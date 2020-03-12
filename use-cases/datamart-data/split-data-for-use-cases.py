@@ -269,7 +269,7 @@ if __name__ == '__main__':
     )
 
     # reading records and retrieving new data
-    training_records = sc.textFile(training_records_file).repartition(1000).map(
+    training_records = sc.textFile(training_records_file).repartition(2000).map(
         lambda x: json.loads(x)
     ).map(
         # (query dataset name, record)
@@ -373,7 +373,7 @@ if __name__ == '__main__':
     filename = os.path.join(output_dir, 'training-data-%s' % algorithm_name)
     all_training_records.map(
         lambda x: json.dumps(x)
-    ).repartition(1000).saveAsTextFile(filename)
+    ).repartition(2000).saveAsTextFile(filename)
 
     filename = os.path.join(output_dir, 'id-to-dataset-training')
     dataset_id_to_data.repartition(1000).saveAsPickleFile(filename)
