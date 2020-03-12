@@ -52,7 +52,7 @@ We run a PySpark job to save the data in the expected format for learning featur
 
 ```
 {
-    "datasets_directory": directory of original datasets
+    "datasets_directory": directory of original datasets, i.e., <hdfs-directory>
     "new_datasets_directory": output directory where the query and the candidate datasets will be saved
     "hdfs_address": the address (host and port) for the distributed file system
     "hdfs_user": the username for the distributed file system
