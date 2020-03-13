@@ -310,7 +310,7 @@ if __name__ == '__main__':
 
     id_candidate_training_records = id_query_training_records.flatMap(
         lambda x: x[1]
-    ).map(
+    ).repartition(2000).map(
         # key => candidate dataset
         lambda x: (x[0], [(x[1], x[2])])
     ).reduceByKey(
@@ -332,7 +332,7 @@ if __name__ == '__main__':
 
     id_joined_training_records = id_candidate_training_records.flatMap(
         lambda x: x[1]
-    ).map(
+    ).repartition(2000).map(
         # key => joined dataset
         lambda x: (x[0], [x[1]])
     ).reduceByKey(
