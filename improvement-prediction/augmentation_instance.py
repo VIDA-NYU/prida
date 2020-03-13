@@ -51,10 +51,10 @@ class AugmentationInstance:
             self.r2_score_before = np.nan
             self.r2_score_after = np.nan
 
-        if self.instance_values_dict['joined_dataset']:
+        if self.instance_values_dict['joined_dataset_id']:
             self.joined_dataset = Dataset()
-            self.joined_dataset.initialize_from_filename(
-                self.instance_values_dict['joined_dataset'],
+            self.joined_dataset.initialize_from_data(
+                self.instance_values_dict['joined_data'],
                 key=self.instance_values_dict['query_key']
             )
             self.containment_score = self.get_key_ratio_between_query_and_candidate_datasets(use_join=True)

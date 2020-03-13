@@ -1,0 +1,7 @@
+{
+    "datasets_directory": "dataset-ranking/datamart-data",
+    "new_datasets_directory": "dataset-ranking/taxi-vehicle-collision-single-column-results",
+    "hdfs_address": "http://gray01.poly.edu:50070",
+    "hdfs_user": "fsc234",
+    "training_records": "dataset-ranking/datamart-data/taxi-vehicle-collision-training-records"
+}
