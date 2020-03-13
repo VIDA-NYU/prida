@@ -288,18 +288,20 @@ if __name__ == '__main__':
 
     # getting ids for query datasets
 
+    dataset_id_to_data_query = id_query_training_records.map(
+        lambda x: x[0]
+    ).distinct().map(
+        lambda x: (str(uuid.uuid4()), x)
+    ).persist(StorageLevel.MEMORY_AND_DISK)
+
     id_query_training_records = training_records.map(
         # key => query dataset
-        lambda x: (x[0], [(x[1], x[2], x[3])])
-    ).reduceByKey(
-        lambda x, y: x + y
-    ).map(
-        # generating id
-        # ((query datase id, query dataset), list of (candidate dataset, joined dataset, record))
-        lambda x: ((str(uuid.uuid4()), x[0]), x[1])
+        lambda x: (x[0], (x[1], x[2], x[3]))
+    ).join(
+        dataset_id_to_data_query.map(x[1], x[0])
     ).map(
         # replacing query dataset name for id inside the records
-        lambda x: (x[0], [(elem[0], elem[1], save_id_to_record(x[0][0], elem[2], 'query_dataset')) for elem in x[1]])
+        lambda x: (x[1][0][0], x[1][0][1], save_id_to_record(x[1][0][2], x[1][1], 'query_dataset'))
     ).persist(StorageLevel.MEMORY_AND_DISK)
 
     dataset_id_to_data_query = id_query_training_records.map(
