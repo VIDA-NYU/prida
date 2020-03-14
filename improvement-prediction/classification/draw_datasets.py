@@ -11,8 +11,8 @@ import pandas as pd
 import sys
 import numpy as np
 
-NUMBER_OF_VERSIONS_WITH_ONE_CANDIDATE_PER_QUERY = 10
-NUMBER_OF_VERSIONS_WITH_TWO_CANDIDATES_PER_QUERY = 10
+NUMBER_OF_VERSIONS_WITH_ONE_CANDIDATE_PER_QUERY = 5
+NUMBER_OF_VERSIONS_WITH_TWO_CANDIDATES_PER_QUERY = 5
 
 def create_version_of_dataset_2(larger_dataset, n_queries, one_candidate_per_query=True):
   """This function draws candidates from larger_dataset for n_queries of its queries. 
@@ -24,7 +24,11 @@ def create_version_of_dataset_2(larger_dataset, n_queries, one_candidate_per_que
   
   queries = np.random.choice(list(set(larger_dataset['query'])), n_queries)
   subdatasets = []
+  i = 0
   for q in queries:
+    if i % 1000 == 0:
+      print(i)
+    i += 1  
     subtable = larger_dataset.loc[larger_dataset['query'] == q]
     if one_candidate_per_query:
       sample = subtable.sample(1)
@@ -42,6 +46,15 @@ if __name__ == '__main__':
   dataset_name = sys.argv[1]
   number_of_queries = int(sys.argv[2])
   dataset = pd.read_csv(dataset_name)
-  
-  drawn_dataset = create_version_of_dataset_2(dataset, number_of_queries)
 
+  for i in range(NUMBER_OF_VERSIONS_WITH_ONE_CANDIDATE_PER_QUERY):
+    drawn_dataset = create_version_of_dataset_2(dataset, number_of_queries)
+    f = open('draw_' + str(i) + '_one_candidate_per_query_from_' + dataset_name, 'w')
+    f.write(drawn_dataset.to_csv(index=False))
+    f.close()
+  for i in range(NUMBER_OF_VERSIONS_WITH_TWO_CANDIDATES_PER_QUERY):
+    drawn_dataset = create_version_of_dataset_2(dataset, number_of_queries, one_candidate_per_query=False)
+    f = open('draw_' + str(i) + '_two_candidates_per_query_from_' + dataset_name, 'w')
+    f.write(drawn_dataset.to_csv(index=False))
+    f.close()
+  

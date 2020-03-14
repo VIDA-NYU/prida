@@ -52,7 +52,7 @@ def  plot_features_and_target_histograms(data, prefix):
   #tmp = remove_outliers_based_on_zscores(data[TARGET])
   #tmp = remove_outliers_based_on_mad(tmp)
   #tmp = remove_outliers_based_on_mad(data[TARGET])
-  tmp = data[feature_name]
+  tmp = remove_outliers_based_on_mad(data[TARGET])
 
   weights = np.ones_like(tmp)/float(len(tmp))
   plt.hist(tmp, bins=50, alpha=0.5, weights=weights)
@@ -84,19 +84,19 @@ def split_augmentations_into_positive_and_negative_class(data):
   
 if __name__=='__main__':
   use_case_dataset = pd.read_csv(sys.argv[1])
-  
-  fp = use_case_dataset.loc[use_case_dataset[EVAL_COLUMN] == 'fp']
-  plot_features_and_target_histograms(fp, 'fp')
-  tp = use_case_dataset.loc[use_case_dataset[EVAL_COLUMN] == 'tp']
-  plot_features_and_target_histograms(tp, 'tp')
-  fn = use_case_dataset.loc[use_case_dataset[EVAL_COLUMN] == 'fn']
-  plot_features_and_target_histograms(fn, 'fn')
-  tn = use_case_dataset.loc[use_case_dataset[EVAL_COLUMN] == 'tn']
-  plot_features_and_target_histograms(tn, 'tn')
+  plot_features_and_target_histograms(use_case_dataset, 'entire data')  
+  # fp = use_case_dataset.loc[use_case_dataset[EVAL_COLUMN] == 'fp']
+  # plot_features_and_target_histograms(fp, 'fp')
+  # tp = use_case_dataset.loc[use_case_dataset[EVAL_COLUMN] == 'tp']
+  # plot_features_and_target_histograms(tp, 'tp')
+  # fn = use_case_dataset.loc[use_case_dataset[EVAL_COLUMN] == 'fn']
+  # plot_features_and_target_histograms(fn, 'fn')
+  # tn = use_case_dataset.loc[use_case_dataset[EVAL_COLUMN] == 'tn']
+  # plot_features_and_target_histograms(tn, 'tn')
     
-  # gain, loss = split_augmentations_into_gain_and_loss(use_case_dataset)
-  # plot_features_and_target_histograms(gain, 'gain')
-  # plot_features_and_target_histograms(loss, 'loss')
+  gain, loss = split_augmentations_into_gain_and_loss(use_case_dataset)
+  plot_features_and_target_histograms(gain, 'gain')
+  plot_features_and_target_histograms(loss, 'loss')
 
   # positive, negative = split_augmentations_into_positive_and_negative_class(use_case_dataset)
   # plot_features_and_target_histograms(positive, 'positive class')
