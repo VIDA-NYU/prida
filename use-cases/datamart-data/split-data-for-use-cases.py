@@ -264,7 +264,7 @@ if __name__ == '__main__':
     )
 
     # reading records and retrieving new data
-    training_records = sc.textFile(training_records_file).repartition(2000).map(
+    training_records = sc.textFile(training_records_file).repartition(1000).map(
         lambda x: json.loads(x)
     ).map(
         # (query dataset name, record)
@@ -284,11 +284,11 @@ if __name__ == '__main__':
     ).flatMap(
         # (query dataset, candidate dataset, joined dataset, record)
         lambda x: break_companion_and_join_datasets(x[0], x[1], x[2], x[3], x[4])
-    )
+    ).persist(StorageLevel.MEMORY_AND_DISK)
 
     # getting ids for query datasets
 
-    dataset_id_to_data_query = id_query_training_records.map(
+    dataset_id_to_data_query = training_records.map(
         lambda x: x[0]
     ).distinct().map(
         lambda x: (str(uuid.uuid4()), x)
@@ -298,21 +298,17 @@ if __name__ == '__main__':
         # key => query dataset
         lambda x: (x[0], (x[1], x[2], x[3]))
     ).join(
-        dataset_id_to_data_query.map(x[1], x[0])
+        dataset_id_to_data_query.map(lambda x: (x[1], x[0])), numPartitions=1000
     ).map(
         # replacing query dataset name for id inside the records
-        lambda x: (x[1][0][0], x[1][0][1], save_id_to_record(x[1][0][2], x[1][1], 'query_dataset'))
-    ).persist(StorageLevel.MEMORY_AND_DISK)
-
-    dataset_id_to_data_query = id_query_training_records.map(
-        lambda x: x[0]
+        lambda x: (x[1][0][0], x[1][0][1], save_id_to_record(x[1][1], x[1][0][2], 'query_dataset'))
     ).persist(StorageLevel.MEMORY_AND_DISK)
 
     # getting ids for candidate datasets
 
-    id_candidate_training_records = id_query_training_records.flatMap(
-        lambda x: x[1]
-    ).repartition(2000).map(
+    print("Distinct: %d"%(id_query_training_records.map(lambda x: x[0]).distinct().count()))
+
+    id_candidate_training_records = id_query_training_records.map(
         # key => candidate dataset
         lambda x: (x[0], [(x[1], x[2])])
     ).reduceByKey(
@@ -334,7 +330,7 @@ if __name__ == '__main__':
 
     id_joined_training_records = id_candidate_training_records.flatMap(
         lambda x: x[1]
-    ).repartition(2000).map(
+    ).repartition(1000).map(
         # key => joined dataset
         lambda x: (x[0], [x[1]])
     ).reduceByKey(
@@ -373,7 +369,7 @@ if __name__ == '__main__':
     filename = os.path.join(output_dir, 'training-data-%s' % algorithm_name)
     all_training_records.map(
         lambda x: json.dumps(x)
-    ).repartition(2000).saveAsTextFile(filename)
+    ).repartition(1000).saveAsTextFile(filename)
 
     filename = os.path.join(output_dir, 'id-to-dataset-training')
     dataset_id_to_data.repartition(1000).saveAsPickleFile(filename)
