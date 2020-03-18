@@ -29,13 +29,13 @@ def determine_class_for_query_augmentations(query_rows):
   mean_ = np.mean(target_values)
   for index, row in query_rows.iterrows():
       med_tmp = row[TARGET] - median
-      if med_tmp > 0:
+      if med_tmp > 0 and row[TARGET] > 0:
           med_class = POSITIVE_CLASS
       else:
           med_class = NEGATIVE_CLASS
 
       mean_tmp = row[TARGET] - mean_
-      if mean_tmp > 0:
+      if mean_tmp > 0 and row[TARGET] > 0:
           mean_class = POSITIVE_CLASS
       else:
           mean_class = NEGATIVE_CLASS
