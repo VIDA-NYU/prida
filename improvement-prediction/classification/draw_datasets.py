@@ -14,7 +14,7 @@ import numpy as np
 NUMBER_OF_VERSIONS_WITH_ONE_CANDIDATE_PER_QUERY = 10
 NUMBER_OF_VERSIONS_WITH_TWO_CANDIDATES_PER_QUERY = 10
 
-def create_version_of_dataset_2(larger_dataset, n_queries, one_candidate_per_query=True):
+def create_version_of_dataset(larger_dataset, n_queries, one_candidate_per_query=True):
   """This function draws candidates from larger_dataset for n_queries of its queries. 
   
   If one_candidate_per_query == True, it only draws one candidate, with either 
@@ -42,6 +42,16 @@ if __name__ == '__main__':
   dataset_name = sys.argv[1]
   number_of_queries = int(sys.argv[2])
   dataset = pd.read_csv(dataset_name)
-  
-  drawn_dataset = create_version_of_dataset_2(dataset, number_of_queries)
 
+  for index in range(NUMBER_OF_VERSIONS_WITH_ONE_CANDIDATE_PER_QUERY):
+    drawn_dataset = create_version_of_dataset(dataset, number_of_queries)
+    f = open('sample_with_one_candidate_' + str(index) + '_' + dataset_name, 'w')
+    f.write(drawn_dataset.to_csv(index=False))
+    f.close()
+  for index in range(NUMBER_OF_VERSIONS_WITH_TWO_CANDIDATES_PER_QUERY):
+    drawn_dataset = create_version_of_dataset(dataset, number_of_queries, one_candidate_per_query=False)
+    f = open('sample_with_two_candidates_' + str(index) + '_' + dataset_name, 'w')
+    f.write(drawn_dataset.to_csv(index=False))
+    f.close()
+ 
+ 
