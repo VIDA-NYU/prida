@@ -82,21 +82,21 @@ def plot_two_kinds_of_histograms(data1, label1, data2, label2):
   """ This function plots histograms for features and targets, just like 
   function 'plot_features_and_target_histograms' for two different data (data1 and data2)
   """
-  print('max gain in data1:', max(data1['gain_in_r2_score']), 'max gain in data2:', max(data2['gain_in_r2_score']))
-  for feature_name in FEATURES:
+  #print('max gain in data1:', max(data1['gain_in_r2_score']), 'max gain in data2:', max(data2['gain_in_r2_score']))
+  for feature_name in ['containment_fraction']: #FEATURES:
     #tmp1 = normalize_values(remove_outliers_based_on_mad(data1[feature_name]))
     #tmp2 = normalize_values(remove_outliers_based_on_mad(data2[feature_name]))
-    tmp1 = remove_outliers_based_on_mad(data1[feature_name])
-    tmp2 = remove_outliers_based_on_mad(data2[feature_name])
+    tmp1 = data1[feature_name] #remove_outliers_based_on_mad(data1[feature_name])
+    tmp2 = data2[feature_name] #remove_outliers_based_on_mad(data2[feature_name])
     weights1 = np.ones_like(tmp1)/float(len(tmp1))
     weights2 = np.ones_like(tmp2)/float(len(tmp2))
-    plt.hist(tmp1, bins=50, alpha=0.5, weights=weights1, label=label1)
-    plt.hist(tmp2, bins=50, alpha=0.5, weights=weights2, label=label2)
-    plt.xlabel('Normalized Value Ranges')
+    plt.hist(tmp1, bins=50, alpha=0.5, weights=weights1, label=label1, color='blue')
+    plt.hist(tmp2, bins=50, alpha=0.5, weights=weights2, label=label2, color='red')
+    plt.xlabel('Value Ranges')
     plt.ylabel('Percentages')
-    plt.title(ABBREVIATIONS[feature_name])
+    plt.title('Query Containment Fraction') #ABBREVIATIONS[feature_name])
     plt.legend()
-    plt.savefig('non-normalized-' + feature_name + '.png',  dpi=600)
+    plt.savefig(feature_name + '.png',  dpi=600)
     plt.close()
 
   tmp1 = data1[feature_name]
@@ -145,7 +145,7 @@ if __name__=='__main__':
   # plot_features_and_target_histograms(tn, 'tn')
     
   gain, loss = split_augmentations_into_gain_and_loss(use_case_dataset)
-  plot_two_kinds_of_histograms(gain, 'succ', loss, 'unsucc')
+  plot_two_kinds_of_histograms(gain, 'successful', loss, 'unsuccessful')
 
   # plot_features_and_target_histograms(gain, 'successful')
   # plot_features_and_target_histograms(loss, 'unsuccessful')
