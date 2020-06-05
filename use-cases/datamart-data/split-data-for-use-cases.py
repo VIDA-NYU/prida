@@ -167,7 +167,7 @@ def break_companion_and_join_datasets(query_dataset, candidate_dataset, candidat
     if column == candidate_key:
         return list()
     
-    # creating new candidate dataset
+    # creating new single column candidate dataset
     columns_to_drop = set(list(candidate_data.columns)).difference(
         set([candidate_key, column])
     )
@@ -264,31 +264,32 @@ if __name__ == '__main__':
     )
 
     # reading records and retrieving new data
+    # example of trainining record: {"query_dataset": PATH-TO-QUERY-DATASET, "query_key": QUERY-KEY, "target": NAME-OF-TARGET-COLUMN, "candidate_dataset": PATH-TO-CANDIDATE-DATASET, "candidate_key": CANDIDATE-KEY, "joined_dataset": PATH-TO-JOINED-DATASET, "imputation_strategy": "mean", "mean_absolute_error": [mae-before, mae-after], "mean_squared_error": [mse-before, mse-after], "median_absolute_error": [medae-before, medae-after], "r2_score": [r2score-before, r2score-after]}
     training_records = sc.textFile(training_records_file).repartition(1000).map(
         lambda x: json.loads(x)
     ).map(
         # (query dataset name, record)
         lambda x: (os.path.basename(x['query_dataset']), x)
-    ).join(query_datasets).map(
+    ).join(query_datasets).map( # this join allows us to retrieve the query dataset associated with the 'query dataset name' above
         # (companion dataset name, (query dataset, record))
         lambda x: (os.path.basename(x[1][0]['candidate_dataset']), (x[1][1], x[1][0]))
-    ).join(companion_datasets).map(
+    ).join(companion_datasets).map( # this join allows us to retrieve the candidate dataset associated with the 'companion dataset name' above
         # (join dataset name, (query dataset, companion dataset, record))
         lambda x: (os.path.join(*(x[1][0][1]['joined_dataset'].split(os.path.sep)[-2:])), (x[1][0][0], x[1][1], x[1][0][1]))
-    ).join(join_datasets).map(
+    ).join(join_datasets).map( # this final join here allows us to retrieve the join dataset, associated with the 'join dataset name' above
         # (query dataset, companion dataset, join dataset, record)
         lambda x: (x[1][0][0], x[1][0][1], x[1][1], x[1][0][2])
-    ).flatMap(
-        # (query dataset, candidate dataset, candidate column, joined dataset, record)
+    ).flatMap( # map gets one element and returns one element; flatMap can return a list of elements per elements. The outputis flattened out in a single list
+        # (query dataset, candidate dataset, candidate column, joined dataset, record) ---- note that this generates a list fo each cand. column i
         lambda x: [(x[0], x[1], i, x[2], x[3]) for i in range(len(pd.read_csv(StringIO(x[1])).select_dtypes(exclude=['bool']).columns))]
-    ).flatMap(
-        # (query dataset, candidate dataset, joined dataset, record)
+    ).flatMap( # for each instance of x defined as in the line above, this flatMap gets single_column versions for candidate and join, along with an updated record
+        # (query dataset, single-column candidate dataset, single-column joined dataset, updated record with scores for single-column augmentation)
         lambda x: break_companion_and_join_datasets(x[0], x[1], x[2], x[3], x[4])
-    )
+    ).persist(StorageLevel.MEMORY_AND_DISK)
 
     # getting ids for query datasets
 
-    dataset_id_to_data_query = id_query_training_records.map(
+    dataset_id_to_data_query = training_records.map(
         lambda x: x[0]
     ).distinct().map(
         lambda x: (str(uuid.uuid4()), x)
@@ -298,62 +299,63 @@ if __name__ == '__main__':
         # key => query dataset
         lambda x: (x[0], (x[1], x[2], x[3]))
     ).join(
-        dataset_id_to_data_query.map(x[1], x[0])
+        dataset_id_to_data_query.map(lambda x: (x[1], x[0])), numPartitions=1000
     ).map(
         # replacing query dataset name for id inside the records
-        lambda x: (x[1][0][0], x[1][0][1], save_id_to_record(x[1][0][2], x[1][1], 'query_dataset'))
-    ).persist(StorageLevel.MEMORY_AND_DISK)
-
-    dataset_id_to_data_query = id_query_training_records.map(
-        lambda x: x[0]
+        lambda x: (x[1][0][0], x[1][0][1], save_id_to_record(x[1][1], x[1][0][2], 'query_dataset'))
     ).persist(StorageLevel.MEMORY_AND_DISK)
 
     # getting ids for candidate datasets
 
-    id_candidate_training_records = id_query_training_records.flatMap(
-        lambda x: x[1]
-    ).map(
+    print("Distinct: %d"%(id_query_training_records.map(lambda x: x[0]).distinct().count()))
+
+    id_candidate_training_records = id_query_training_records.map(
         # key => candidate dataset
         lambda x: (x[0], [(x[1], x[2])])
     ).reduceByKey(
         lambda x, y: x + y
     ).map(
         # generating id
-        # ((candidate datase id, candidate dataset), list of (joined dataset, record))
+        # ((candidate dataset id, candidate dataset), list of (joined dataset, record))
         lambda x: ((str(uuid.uuid4()), x[0]), x[1])
     ).map(
-        # replacing candidate dataset name for id inside the records
+        # replacing candidate dataset name for id inside the records => ((id_, candidate), [(joined dataset 1, record 1 with id_), ..., (joined dataset N, record N with id_)]
         lambda x: (x[0], [(elem[0], save_id_to_record(x[0][0], elem[1], 'candidate_dataset')) for elem in x[1]])
     ).persist(StorageLevel.MEMORY_AND_DISK)
 
     dataset_id_to_data_candidate = id_candidate_training_records.map(
+        # (candidate dataset id, candidate dataset)
         lambda x: x[0]
     ).persist(StorageLevel.MEMORY_AND_DISK)
 
     # getting ids for joined datasets
 
     id_joined_training_records = id_candidate_training_records.flatMap(
+        # that is, you end up with [(joined dataset 1, record 1 with id_ x), ..., (joined dataset N, record N with id_ x)]
         lambda x: x[1]
-    ).map(
+    ).repartition(1000).map(
         # key => joined dataset
         lambda x: (x[0], [x[1]])
     ).reduceByKey(
+        # here, you end up with a list of records that are associated to a fixed joined dataset
         lambda x, y: x + y
     ).map(
         # generating id
-        # ((joined datase id, joined dataset), list of (record))
+        # ((joined dataset id, joined dataset), list of (record))
         lambda x: ((str(uuid.uuid4()), x[0]), x[1])
     ).map(
-        # replacing joined dataset name for id inside the records
+        # replacing joined dataset name for id inside the records => ((id_, joined dataset), [record 1 with id_, ..., record M with id_])
         lambda x: (x[0], [save_id_to_record(x[0][0], elem, 'joined_dataset') for elem in x[1]])
     ).persist(StorageLevel.MEMORY_AND_DISK)
 
     dataset_id_to_data_joined = id_joined_training_records.map(
+        # (joined dataset id_, joined dataset)
         lambda x: x[0]
     ).persist(StorageLevel.MEMORY_AND_DISK)
 
     # training records
     all_training_records = id_joined_training_records.flatMap(
+        # here, we save the records with the after-augmentation scores and ids in lieu of the names of the datasets 
         lambda x: x[1]
     ).persist(StorageLevel.MEMORY_AND_DISK)
 

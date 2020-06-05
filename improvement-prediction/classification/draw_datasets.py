@@ -14,7 +14,7 @@ import numpy as np
 NUMBER_OF_VERSIONS_WITH_ONE_CANDIDATE_PER_QUERY = 5
 NUMBER_OF_VERSIONS_WITH_TWO_CANDIDATES_PER_QUERY = 5
 
-def create_version_of_dataset_2(larger_dataset, n_queries, one_candidate_per_query=True):
+def create_version_of_dataset(larger_dataset, n_queries, one_candidate_per_query=True):
   """This function draws candidates from larger_dataset for n_queries of its queries. 
   
   If one_candidate_per_query == True, it only draws one candidate, with either 
