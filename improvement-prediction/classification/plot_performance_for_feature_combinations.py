@@ -40,16 +40,16 @@ color_legend = {'lightblue': 'query', 'blue': 'query/target', 'pink': 'candidate
 def plot_boxplot(features_dict):
     features = sorted(features_dict.items(), key= lambda x: x[1], reverse=True)
     fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(18, 8))
-    axes.plot([abbrev[f[0]] for f in features], [f[1][0] for f in features], 'o-', color='green', label='recall')
-    axes.plot([abbrev[f[0]] for f in features], [f[1][1] for f in features], 'o--', color='blue', label='precision')
-    axes.plot([abbrev[f[0]] for f in features], [f[1][2] for f in features], 'o:', color='red', label='f-measure')
+    axes.plot([abbrev[f[0]] for f in features], [f[1][0] for f in features], 'o-', linewidth=3, color='#809a41', label='recall')
+    axes.plot([abbrev[f[0]] for f in features], [f[1][1] for f in features], 'o--', linewidth=3, color='#1d3557', label='precision')
+    axes.plot([abbrev[f[0]] for f in features], [f[1][2] for f in features], 'o:', linewidth=3, color='#e63946', label='f-measure')
     for label in axes.get_xticklabels():
-        label.set_rotation(90)
-        label.set_fontsize(28)
+        label.set_rotation(45)
+        label.set_fontsize(24)
     axes.yaxis.grid(True, alpha=0.3)
     axes.yaxis.set_tick_params(labelsize=24)
-    axes.set_xlabel('Feature Combinations', fontsize=28, fontweight='bold')
-    axes.set_ylabel('Performance', fontsize=28, fontweight='bold')
+    axes.set_xlabel('Feature Combinations', fontsize=28)
+    axes.set_ylabel('Performance', fontsize=28)
 
 #     q = mpatches.Patch(color='lightblue', label='query')
 #     qt = mpatches.Patch(color='blue', label='query-target')
@@ -58,7 +58,7 @@ def plot_boxplot(features_dict):
 #     qc = mpatches.Patch(color='green', label='query-candidate')
 #     cb = mpatches.Patch(color='brown', label='combination')
 #     axes.legend(handles=[q, qt, c, ct, qc, cb], loc='upper right', prop={'size':22})
-    axes.legend(loc='upper left', prop={'size':22})
+    axes.legend(loc='upper right', prop={'size':22})
     plt.savefig('feature_performance_plot.png', bbox_inches='tight', dpi=600)
 
 lists = [eval(i.strip()) for i in open(sys.argv[1]).readlines() if '[(' in i]
