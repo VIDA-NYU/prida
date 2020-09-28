@@ -60,8 +60,8 @@ def plot_boxplot(features_dict):
     #adding horizontal grid lines
     axes.yaxis.grid(True)
     axes.yaxis.set_tick_params(labelsize=24)
-    axes.set_xlabel('Features', fontsize=28, fontweight='bold')
-    axes.set_ylabel('Gini Importance', fontsize=28, fontweight='bold')
+    axes.set_xlabel('Features', fontsize=32) #, fontweight='bold')
+    axes.set_ylabel('Gini Importance', fontsize=32) #, fontweight='bold')
 
 #color_legend = {'lightblue': 'query', 'blue': 'query/target', 'pink': 'candidate', 'red': 'candidate/target', 'green': 'containment'}
     q = mpatches.Patch(color='lightblue', label='query')
