@@ -11,13 +11,13 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 
-# FEATURES = ['query_num_of_columns', 'query_num_of_rows', 'query_row_column_ratio', 'query_max_skewness', 'query_max_kurtosis', 'query_max_unique',
-#             'candidate_num_of_columns', 'candidate_num_rows', 'candidate_row_column_ratio', 'candidate_max_skewness', 'candidate_max_kurtosis',
-#             'candidate_max_unique', 'query_target_max_pearson', 'query_target_max_spearman', 'query_target_max_covariance','query_target_max_mutual_info',
-#             'candidate_target_max_pearson', 'candidate_target_max_spearman', 'candidate_target_max_covariance', 'candidate_target_max_mutual_info',
-#             'max_pearson_difference', 'containment_fraction']
+FEATURES = ['query_num_of_columns', 'query_num_of_rows', 'query_row_column_ratio', 'query_max_skewness', 'query_max_kurtosis', 'query_max_unique',
+            'candidate_num_of_columns', 'candidate_num_rows', 'candidate_row_column_ratio', 'candidate_max_skewness', 'candidate_max_kurtosis',
+            'candidate_max_unique', 'query_target_max_pearson', 'query_target_max_spearman', 'query_target_max_covariance','query_target_max_mutual_info',
+            'candidate_target_max_pearson', 'candidate_target_max_spearman', 'candidate_target_max_covariance', 'candidate_target_max_mutual_info',
+            'containment_fraction']
 
-FEATURES = ['query_row_column_ratio', 'candidate_target_max_pearson', 'candidate_target_max_spearman', 'max_pearson_difference', 'containment_fraction']
+#FEATURES = ['query_row_column_ratio', 'candidate_target_max_pearson', 'candidate_target_max_spearman', 'max_pearson_difference', 'containment_fraction']
 ALPHA = 0
 TARGET_COLUMN = 'gain_in_r2_score'
 
@@ -26,6 +26,7 @@ def fit_tsne(data_filename, class_column='standard', use_sample=True, sample=200
   """
   
   training_data = pd.read_csv(data_filename).sample(n=sample) if use_sample else pd.read_csv(data_filename)
+  print('done collecting training data')
   if class_column == 'standard':
     training_data[class_column] = ['good_gain' if row[TARGET_COLUMN] > ALPHA else 'loss' for index, row in training_data.iterrows()]
   X_train = training_data[FEATURES]
@@ -38,6 +39,7 @@ def fit_tsne(data_filename, class_column='standard', use_sample=True, sample=200
 if __name__ == '__main__':
   dataset_filename = sys.argv[1]
   class_column_name = sys.argv[2]
+  print('dataset', dataset_filename)
 
   y_pred_training, y_train_training = fit_tsne(dataset_filename, class_column_name, use_sample=False)
   colors = np.array(['green' if x=='good_gain' else 'red' for x in y_train_training])

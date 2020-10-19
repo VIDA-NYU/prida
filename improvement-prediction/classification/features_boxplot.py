@@ -60,16 +60,17 @@ def plot_boxplot(features_dict):
     #adding horizontal grid lines
     axes.yaxis.grid(True)
     axes.yaxis.set_tick_params(labelsize=24)
-    axes.set_xlabel('Features', fontsize=28, fontweight='bold')
-    axes.set_ylabel('Gini Importance', fontsize=28, fontweight='bold')
+    axes.set_xlabel('Features', fontsize=32) #, fontweight='bold')
+    axes.set_ylabel('Gini Importance', fontsize=32) #, fontweight='bold')
 
 #color_legend = {'lightblue': 'query', 'blue': 'query/target', 'pink': 'candidate', 'red': 'candidate/target', 'green': 'containment'}
     q = mpatches.Patch(color='lightblue', label='query')
     qt = mpatches.Patch(color='blue', label='query-target')
     c = mpatches.Patch(color='pink', label='candidate')
     ct = mpatches.Patch(color='red', label='candidate-target')
-    qc = mpatches.Patch(color='green', label='query-candidate')
-    axes.legend(handles=[q, qt, c, ct, qc], loc='upper right', prop={'size':22})
+    #qc = mpatches.Patch(color='green', label='query-candidate')
+    axes.legend(handles=[q, qt, c, ct],
+                loc='upper right', prop={'size':22})
 
     #axes.legend([i for i in indices_for_caption.values()], [i for i in indices_for_caption.keys()], loc='upper right', prop={'size':22})
     plt.savefig('feature-boxplot.png', bbox_inches='tight')
