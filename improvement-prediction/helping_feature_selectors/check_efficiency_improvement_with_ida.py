@@ -239,21 +239,24 @@ from sklearn.linear_model import Lasso
 from sklearn.model_selection import train_test_split
 
 RANDOM_PREFIX = 'random_feature_'
+MAX_ROWS_FOR_ESTIMATION = 5000
 
-def augment_with_random_features(dataset, number_of_random_features):
+def augment_with_random_features(dataset, target_name, number_of_random_features):
     '''
-    Given a dataset and a number of random features, this function derives
+    Given a dataset, the name of the target, and a number of random features, this function derives
     random features that are based on the original ones in the dataset
     '''
-    print('in augment_with_random_features')
-    mean = dataset.T.mean()
+    #print('in augment_with_random_features')
+    if dataset.shape[0] > MAX_ROWS_FOR_ESTIMATION:
+        dataset = dataset.sample(n=MAX_ROWS_FOR_ESTIMATION, random_state=42)
+    mean = dataset.drop([target_name], axis=1).T.mean()
     #print('MEAN SHAPE', mean.shape)
-    cov = dataset.T.cov()
+    cov = dataset.drop([target_name], axis=1).T.cov()
     #print('COVARIANCE', cov)
     features = np.random.multivariate_normal(mean, cov, number_of_random_features)
     for i in range(number_of_random_features):
         dataset[RANDOM_PREFIX + str(i)] = features[i,:]
-    print('leaving augment_with_random_features')
+    #print('leaving augment_with_random_features')
     return dataset
 
 def combine_rankings(rf_coefs, regression_coefs, feature_names, lin_comb_coef=0.5):
@@ -307,8 +310,8 @@ def aggregate_features_by_quality(rankings):
                            reverse=True)
     return [(elem[0], elem[1]/len(rankings)) for elem in sorted_feats]
     
-def random_injection_feature_selection(augmented_dataset_features, 
-                                       target_column_data, 
+def random_injection_feature_selection(augmented_dataset,
+                                       target_name,  
                                        tau, 
                                        eta, 
                                        k_random_seeds):
@@ -319,30 +322,32 @@ def random_injection_feature_selection(augmented_dataset_features,
     k experiments in a reproducible way, it selects the features that should be used in the augmented 
     dataset
     '''
-    print('in random injection')
-    number_of_random_features = int(np.ceil(eta*augmented_dataset_features.shape[1]))
-    print('number of random features', number_of_random_features)
-    augmented_dataset_with_random = augment_with_random_features(augmented_dataset_features, 
+    #print('in random injection')
+    number_of_random_features = int(np.ceil(eta*augmented_dataset.drop([target_name], axis=1).shape[1]))
+    #print('number of random features', number_of_random_features)
+    augmented_dataset_with_random = augment_with_random_features(augmented_dataset,
+                                                                 target_name, 
                                                                  number_of_random_features)
     
     # Now we obtain rankings using random forests and sparse regression models
     ## the paper does not say what hyperparameters were used in the experiment
     rankings = []
     for seed in k_random_seeds:
-        print('seed', seed)
+        #print('seed', seed)
         rf = RandomForestRegressor(n_estimators=100, random_state=seed)
-        rf.fit(augmented_dataset_features, target_column_data)
+        rf.fit(augmented_dataset_with_random.drop([target_name], axis=1), augmented_dataset_with_random[target_name])
         rf_coefs = rf.feature_importances_
-        
+        #print('done fitting random forest')
         ## coef = STRidge().fit(augmented_dataset_features, target_column_data).coef_
         ## print(coef, augmented_dataset_features.columns)
         ## print(len(rf.feature_importances_))
         
         ## This version of lasso is giving lower weights to random features, which is good
         lasso = Lasso(random_state=seed)
-        lasso.fit(augmented_dataset_features, target_column_data)
+        lasso.fit(augmented_dataset_with_random.drop([target_name], axis=1), augmented_dataset_with_random[target_name])
         lasso_coefs = lasso.coef_
-        rank = combine_rankings(rf_coefs, lasso_coefs, augmented_dataset_features.columns)
+        #print('done fitting lasso')
+        rank = combine_rankings(rf_coefs, lasso_coefs, augmented_dataset_with_random.drop([target_name], axis=1).columns)
         rankings.append(rank)
     
     # Now, for each non-random feature, we get the number of times it appeared in front of 
@@ -361,15 +366,15 @@ def wrapper_algorithm(augmented_dataset, target_name, key, thresholds_T, eta, k_
     current_r2_score = float('-inf')
     linreg = LinearRegression()
     selected = []
-    print('wrapper algorithm')
+    #print('wrapper algorithm')
     for tau in thresholds_T:
-        print('tau', tau)
-        selected = random_injection_feature_selection(augmented_dataset.drop([target_name], axis=1), 
-                                                      augmented_dataset[target_name],
+        #print('tau', tau)
+        selected = random_injection_feature_selection(augmented_dataset,
+                                                      target_name, 
                                                       tau, 
                                                       eta, 
                                                       k_random_seeds)
-        print('got out of random injection')
+        #print('got out of random injection')
         linreg.fit(X_train[selected], y_train)
         y_pred = linreg.predict(X_test[selected])
         new_r2_score = r2_score(y_test, y_pred)
@@ -445,7 +450,10 @@ def check_efficiency_with_ida(base_dataset,
     time2 = time.time()
     print('time to predict what candidates to keep', (time2-time1)*1000.0, 'ms')
     
-    #Step 5: run RIFS only considering the features to keep   
+    #Step 5: run RIFS only considering the features to keep
+    #print('initial columns', base_dataset.set_index(key).columns.to_list())
+    #print('candidates to keep', candidates_to_keep)
+    #print('augmented columns', augmented_dataset.columns)
     pruned = augmented_dataset[base_dataset.set_index(key).columns.to_list() + candidates_to_keep]
     
     time1 = time.time()
@@ -479,10 +487,10 @@ if __name__ == '__main__':
                                           openml_training_high_containment['class_pos_neg'])
 
     flight_query_dataset = pd.read_csv('arda_datasets/airline/flights.csv')
-    categorical_columns = flight_query_dataset.set_index('key').select_dtypes(exclude=['int64', 'float64'])
+    flight_query_dataset = flight_query_dataset.set_index('key').select_dtypes(include=['int64', 'float64'])
 
 
-    selected_all_airplane, candidates_to_keep_airplane, selected_pruned_airplane = check_efficiency_with_ida(flight_query_dataset, 
+    selected_all_airplane, candidates_to_keep_airplane, selected_pruned_airplane = check_efficiency_with_ida(flight_query_dataset.reset_index(), 
                                                                                                              'arda_datasets/airline/candidates/', 
                                                                                                              'key', 
                                                                                                              'population', 
