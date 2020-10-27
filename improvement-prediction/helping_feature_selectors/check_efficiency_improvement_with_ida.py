@@ -474,6 +474,10 @@ def check_efficiency_with_ida(base_dataset,
     time2 = time.time()
     print('time to run feature selector over features to keep', (time2-time1)*1000.0, 'ms')
     print('size of entire dataset', augmented_dataset.shape[1], 'size of pruned', pruned.shape[1])
+    print('size of selected features when you use the entire dataset', len(selected_all))
+    print('size of selected features when you use the pruned dataset', len(selected_pruned))
+    print('size of candidates that were selected to be kept', len(candidates_to_keep))
+    print('total number of candidates', len(candidate_names))
     return selected_all, candidates_to_keep, selected_pruned
 
 
@@ -486,25 +490,39 @@ if __name__ == '__main__':
     feature_scaler, model = train_rbf_svm(openml_training_high_containment[FEATURES], 
                                           openml_training_high_containment['class_pos_neg'])
 
-    flight_query_dataset = pd.read_csv('arda_datasets/airline/flights.csv')
-    flight_query_dataset = flight_query_dataset.set_index('key').select_dtypes(include=['int64', 'float64'])
+    # flight_query_dataset = pd.read_csv('arda_datasets/airline/flights.csv')
+    # flight_query_dataset = flight_query_dataset.set_index('key').select_dtypes(include=['int64', 'float64'])
 
 
-    selected_all_airplane, candidates_to_keep_airplane, selected_pruned_airplane = check_efficiency_with_ida(flight_query_dataset.reset_index(), 
-                                                                                                             'arda_datasets/airline/candidates/', 
-                                                                                                             'key', 
-                                                                                                             'population', 
-                                                                                                             openml_training_high_containment, 
-                                                                                                             rename_numerical=False, 
-                                                                                                             separator=',')
+    # selected_all_airplane, candidates_to_keep_airplane, selected_pruned_airplane = check_efficiency_with_ida(flight_query_dataset.reset_index(), 
+    #                                                                                                          'arda_datasets/airline/candidates/', 
+    #                                                                                                          'key', 
+    #                                                                                                          'population', 
+    #                                                                                                          openml_training_high_containment, 
+    #                                                                                                          rename_numerical=False, 
+    #                                                                                                          separator=',')
 
-    # initial_college_dataset = pd.read_csv('datasets_for_use_cases/companion-datasets/college-debt-v2.csv')
-    # initial_college_dataset = initial_college_dataset.fillna(initial_college_dataset.mean())
-    # selected_all, candidates_to_keep, selected_pruned = check_efficiency_with_ida(initial_college_dataset, 
-    #                                                                           'datasets_for_use_cases/companion-datasets/college-debt-single-column/', 
-    #                                                                           'UNITID', 
-    #                                                                           'DEBT_EARNINGS_RATIO', 
-    #                                                                           openml_training_high_containment, 
-    #                                                                           rename_numerical=False, 
-    #                                                                           separator=',')
+    initial_college_dataset = pd.read_csv('datasets_for_use_cases/companion-datasets/college-debt-v2.csv')
+    initial_college_dataset = initial_college_dataset.fillna(initial_college_dataset.mean())
+    selected_all, candidates_to_keep, selected_pruned = check_efficiency_with_ida(initial_college_dataset, 
+                                                                              'datasets_for_use_cases/companion-datasets/college-debt-single-column/', 
+                                                                              'UNITID', 
+                                                                              'DEBT_EARNINGS_RATIO', 
+                                                                              openml_training_high_containment, 
+                                                                              rename_numerical=False, 
+                                                                              separator=',')
+
+    print('FEATURES SELECTED FROM ENTIRE DATASET -- COLLEGE', selected_all)
+    print('FEATURES SELECTED FROM THE PRUNED DATASET -- COLLEGE', selected_pruned)
+    
+    crash_many_predictors = pd.read_csv('crash_many_predictors.csv', sep=SEPARATOR)
+    selected_all_crash, candidates_to_keep_crash, selected_pruned_crash = check_efficiency_with_ida(crash_many_predictors,
+                                                                                                    'nyc_indicators/',
+                                                                                                    'time',
+                                                                                                    'crash_count',
+                                                                                                    openml_training_high_containment)
+    print('FEATURES SELECTED FROM ENTIRE DATASET -- CRASH', selected_all_crash)
+    print('FEATURES SELECTED FROM THE PRUNED DATASET -- CRASH', selected_pruned_crash)
+
+
 
