@@ -538,7 +538,7 @@ def recursive_feature_elimination(data, target):
     estimator = LinearRegression()
     selector = RFE(estimator)
     reduced = selector.fit_transform(data, target)
-    print(reduced.columns)
+    #print(reduced.columns)
     return list(reduced.columns)
 
 def assess_classifier_quality(classifier, 
