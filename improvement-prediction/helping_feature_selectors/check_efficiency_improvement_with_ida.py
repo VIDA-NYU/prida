@@ -534,9 +534,8 @@ def stepwise_selection(data, target, SL_in=0.05, SL_out = 0.05):
     return best_features
 
 from sklearn.feature_selection import RFE
-from sklearn.svm import SVR
 def recursive_feature_elimination(data, target):
-    estimator = SVR(kernel="linear")
+    estimator = LinearRegression()
     selector = RFE(estimator)
     reduced = selector.fit_transform(data, target)
     print(reduced.columns)
