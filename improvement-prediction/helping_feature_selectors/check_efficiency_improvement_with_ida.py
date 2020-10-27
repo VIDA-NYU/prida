@@ -81,36 +81,32 @@ sys.path.append('../')
 from feature_factory import *
 
 
-def compute_features(query_dataset, 
+def compute_features(query_key_values,
                      candidate_dataset, 
                      key, 
                      target_name, 
                      augmented_dataset=pd.DataFrame([]),
                      mean_data_imputation=True):
     '''
-    This function generates all the features required to determine, through classification, 
+    This function generates features required to determine, through classification, 
     whether an augmentation with the candidate_dataset (which is single-feature) is likely to 
     hamper the model (or simply bring no gain)
     '''
     
-    # Step 1: individual query features
-    feature_factory_query = FeatureFactory(query_dataset.drop([target_name], axis=1))
-    query_dataset_individual_features = feature_factory_query.get_individual_features(func=max_in_modulus)
     ## In order, the returned features are number_of_columns, number_of_rows, row_to_column_ratio,
     ## max_mean, max_outlier_percentage, max_skewness, max_kurtosis, max_number_of_unique_values.
     ## For now, we're only using number_of_columns, number_of_rows, row_to_column_ratio, 
     ## max_skewness, max_kurtosis, max_number_of_unique_values, so we remove the unnecessary elements 
     ## in the lines below
-    query_dataset_individual_features = [query_dataset_individual_features[index] for index in [0, 1, 2, 5, 6, 7]]
  
-    # Step 2: individual candidate features
+    # Step 1: individual candidate features
     feature_factory_candidate = FeatureFactory(candidate_dataset)
     candidate_dataset_individual_features = feature_factory_candidate.get_individual_features(func=max_in_modulus)
     ## For now, we're only using number_of_rows, max_skewness, max_kurtosis, max_number_of_unique_values, 
     ## so we remove the unnecessary elements in the lines below 
     candidate_dataset_individual_features = [candidate_dataset_individual_features[index] for index in [1, 5, 6, 7]]
 
-    # Step 3: join the datasets and compute pairwise features
+    # Step 2: join the datasets and compute pairwise features
     if augmented_dataset.empty:
         augmented_dataset = pd.merge(query_dataset, 
                                      candidate_dataset,
@@ -124,13 +120,7 @@ def compute_features(query_dataset,
         new_dataset.index = augmented_dataset.index
         augmented_dataset = new_dataset
     
-    # Step 3.1: get query-target features 
-    ## The features are, in order: max_query_target_pearson, max_query_target_spearman, 
-    ## max_query_target_covariance, max_query_target_mutual_info
-    feature_factory_full_query = FeatureFactory(query_dataset)
-    query_features_target = feature_factory_full_query.get_pairwise_features_with_target(target_name,
-                                                                                         func=max_in_modulus)
-    # Step 3.2: get candidate-target features
+    # Step 3: get candidate-target features
     ## The features are, in order: max_query_candidate_pearson, max_query_candidate_spearman, 
     ## max_query_candidate_covariance, max_query_candidate_mutual_info
     column_names = candidate_dataset.columns.tolist() + [target_name]
@@ -139,17 +129,11 @@ def compute_features(query_dataset,
                                                                                                    func=max_in_modulus)
      # Step 4: get query-candidate feature "containment ratio". We may not use it in models, but it's 
     ## important to have this value in order to filter candidates in baselines, for example.
-    query_key_values = query_dataset.index.values
     candidate_key_values = candidate_dataset.index.values
     intersection_size = len(set(query_key_values) & set(candidate_key_values))
     containment_ratio = [intersection_size/len(query_key_values)]
 
-    return np.array(query_dataset_individual_features + 
-                    candidate_dataset_individual_features + 
-                    query_features_target + 
-                    candidate_features_target + 
-                    containment_ratio)
-
+    return candidate_dataset_individual_features, candidate_features_target, containment_ratio
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
@@ -434,16 +418,35 @@ def check_efficiency_with_ida(base_dataset,
     time1 = time.time()
     candidate_names = set(augmented_dataset.columns) - set(base_dataset.columns)
     feature_vectors = []
+
+    ## We just need to compute query features once!
+    ## In order, the returned features are number_of_columns, number_of_rows, row_to_column_ratio,
+    ## max_mean, max_outlier_percentage, max_skewness, max_kurtosis, max_number_of_unique_values.
+    ## For now, we're only using number_of_columns, number_of_rows, row_to_column_ratio, 
+    ## max_skewness, max_kurtosis, max_number_of_unique_values, so we remove the unnecessary elements 
+    ## in the lines below
+    feature_factory_query = FeatureFactory(base_dataset.set_index(key).drop([target_name], axis=1))
+    query_features = feature_factory_query.get_individual_features(func=max_in_modulus)
+    query_features = [query_features[index] for index in [0, 1, 2, 5, 6, 7]]
+
+    ## get query-target features 
+    ## The features are, in order: max_query_target_pearson, max_query_target_spearman, 
+    ## max_query_target_covariance, max_query_target_mutual_info
+    feature_factory_full_query = FeatureFactory(base_dataset.set_index(key))
+    query_features_target = feature_factory_full_query.get_pairwise_features_with_target(target_name, 
+                                                                                         func=max_in_modulus)
+    query_key_values = base_dataset.set_index(key).index.values
+        
     for name in candidate_names:
         candidate_dataset = augmented_dataset.reset_index()[[key, name]]
         #print('getting features for candidate column', name)
         #print(candidate_dataset.set_index(key))
-        features = compute_features(base_dataset.set_index(key), 
-                                    candidate_dataset.set_index(key), 
-                                    key, 
-                                    target_name, 
-                                    augmented_dataset=augmented_dataset)
-        feature_vectors.append(features[:-1])
+        candidate_features, candidate_features_target, containment_ratio = compute_features(query_key_values,
+                                                                                            candidate_dataset.set_index(key), 
+                                                                                            key, 
+                                                                                            target_name, 
+                                                                                            augmented_dataset=augmented_dataset)
+        feature_vectors.append(query_features + candidate_features + query_features_target + candidate_features_target)
     predictions = model.predict(normalize_features(np.array(feature_vectors))) 
 
     candidates_to_keep = [name for name, pred in zip(candidate_names, predictions) if pred == 'gain']
@@ -502,18 +505,18 @@ if __name__ == '__main__':
     #                                                                                                          rename_numerical=False, 
     #                                                                                                          separator=',')
 
-    initial_college_dataset = pd.read_csv('datasets_for_use_cases/companion-datasets/college-debt-v2.csv')
-    initial_college_dataset = initial_college_dataset.fillna(initial_college_dataset.mean())
-    selected_all, candidates_to_keep, selected_pruned = check_efficiency_with_ida(initial_college_dataset, 
-                                                                              'datasets_for_use_cases/companion-datasets/college-debt-single-column/', 
-                                                                              'UNITID', 
-                                                                              'DEBT_EARNINGS_RATIO', 
-                                                                              openml_training_high_containment, 
-                                                                              rename_numerical=False, 
-                                                                              separator=',')
+    # initial_college_dataset = pd.read_csv('datasets_for_use_cases/companion-datasets/college-debt-v2.csv')
+    # initial_college_dataset = initial_college_dataset.fillna(initial_college_dataset.mean())
+    # selected_all, candidates_to_keep, selected_pruned = check_efficiency_with_ida(initial_college_dataset, 
+    #                                                                           'datasets_for_use_cases/companion-datasets/college-debt-single-column/', 
+    #                                                                           'UNITID', 
+    #                                                                           'DEBT_EARNINGS_RATIO', 
+    #                                                                           openml_training_high_containment, 
+    #                                                                           rename_numerical=False, 
+    #                                                                           separator=',')
 
-    print('FEATURES SELECTED FROM ENTIRE DATASET -- COLLEGE', selected_all)
-    print('FEATURES SELECTED FROM THE PRUNED DATASET -- COLLEGE', selected_pruned)
+    # print('FEATURES SELECTED FROM ENTIRE DATASET -- COLLEGE', selected_all)
+    # print('FEATURES SELECTED FROM THE PRUNED DATASET -- COLLEGE', selected_pruned)
     
     crash_many_predictors = pd.read_csv('crash_many_predictors.csv', sep=SEPARATOR)
     selected_all_crash, candidates_to_keep_crash, selected_pruned_crash = check_efficiency_with_ida(crash_many_predictors,
