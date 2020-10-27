@@ -401,6 +401,8 @@ def check_efficiency_with_ida(base_dataset,
         selected_all = boruta_algorithm(augmented_dataset, target_name)
     elif feature_selector == stepwise_selection:
         selected_all = stepwise_selection(augmented_dataset.drop([target_name], axis=1), augmented_dataset[target_name])
+    elif feature_selector == recursive_feature_elimination:
+        selected_all = recursive_feature_elimination(augmented_dataset.drop([target_name], axis=1), augmented_dataset[target_name])
     else:
         print('feature selector that was passed is not implemented')
         exit()
@@ -471,6 +473,8 @@ def check_efficiency_with_ida(base_dataset,
         selected_pruned = boruta_algorithm(pruned, target_name)
     elif feature_selector == stepwise_selection:
         selected_pruned = stepwise_selection(pruned.drop([target_name], axis=1), pruned[target_name])
+    elif feature_selector == recursive_feature_elimination:
+        selected_pruned = recursive_feature_elimination(pruned.drop([target_name], axis=1), pruned[target_name])
     else:
         print('feature selector that was passed is not implemented')
         exit()  
@@ -483,6 +487,60 @@ def check_efficiency_with_ida(base_dataset,
     print('total number of candidates', len(candidate_names))
     return selected_all, candidates_to_keep, selected_pruned
 
+from boruta import BorutaPy
+from sklearn.ensemble import RandomForestClassifier
+def boruta_algorithm(dataset, target_name):
+    '''
+    This function selects features in the dataset using an implementation 
+    of the boruta algorithm
+    '''
+    print('USING BORUTA')
+    rf = RandomForestClassifier(n_estimators=100, random_state=42)
+    feat_selector = BorutaPy(rf, n_estimators='auto', random_state=1)
+    feat_selector.fit(dataset.drop([target_name], axis=1).values, dataset[target_name].values.ravel())
+    filtered = feat_selector.transform(dataset.drop([target_name], axis=1).values)
+    generously_selected = feat_selector.support_weak_
+    feat_names = dataset.drop([target_name], axis=1).columns
+    return [name for name, mask in zip(feat_names, generously_selected) if mask]
+    
+import statsmodels.api as sm
+def stepwise_selection(data, target, SL_in=0.05, SL_out = 0.05):
+    print('USING STEPWISE_SELECTION')
+    initial_features = data.columns.tolist()
+    best_features = []
+    print('initial features', len(initial_features))
+    while (len(initial_features)>0):
+        remaining_features = list(set(initial_features)-set(best_features))
+        print('remaining features', len(remaining_features))
+        new_pval = pd.Series(index=remaining_features)
+        for new_column in remaining_features:
+            model = sm.OLS(target, sm.add_constant(data[best_features+[new_column]])).fit()
+            new_pval[new_column] = model.pvalues[new_column]
+        min_p_value = new_pval.min()
+        if(min_p_value<SL_in):
+            best_features.append(new_pval.idxmin())
+            while(len(best_features)>0):
+                best_features_with_constant = sm.add_constant(data[best_features])
+                p_values = sm.OLS(target, best_features_with_constant).fit().pvalues[1:]
+                max_p_value = p_values.max()
+                if(max_p_value >= SL_out):
+                    excluded_feature = p_values.idxmax()
+                    best_features.remove(excluded_feature)
+                else:
+                    break 
+        else:
+            break
+    print(len(best_features))
+    return best_features
+
+from sklearn.feature_selection import RFE
+from sklearn.svm import SVR
+def recursive_feature_elimination(data, target):
+    estimator = SVR(kernel="linear")
+    selector = RFE(estimator)
+    reduced = selector.fit_transform(data, target)
+    print(reduced.columns)
+    return list(reduced.columns)
 
 if __name__ == '__main__':
     openml_training = pd.read_csv('../classification/training-simplified-data-generation.csv')
@@ -519,13 +577,29 @@ if __name__ == '__main__':
     # print('FEATURES SELECTED FROM THE PRUNED DATASET -- COLLEGE', selected_pruned)
     
     crash_many_predictors = pd.read_csv('crash_many_predictors.csv', sep=SEPARATOR)
-    selected_all_crash, candidates_to_keep_crash, selected_pruned_crash = check_efficiency_with_ida(crash_many_predictors,
-                                                                                                    'nyc_indicators/',
-                                                                                                    'time',
-                                                                                                    'crash_count',
-                                                                                                    openml_training_high_containment)
-    print('FEATURES SELECTED FROM ENTIRE DATASET -- CRASH', selected_all_crash)
-    print('FEATURES SELECTED FROM THE PRUNED DATASET -- CRASH', selected_pruned_crash)
+    # selected_all_crash, candidates_to_keep_crash, selected_pruned_crash = check_efficiency_with_ida(crash_many_predictors,
+    #                                                                                                 'nyc_indicators/',
+    #                                                                                                 'time',
+    #                                                                                                 'crash_count',
+    #                                                                                                 openml_training_high_containment)
+    # print('FEATURES SELECTED FROM ENTIRE DATASET -- CRASH', selected_all_crash)
+    # print('FEATURES SELECTED FROM THE PRUNED DATASET -- CRASH', selected_pruned_crash)
 
+    # selected_all_boruta, candidates_to_keep_boruta, selected_pruned_boruta = check_efficiency_with_ida(crash_many_predictors, 
+    #                                                                                                    'nyc_indicators/', 
+    #                                                                                                    'time', 
+    #                                                                                                    'crash_count', 
+    #                                                                                                    openml_training_high_containment, 
+    #                                                                                                    feature_selector=boruta_algorithm)
+    # print('FEATURES SELECTED FROM ENTIRE DATASET -- CRASH -- BORUTA', selected_all_boruta)
+    # print('FEATURES SELECTED FROM THE PRUNED DATASET -- CRASH -- BORUTA', selected_pruned_boruta)
 
-
+    selected_all_rfe, candidates_to_keep_rfe, selected_pruned_rfe = check_efficiency_with_ida(crash_many_predictors, 
+                                                                                              'nyc_indicators/', 
+                                                                                              'time', 
+                                                                                              'crash_count', 
+                                                                                              openml_training_high_containment, 
+                                                                                              feature_selector=recursive_feature_elimination)
+    print('FEATURES SELECTED FROM ENTIRE DATASET -- CRASH -- RFE', selected_all_rfe)
+    print('FEATURES SELECTED FROM THE PRUNED DATASET -- CRASH -- RFE', selected_pruned_rfe)
+    
