@@ -537,9 +537,8 @@ from sklearn.feature_selection import RFE
 def recursive_feature_elimination(data, target):
     estimator = LinearRegression()
     selector = RFE(estimator)
-    reduced = selector.fit_transform(data, target)
-    print(reduced.columns)
-    return list(reduced.columns)
+    reduced = selector.fit_transform(data, target).support_
+    return [elem for elem, label in zip(list(data.columns), list(reduced)) if label]
 
 def assess_classifier_quality(classifier, 
                               base_dataset, 
