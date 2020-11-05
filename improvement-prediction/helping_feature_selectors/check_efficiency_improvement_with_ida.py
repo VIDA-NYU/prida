@@ -69,7 +69,7 @@ def train_rbf_svm(features, classes):
 
     feature_scaler = MinMaxScaler().fit(features)
     features_train = feature_scaler.transform(features)
-    clf = SVC(max_iter=1000, gamma='auto')
+    clf = SVC(max_iter=1000, gamma='auto', probability=True)
     clf.fit(features_train, classes)
 
     return feature_scaler, clf
@@ -382,7 +382,8 @@ def check_efficiency_with_ida(base_dataset,
                               mean_data_imputation=True, 
                               rename_numerical=True, 
                               separator='|', 
-                              feature_selector=wrapper_algorithm):
+                              feature_selector=wrapper_algorithm,
+                              gain_prob_threshold=0.5):
     '''
     This function compares the time to run a feature selector with and without pre-pruning with IDA
     '''
@@ -450,8 +451,10 @@ def check_efficiency_with_ida(base_dataset,
                                                                                             augmented_dataset=augmented_dataset)
         feature_vectors.append(query_features + candidate_features + query_features_target + candidate_features_target)
     predictions = model.predict(normalize_features(np.array(feature_vectors))) 
-
-    candidates_to_keep = [name for name, pred in zip(candidate_names, predictions) if pred == 'gain']
+    gain_pred_probas = [elem[0] for elem in model.predict_proba(normalize_features(np.array(feature_vectors)))]
+    probs_dictionary = {name: prob for name, prob in zip(candidate_names, list(gain_pred_probas))}
+    
+    candidates_to_keep = [name for name, pred, prob in zip(candidate_names, predictions, gain_pred_probas) if pred == 'gain' and prob >= gain_prob_threshold]
     time2 = time.time()
     print('time to predict what candidates to keep', (time2-time1)*1000.0, 'ms')
     
@@ -485,7 +488,7 @@ def check_efficiency_with_ida(base_dataset,
     print('size of selected features when you use the pruned dataset', len(selected_pruned))
     print('size of candidates that were selected to be kept', len(candidates_to_keep))
     print('total number of candidates', len(candidate_names))
-    return selected_all, candidates_to_keep, selected_pruned, model
+    return selected_all, candidates_to_keep, selected_pruned, model, probs_dictionary
 
 from boruta import BorutaPy
 from sklearn.ensemble import RandomForestClassifier
@@ -502,36 +505,41 @@ def boruta_algorithm(dataset, target_name):
     generously_selected = feat_selector.support_weak_
     feat_names = dataset.drop([target_name], axis=1).columns
     return [name for name, mask in zip(feat_names, generously_selected) if mask]
-    
-import statsmodels.api as sm
-def stepwise_selection(data, target, SL_in=0.05, SL_out = 0.05):
+
+def compute_model_performance(dataset, features, target_name):
+    '''
+    This function checks how well a random forest, trained on a given set of features, 
+    performs in the prediction of a target
+    '''
+
+    # Now let's split the data
+    X_train, X_test, y_train, y_test = train_test_split(dataset.drop([target_name], axis=1),
+                                                        dataset[target_name],
+                                                        test_size=0.33,
+                                                        random_state=42)
+    model = RandomForestRegressor(n_estimators=100, random_state=42)
+    model.fit(X_train[features], y_train.ravel())
+    y_pred = model.predict(X_test[features])
+    print(r2_score(y_test, y_pred))
+
+from mlxtend.feature_selection import SequentialFeatureSelector as sfs
+def stepwise_selection(data, target):
     print('USING STEPWISE_SELECTION')
-    initial_features = data.columns.tolist()
-    best_features = []
-    print('initial features', len(initial_features))
-    while (len(initial_features)>0):
-        remaining_features = list(set(initial_features)-set(best_features))
-        print('remaining features', len(remaining_features))
-        new_pval = pd.Series(index=remaining_features)
-        for new_column in remaining_features:
-            model = sm.OLS(target, sm.add_constant(data[best_features+[new_column]])).fit()
-            new_pval[new_column] = model.pvalues[new_column]
-        min_p_value = new_pval.min()
-        if(min_p_value<SL_in):
-            best_features.append(new_pval.idxmin())
-            while(len(best_features)>0):
-                best_features_with_constant = sm.add_constant(data[best_features])
-                p_values = sm.OLS(target, best_features_with_constant).fit().pvalues[1:]
-                max_p_value = p_values.max()
-                if(max_p_value >= SL_out):
-                    excluded_feature = p_values.idxmax()
-                    best_features.remove(excluded_feature)
-                else:
-                    break 
-        else:
-            break
-    print(len(best_features))
-    return best_features
+    # Build RF regressor  to use in feature selection
+    rf = RandomForestRegressor(n_estimators=10, n_jobs=-1, random_state=42)
+    # Build step forward feature selection
+    sfs1 = sfs(rf,
+               k_features=5,
+               forward=True,
+               floating=True,
+               scoring='r2',
+               cv=5)
+
+    # Perform SFFS
+    sfs1 = sfs1.fit(data, target)
+    all_features = data.columns.tolist()
+    chosen_features = list(sfs1.k_feature_idx_)
+    return [all_features[i] for i in chosen_features]
 
 from sklearn.feature_selection import RFE
 def recursive_feature_elimination(data, target):
@@ -562,7 +570,7 @@ def assess_classifier_quality(classifier,
     candidate_names = set(augmented_dataset.columns) - set(base_dataset.columns)
     feature_vectors = []
     labels = []
-
+    improvements = {}
     feature_factory_query = FeatureFactory(base_dataset.set_index(key).drop([target_name], axis=1))
     query_features = feature_factory_query.get_individual_features(func=max_in_modulus)
     query_features = [query_features[index] for index in [0, 1, 2, 5, 6, 7]]
@@ -588,11 +596,25 @@ def assess_classifier_quality(classifier,
             labels.append('gain')
         else:
             labels.append('loss')
+        improvements[name] = improvement
     predictions = classifier.predict(normalize_features(np.array(feature_vectors))) 
     #print(labels)
     #print(predictions)
     print(classification_report(labels, predictions))
-    return (labels, predictions)
+    return improvements
+
+import matplotlib.pyplot as plt
+NUM_BINS = 50
+def plot_histogram(data, xlabel, ylabel, title, figname):
+    '''
+    Simple histogram-plotting function
+    '''
+    plt.hist(data, bins=NUM_BINS, alpha=0.7, color='blue')
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.savefig(figname, dpi=600)
+
 
 if __name__ == '__main__':
     openml_training = pd.read_csv('../classification/training-simplified-data-generation.csv')
@@ -607,36 +629,46 @@ if __name__ == '__main__':
     flight_query_dataset = flight_query_dataset.set_index('key').select_dtypes(include=['int64', 'float64'])
 
 
-    selected_all_airplane, candidates_to_keep_airplane, selected_pruned_airplane, model = check_efficiency_with_ida(flight_query_dataset.reset_index(), 
+    selected_all_airplane, candidates_to_keep_airplane, selected_pruned_airplane, model, gain_probs = check_efficiency_with_ida(flight_query_dataset.reset_index(), 
                                                                                                                     'arda_datasets/airline/candidates/', 
                                                                                                                     'key', 
                                                                                                                     'population', 
                                                                                                                     openml_training_high_containment, 
                                                                                                                     rename_numerical=False, 
                                                                                                                     separator=',')
-    print('FEATURES SELECTED FROM ENTIRE DATASET -- AIRPLANE', selected_all_airplane)
-    print('FEATURES SELECTED FROM THE PRUNED DATASET -- AIRPLANE', selected_pruned_airplane)
-    assess_classifier_quality(model,
-                              flight_query_dataset.reset_index(),
-                              'arda_datasets/airline/candidates/',
-                              'key',
-                              'population',
-                              rename_numerical=False,
-                              separator=',')
+    plot_histogram(gain_probs.values(), 'Probability of Gain', 'Percentage', 'Probabilities of Gain -- Pickup Use Case', 'pickup_gain_probs.png')
+    print('FEATURES SELECTED FROM ENTIRE DATASET ALONG WITH PROBABILITIES -- PICKUP', [(candidate, gain_probs[candidate]) for candidate in selected_all_airplane if candidate in gain_probs])
+    print('FEATURES SELECTED FROM PRUNED DATASET ALONG WITH PROBABILITIES -- PICKUP', [(candidate, gain_probs[candidate]) for candidate in selected_pruned_airplane  if candidate in gain_probs])    
+    #print('FEATURES SELECTED FROM ENTIRE DATASET -- AIRPLANE', selected_all_airplane)
+    #print('FEATURES SELECTED FROM THE PRUNED DATASET -- AIRPLANE', selected_pruned_airplane)
+    ## THE LINE BELOW TAKES A LONG TIME TO RUN!
+    # improvements = assess_classifier_quality(model,
+    #                           flight_query_dataset.reset_index(),
+    #                           'arda_datasets/airline/candidates/',
+    #                           'key',
+    #                           'population',
+    #                           rename_numerical=False,
+    #                           separator=',')
+    # plot_histogram(improvements.values(), 'Performance Improvement', 'Percentage', 'Performance Improvements -- Pickup Use Case', 'pickup_gain_improvements.png')
+    # print('FEATURES SELECTED FROM ENTIRE DATASET ALONG WITH IMPROVEMENTS -- PICKUP', [(candidate, improvements[candidate]) for candidate in selected_all_airplane  if candidate in improvements])
+    # print('FEATURES SELECTED FROM PRUNED DATASET ALONG WITH IMPROVEMENTS -- PICKUP', [(candidate, improvements[candidate]) for candidate in selected_pruned_airplane  if candidate in improvements])
 
     
     initial_college_dataset = pd.read_csv('datasets_for_use_cases/companion-datasets/college-debt-v2.csv')
     initial_college_dataset = initial_college_dataset.fillna(initial_college_dataset.mean())
-    selected_all, candidates_to_keep, selected_pruned, model = check_efficiency_with_ida(initial_college_dataset, 
+    selected_all, candidates_to_keep, selected_pruned, model, gain_probs = check_efficiency_with_ida(initial_college_dataset, 
                                                                                          'datasets_for_use_cases/companion-datasets/college-debt-single-column/', 
                                                                                          'UNITID', 
                                                                                          'DEBT_EARNINGS_RATIO', 
                                                                                          openml_training_high_containment, 
                                                                                          rename_numerical=False, 
                                                                                          separator=',')
-    print('FEATURES SELECTED FROM ENTIRE DATASET -- COLLEGE', selected_all)
-    print('FEATURES SELECTED FROM THE PRUNED DATASET -- COLLEGE', selected_pruned)
-    assess_classifier_quality(model,
+    plot_histogram(gain_probs.values(), 'Probability of Gain', 'Percentage', 'Probabilities of Gain -- College Use Case', 'college_gain_probs.png')
+    print('FEATURES SELECTED FROM ENTIRE DATASET ALONG WITH PROBABILITIES -- COLLEGE', [(candidate, gain_probs[candidate]) for candidate in selected_all if candidate in gain_probs])
+    print('FEATURES SELECTED FROM PRUNED DATASET ALONG WITH PROBABILITIES -- COLLEGE', [(candidate, gain_probs[candidate]) for candidate in selected_pruned  if candidate in gain_probs])    
+    #print('FEATURES SELECTED FROM ENTIRE DATASET -- COLLEGE', selected_all)
+    #print('FEATURES SELECTED FROM THE PRUNED DATASET -- COLLEGE', selected_pruned)
+    improvements = assess_classifier_quality(model,
                               initial_college_dataset,
                               'datasets_for_use_cases/companion-datasets/college-debt-single-column/', 
                               'UNITID', 
@@ -644,83 +676,92 @@ if __name__ == '__main__':
                               rename_numerical=False,
                               separator=',')
     
+    plot_histogram(improvements.values(), 'Performance Improvement', 'Percentage', 'Performance Improvements -- College Use Case', 'college_gain_improvements.png')
+    print('FEATURES SELECTED FROM ENTIRE DATASET ALONG WITH IMPROVEMENTS -- COLLEGE', [(candidate, improvements[candidate]) for candidate in selected_all  if candidate in improvements])
+    print('FEATURES SELECTED FROM PRUNED DATASET ALONG WITH IMPROVEMENTS -- COLLEGE', [(candidate, improvements[candidate]) for candidate in selected_pruned  if candidate in improvements])
     
     crash_many_predictors = pd.read_csv('crash_many_predictors.csv', sep=SEPARATOR)
-    selected_all_crash, candidates_to_keep_crash, selected_pruned_crash, model = check_efficiency_with_ida(crash_many_predictors,
-                                                                                                           'nyc_indicators/',
-                                                                                                           'time',
-                                                                                                           'crash_count',
-                                                                                                           openml_training_high_containment)
-    print('FEATURES SELECTED FROM ENTIRE DATASET -- CRASH', selected_all_crash)
-    print('FEATURES SELECTED FROM THE PRUNED DATASET -- CRASH', selected_pruned_crash)
-    assess_classifier_quality(model,
-                              crash_many_predictors,
-                              'nyc_indicators/',
-                              'time',
-                              'crash_count')
+    selected_all_crash, candidates_to_keep_crash, selected_pruned_crash, model, gain_probs = check_efficiency_with_ida(crash_many_predictors,
+                                                                                                                          'nyc_indicators/',
+                                                                                                                          'time',
+                                                                                                                          'crash_count',
+                                                                                                                          openml_training_high_containment)
+    plot_histogram(gain_probs.values(), 'Probability of Gain', 'Percentage', 'Probabilities of Gain -- Crash Use Case', 'crash_gain_probs.png')
+    print('FEATURES SELECTED FROM ENTIRE DATASET ALONG WITH PROBABILITIES -- CRASH', [(candidate, gain_probs[candidate]) for candidate in selected_all_crash if candidate in gain_probs])
+    print('FEATURES SELECTED FROM PRUNED DATASET ALONG WITH PROBABILITIES -- CRASH', [(candidate, gain_probs[candidate]) for candidate in selected_pruned_crash  if candidate in gain_probs])    
+    # print('FEATURES SELECTED FROM ENTIRE DATASET -- CRASH', selected_all_crash)
+    # print('FEATURES SELECTED FROM THE PRUNED DATASET -- CRASH', selected_pruned_crash)
+    improvements = assess_classifier_quality(model,
+                                             crash_many_predictors,
+                                             'nyc_indicators/',
+                                             'time',
+                                             'crash_count')
+    plot_histogram(improvements.values(), 'Performance Improvement', 'Percentage', 'Performance Improvements -- Crash Use Case', 'crash_gain_improvements.png')
+    print('FEATURES SELECTED FROM ENTIRE DATASET ALONG WITH IMPROVEMENTS -- CRASH', [(candidate, improvements[candidate]) for candidate in selected_all_crash  if candidate in improvements])
+    print('FEATURES SELECTED FROM PRUNED DATASET ALONG WITH IMPROVEMENTS -- CRASH', [(candidate, improvements[candidate]) for candidate in selected_pruned_crash  if candidate in improvements])    
 
     
-    selected_all_airplane_boruta, candidates_to_keep_airplane_boruta, selected_pruned_airplane_boruta, model = check_efficiency_with_ida(flight_query_dataset.reset_index(), 
-                                                                                                                                         'arda_datasets/airline/candidates/', 
-                                                                                                                                         'key', 
-                                                                                                                                         'population', 
-                                                                                                                                         openml_training_high_containment, 
-                                                                                                                                         rename_numerical=False, 
-                                                                                                                                         separator=',',
-                                                                                                                                         feature_selector=boruta_algorithm)
-    print('FEATURES SELECTED FROM ENTIRE DATASET -- AIRPLANE -- BORUTA', selected_all_airplane_boruta)
-    print('FEATURES SELECTED FROM THE PRUNED DATASET -- AIRPLANE -- BORUTA', selected_pruned_airplane_boruta)
+    # selected_all_airplane_boruta, candidates_to_keep_airplane_boruta, selected_pruned_airplane_boruta, model, gain_probs = check_efficiency_with_ida(flight_query_dataset.reset_index(), 
+    #                                                                                                                                      'arda_datasets/airline/candidates/', 
+    #                                                                                                                                      'key', 
+    #                                                                                                                                      'population', 
+    #                                                                                                                                      openml_training_high_containment, 
+    #                                                                                                                                      rename_numerical=False, 
+    #                                                                                                                                      separator=',',
+    #                                                                                                                                      feature_selector=boruta_algorithm)
+    # print('FEATURES SELECTED FROM ENTIRE DATASET -- AIRPLANE -- BORUTA', selected_all_airplane_boruta)
+    # print('FEATURES SELECTED FROM THE PRUNED DATASET -- AIRPLANE -- BORUTA', selected_pruned_airplane_boruta)
     
-    selected_all_college_boruta, candidates_to_keep_college_boruta, selected_pruned_college_boruta, model = check_efficiency_with_ida(initial_college_dataset,
-                                                                                                                                      'datasets_for_use_cases/companion-datasets/college-debt-single-column/',
-                                                                                                                                      'UNITID',
-                                                                                                                                      'DEBT_EARNINGS_RATIO',
-                                                                                                                                      openml_training_high_containment,
-                                                                                                                                      rename_numerical=False,
-                                                                                                                                      separator=',',
-                                                                                                                                      feature_selector=boruta_algorithm)
+    # selected_all_college_boruta, candidates_to_keep_college_boruta, selected_pruned_college_boruta, model, gain_probs = check_efficiency_with_ida(initial_college_dataset,
+    #                                                                                                                                   'datasets_for_use_cases/companion-datasets/college-debt-single-column/',
+    #                                                                                                                                   'UNITID',
+    #                                                                                                                                   'DEBT_EARNINGS_RATIO',
+    #                                                                                                                                   openml_training_high_containment,
+    #                                                                                                                                   rename_numerical=False,
+    #                                                                                                                                   separator=',',
+    #                                                                                                                                   feature_selector=boruta_algorithm)
     
-    print('FEATURES SELECTED FROM ENTIRE DATASET -- COLLEGE -- BORUTA', selected_all_college_boruta)
-    print('FEATURES SELECTED FROM THE PRUNED DATASET -- COLLEGE -- BORUTA', selected_pruned_college_boruta)
+    # print('FEATURES SELECTED FROM ENTIRE DATASET -- COLLEGE -- BORUTA', selected_all_college_boruta)
+    # print('FEATURES SELECTED FROM THE PRUNED DATASET -- COLLEGE -- BORUTA', selected_pruned_college_boruta)
 
-    selected_all_boruta, candidates_to_keep_boruta, selected_pruned_boruta, model = check_efficiency_with_ida(crash_many_predictors, 
-                                                                                                              'nyc_indicators/', 
-                                                                                                              'time', 
-                                                                                                              'crash_count', 
-                                                                                                              openml_training_high_containment, 
-                                                                                                              feature_selector=boruta_algorithm)
-    print('FEATURES SELECTED FROM ENTIRE DATASET -- CRASH -- BORUTA', selected_all_boruta)
-    print('FEATURES SELECTED FROM THE PRUNED DATASET -- CRASH -- BORUTA', selected_pruned_boruta)
+    # selected_all_boruta, candidates_to_keep_boruta, selected_pruned_boruta, model, gain_probs = check_efficiency_with_ida(crash_many_predictors, 
+    #                                                                                                           'nyc_indicators/', 
+    #                                                                                                           'time', 
+    #                                                                                                           'crash_count', 
+    #                                                                                                           openml_training_high_containment, 
+    #                                                                                                           feature_selector=boruta_algorithm)
+    # print('FEATURES SELECTED FROM ENTIRE DATASET -- CRASH -- BORUTA', selected_all_boruta)
+    # print('FEATURES SELECTED FROM THE PRUNED DATASET -- CRASH -- BORUTA', selected_pruned_boruta)
 
 
-    selected_all_airplane_rfe, candidates_to_keep_airplane_rfe, selected_pruned_airplane_rfe, model = check_efficiency_with_ida(flight_query_dataset.reset_index(), 
-                                                                                                                                'arda_datasets/airline/candidates/', 
-                                                                                                                                'key', 
-                                                                                                                                'population', 
-                                                                                                                                openml_training_high_containment, 
-                                                                                                                                rename_numerical=False, 
-                                                                                                                                separator=',',
-                                                                                                                                feature_selector=recursive_feature_elimination)
-    print('FEATURES SELECTED FROM ENTIRE DATASET -- AIRPLANE -- RFE', selected_all_airplane_rfe)
-    print('FEATURES SELECTED FROM THE PRUNED DATASET -- AIRPLANE -- RFE', selected_pruned_airplane_rfe)
+    # selected_all_airplane_rfe, candidates_to_keep_airplane_rfe, selected_pruned_airplane_rfe, model, gain_probs = check_efficiency_with_ida(flight_query_dataset.reset_index(), 
+    #                                                                                                                             'arda_datasets/airline/candidates/', 
+    #                                                                                                                             'key', 
+    #                                                                                                                             'population', 
+    #                                                                                                                             openml_training_high_containment, 
+    #                                                                                                                             rename_numerical=False, 
+    #                                                                                                                             separator=',',
+    #                                                                                                                             feature_selector=recursive_feature_elimination)
+    # print('FEATURES SELECTED FROM ENTIRE DATASET -- AIRPLANE -- RFE', selected_all_airplane_rfe)
+    # print('FEATURES SELECTED FROM THE PRUNED DATASET -- AIRPLANE -- RFE', selected_pruned_airplane_rfe)
     
-    selected_all_college_rfe, candidates_to_keep_college_rfe, selected_pruned_college_rfe, model = check_efficiency_with_ida(initial_college_dataset,
-                                                                                                                             'datasets_for_use_cases/companion-datasets/college-debt-single-column/',
-                                                                                                                             'UNITID',
-                                                                                                                             'DEBT_EARNINGS_RATIO',
-                                                                                                                             openml_training_high_containment,
-                                                                                                                             rename_numerical=False,
-                                                                                                                             separator=',',
-                                                                                                                             feature_selector=recursive_feature_elimination)
+    # selected_all_college_rfe, candidates_to_keep_college_rfe, selected_pruned_college_rfe, model, gain_probs = check_efficiency_with_ida(initial_college_dataset,
+    #                                                                                                                          'datasets_for_use_cases/companion-datasets/college-debt-single-column/',
+    #                                                                                                                          'UNITID',
+    #                                                                                                                          'DEBT_EARNINGS_RATIO',
+    #                                                                                                                          openml_training_high_containment,
+    #                                                                                                                          rename_numerical=False,
+    #                                                                                                                          separator=',',
+    #                                                                                                                          feature_selector=recursive_feature_elimination)
     
-    print('FEATURES SELECTED FROM ENTIRE DATASET -- COLLEGE -- RFE', selected_all_college_rfe)
-    print('FEATURES SELECTED FROM THE PRUNED DATASET -- COLLEGE -- RFE', selected_pruned_college_rfe)
+    # print('FEATURES SELECTED FROM ENTIRE DATASET -- COLLEGE -- RFE', selected_all_college_rfe)
+    # print('FEATURES SELECTED FROM THE PRUNED DATASET -- COLLEGE -- RFE', selected_pruned_college_rfe)
 
-    selected_all_rfe, candidates_to_keep_rfe, selected_pruned_rfe, model = check_efficiency_with_ida(crash_many_predictors, 
-                                                                                                     'nyc_indicators/', 
-                                                                                                     'time', 
-                                                                                                     'crash_count', 
-                                                                                                     openml_training_high_containment, 
-                                                                                                     feature_selector=recursive_feature_elimination)
-    print('FEATURES SELECTED FROM ENTIRE DATASET -- CRASH -- RFE', selected_all_rfe)
-    print('FEATURES SELECTED FROM THE PRUNED DATASET -- CRASH -- RFE', selected_pruned_rfe)
+    # selected_all_rfe, candidates_to_keep_rfe, selected_pruned_rfe, model, gain_probs = check_efficiency_with_ida(crash_many_predictors, 
+    #                                                                                                  'nyc_indicators/', 
+    #                                                                                                  'time', 
+    #                                                                                                  'crash_count', 
+    #                                                                                                  openml_training_high_containment, 
+    #                                                                                                  feature_selector=recursive_feature_elimination)
+    # print('FEATURES SELECTED FROM ENTIRE DATASET -- CRASH -- RFE', selected_all_rfe)
+    # print('FEATURES SELECTED FROM THE PRUNED DATASET -- CRASH -- RFE', selected_pruned_rfe)
