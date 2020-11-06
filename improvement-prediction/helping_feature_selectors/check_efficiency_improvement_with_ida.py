@@ -531,7 +531,7 @@ def stepwise_selection(data, target):
     sfs1 = sfs(rf,
                k_features=5,
                forward=True,
-               floating=True,
+               floating=False,
                scoring='r2',
                cv=5)
 
