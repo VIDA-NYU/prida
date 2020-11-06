@@ -767,34 +767,34 @@ if __name__ == '__main__':
 
 
     
-    selected_all_airplane_stepwise, candidates_to_keep_airplane_stepwise, selected_pruned_airplane_stepwise, model = check_efficiency_with_ida(flight_query_dataset.reset_index(), 
+    selected_all_airplane_stepwise, candidates_to_keep_airplane_stepwise, selected_pruned_airplane_stepwise, model, probs_dict = check_efficiency_with_ida(flight_query_dataset.reset_index(), 
                                                                                                                                 'arda_datasets/airline/candidates/', 
                                                                                                                                 'key', 
                                                                                                                                 'population', 
                                                                                                                                 openml_training_high_containment, 
                                                                                                                                 rename_numerical=False, 
                                                                                                                                 separator=',',
-                                                                                                                                               feature_selector=stepwise_selection)
+                                                                                                                                feature_selector=stepwise_selection)
     print('FEATURES SELECTED FROM ENTIRE DATASET -- AIRPLANE -- STEPWISE', selected_all_airplane_stepwise)
     print('FEATURES SELECTED FROM THE PRUNED DATASET -- AIRPLANE -- STEPWISE', selected_pruned_airplane_stepwise)
     
-    selected_all_college_stepwise, candidates_to_keep_college_stepwise, selected_pruned_college_stepwise, model = check_efficiency_with_ida(initial_college_dataset,
+    selected_all_college_stepwise, candidates_to_keep_college_stepwise, selected_pruned_college_stepwise, model, probs_dict = check_efficiency_with_ida(initial_college_dataset,
                                                                                                                              'datasets_for_use_cases/companion-datasets/college-debt-single-column/',
                                                                                                                              'UNITID',
                                                                                                                              'DEBT_EARNINGS_RATIO',
                                                                                                                              openml_training_high_containment,
                                                                                                                              rename_numerical=False,
                                                                                                                              separator=',',
-                                                                                                                                            feature_selector=stepwise_selection)
+                                                                                                                             feature_selector=stepwise_selection)
     
     print('FEATURES SELECTED FROM ENTIRE DATASET -- COLLEGE -- STEPWISE', selected_all_college_stepwise)
     print('FEATURES SELECTED FROM THE PRUNED DATASET -- COLLEGE -- STEPWISE', selected_pruned_college_stepwise)
 
-    selected_all_stepwise, candidates_to_keep_stepwise, selected_pruned_stepwise, model = check_efficiency_with_ida(crash_many_predictors, 
+    selected_all_stepwise, candidates_to_keep_stepwise, selected_pruned_stepwise, model, probs_dict = check_efficiency_with_ida(crash_many_predictors, 
                                                                                                      'nyc_indicators/', 
                                                                                                      'time', 
                                                                                                      'crash_count', 
                                                                                                      openml_training_high_containment, 
-                                                                                                                    feature_selector=stepwise_selection)
+                                                                                                     feature_selector=stepwise_selection)
     print('FEATURES SELECTED FROM ENTIRE DATASET -- CRASH -- STEPWISE', selected_all_stepwise)
     print('FEATURES SELECTED FROM THE PRUNED DATASET -- CRASH -- STEPWISE', selected_pruned_stepwise)
