@@ -404,7 +404,7 @@ def check_efficiency_with_ida(base_dataset,
     '''
     This function compares the time to run a feature selector with and without pre-pruning with IDA
     '''
-    
+
     #Step 1: do the join with every candidate dataset in dataset_directory. 
     ## This has to be done both with and without IDA. 
     augmented_dataset = join_datasets(base_dataset, dataset_directory, key, rename_numerical=rename_numerical, separator=separator)
@@ -429,9 +429,9 @@ def check_efficiency_with_ida(base_dataset,
 
     #Step 3: compute the user's regression model with features selected_all
     time1 = time.time()
-    compute_model_performance(augmented_dataset, 
-                              target_name, 
-                              selected_all)
+    compute_user_model_performance(augmented_dataset, 
+                                   target_name, 
+                                   selected_all)
     time2 = time.time()
     print('time to create and assess user\'s model without IDA', (time2-time1)*1000.0, 'ms')
     
@@ -506,9 +506,9 @@ def check_efficiency_with_ida(base_dataset,
 
     #Step 7: compute the user's regression model with features selected_pruned
     time1 = time.time()
-    compute_model_performance(augmented_dataset, 
-                              target_name, 
-                              selected_all)
+    compute_user_model_performance(augmented_dataset, 
+                                   target_name, 
+                                   selected_all)
     time2 = time.time()
     print('time to create and assess user\'s model with IDA', (time2-time1)*1000.0, 'ms')
     
@@ -535,10 +535,10 @@ def boruta_algorithm(dataset, target_name):
     feat_names = dataset.drop([target_name], axis=1).columns
     return [name for name, mask in zip(feat_names, generously_selected) if mask]
 
-def compute_model_performance(dataset, features, target_name):
+def compute_user_model_performance(dataset, target_name, features):
     '''
-    This function checks how well a random forest, trained on a given set of features, 
-    performs in the prediction of a target
+    This function checks how well a random forest (assumed to be the user's model), 
+    trained on a given set of features, performs in the prediction of a target
     '''
 
     # Now let's split the data
@@ -657,7 +657,6 @@ if __name__ == '__main__':
     flight_query_dataset = pd.read_csv('arda_datasets/airline/flights.csv')
     flight_query_dataset = flight_query_dataset.set_index('key').select_dtypes(include=['int64', 'float64'])
 
-    print('********* RIFS *********')
     selected_all_airplane, candidates_to_keep_airplane, selected_pruned_airplane, model, gain_probs = check_efficiency_with_ida(flight_query_dataset.reset_index(), 
                                                                                                                     'arda_datasets/airline/candidates/', 
                                                                                                                     'key', 
