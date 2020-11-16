@@ -428,12 +428,15 @@ def check_efficiency_with_ida(base_dataset,
     print('time to run feature selector', (time2-time1)*1000.0, 'ms')
 
     #Step 3: compute the user's regression model with features selected_all
-    time1 = time.time()
-    compute_user_model_performance(augmented_dataset, 
-                                   target_name, 
-                                   selected_all)
-    time2 = time.time()
-    print('time to create and assess user\'s model without IDA', (time2-time1)*1000.0, 'ms')
+    if len(selected_all) == 0:
+        print('No features were selected. Can\'t run user\'s model.')
+    else:
+        time1 = time.time()
+        compute_user_model_performance(augmented_dataset, 
+                                       target_name, 
+                                       selected_all)
+        time2 = time.time()
+        print('time to create and assess user\'s model without IDA', (time2-time1)*1000.0, 'ms')
     
     #Step 4: let's train our IDA model over the training dataset
     time1 = time.time()
@@ -505,12 +508,15 @@ def check_efficiency_with_ida(base_dataset,
     print('time to run feature selector over features to keep', (time2-time1)*1000.0, 'ms')
 
     #Step 7: compute the user's regression model with features selected_pruned
-    time1 = time.time()
-    compute_user_model_performance(augmented_dataset, 
-                                   target_name, 
-                                   selected_all)
-    time2 = time.time()
-    print('time to create and assess user\'s model with IDA', (time2-time1)*1000.0, 'ms')
+    if len(selected_pruned) == 0:
+        print('No features were selected. Can\'t run user\'s model.')
+    else:
+        time1 = time.time()
+        compute_user_model_performance(augmented_dataset, 
+                                       target_name, 
+                                       selected_pruned)
+        time2 = time.time()
+        print('time to create and assess user\'s model with IDA', (time2-time1)*1000.0, 'ms')
     
     print('size of entire dataset', augmented_dataset.shape[1], 'size of pruned', pruned.shape[1])
     print('size of selected features when you use the entire dataset', len(selected_all))
