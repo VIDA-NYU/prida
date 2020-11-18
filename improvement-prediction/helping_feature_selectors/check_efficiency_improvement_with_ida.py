@@ -1,3 +1,4 @@
+
 import pandas as pd
 import json
 import os
@@ -392,7 +393,8 @@ def prune_candidates_with_ida(training_data,
                               augmented_dataset,
                               base_dataset,
                               target_name,
-                              key): 
+                              key,
+                              gain_prob_threshold=0.5):
     '''
     This function effectively trains and uses IDA as a pruner of candidates for augmentation
     '''
@@ -455,7 +457,7 @@ def check_efficiency_with_ida(base_dataset,
                               separator='|', 
                               feature_selector=wrapper_algorithm,
                               gain_prob_threshold=0.5,
-                              prepruning=None):
+                              prepruning='IDA'):
     '''
     This function gets the time to run a feature selector without pre-pruning 
     or with pre-pruning using either IDA or a pruning baseline
@@ -470,7 +472,7 @@ def check_efficiency_with_ida(base_dataset,
     
     #Step 2: let's see how much time it takes to run chosen pre-pruner
     if prepruning == 'IDA':
-        candidates_to_keep = prune_candidates_with_ida(training_data, augmented_dataset, base_dataset, target_name, key) 
+        candidates_to_keep = prune_candidates_with_ida(training_data, augmented_dataset, base_dataset, target_name, key, gain_prob_threshold) 
         pruned_dataset = augmented_dataset[base_dataset.set_index(key).columns.to_list() + candidates_to_keep]
     elif not prepruning:
         pruned_dataset = augmented_dataset
