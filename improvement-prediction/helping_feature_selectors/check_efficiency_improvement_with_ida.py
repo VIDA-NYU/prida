@@ -457,7 +457,7 @@ def check_efficiency_with_ida(base_dataset,
                               separator='|', 
                               feature_selector=wrapper_algorithm,
                               gain_prob_threshold=0.5,
-                              prepruning='IDA'):
+                              prepruning=None):
     '''
     This function gets the time to run a feature selector without pre-pruning 
     or with pre-pruning using either IDA or a pruning baseline
@@ -529,7 +529,7 @@ def boruta_algorithm(dataset, target_name):
     feat_names = dataset.drop([target_name], axis=1).columns
     return [name for name, mask in zip(feat_names, generously_selected) if mask]
 
-def compute_user_model_performance(dataset, target_name, features, model_type='random_forest'):
+def compute_user_model_performance(dataset, target_name, features, model_type='linear_regression'):
     '''
     This function checks how well a random forest (assumed to be the user's model), 
     trained on a given set of features, performs in the prediction of a target
