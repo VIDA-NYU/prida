@@ -7,12 +7,14 @@ from sklearn.impute import SimpleImputer
 import numpy as np
 from sklearn.linear_model import LinearRegression
 
-def join_datasets(base_dataset, dataset_directory, key, mean_data_imputation=True, rename_numerical=True, separator='|'):
+def join_datasets(base_dataset, dataset_directory, key, mean_data_imputation=True, rename_numerical=True, separator='|', prepruning=None):
     '''
     Given (1) a base dataset, (2) a directory with datasets that only have two 
     columns (one key and one numerical attribute), and (3) a key that is present 
     in all of them and helps for joining purposes, this function generates a big
     table composed of all joined datasets.
+
+    If prepruning == 'containment', the augmentation only happens if the key overlap is of 70% at least
     '''
     
     augmented_dataset = base_dataset
@@ -29,11 +31,20 @@ def join_datasets(base_dataset, dataset_directory, key, mean_data_imputation=Tru
                 dataset = dataset.rename(columns={numerical_column: name.split('.')[0]})
     
             ### Step 3: augment the table
-            #print('NAME', name)
-            augmented_dataset = pd.merge(augmented_dataset, 
-                                         dataset,
-                                         how='left',
-                                         on=key)
+            augment = True
+            if prepruning == 'containment':
+                base_keys = set(base_dataset[key])
+                candidate_keys = set(dataset[key])
+                intersection_size = len(base_keys & candidate_keys)
+                containment_ratio = intersection_size/len(base_keys)
+                if containment_ratio < 0.7:
+                    augment = False
+                    
+            if augment:
+                augmented_dataset = pd.merge(augmented_dataset, 
+                                             dataset,
+                                             how='left',
+                                             on=key)
         except pd.errors.EmptyDataError:
             continue
     
@@ -443,7 +454,8 @@ def prune_candidates_with_ida(training_data,
     time2 = time.time()
     print('time to predict what candidates to keep', (time2-time1)*1000.0, 'ms')
     return candidates_to_keep    
-    
+
+import random
 def check_efficiency_with_ida(base_dataset, 
                               dataset_directory, 
                               key, 
@@ -457,7 +469,7 @@ def check_efficiency_with_ida(base_dataset,
                               separator='|', 
                               feature_selector=wrapper_algorithm,
                               gain_prob_threshold=0.5,
-                              prepruning=None):
+                              prepruning='containment'):
     '''
     This function gets the time to run a feature selector without pre-pruning 
     or with pre-pruning using either IDA or a pruning baseline
@@ -465,8 +477,9 @@ def check_efficiency_with_ida(base_dataset,
 
     print('******* PREPRUNING STRATEGY ********', prepruning)
     #Step 1: do the join with every candidate dataset in dataset_directory. 
-    ## This has to be done both with and without prepruners. 
-    augmented_dataset = join_datasets(base_dataset, dataset_directory, key, rename_numerical=rename_numerical, separator=separator)
+    ## This has to be done both with and without prepruners.
+    ## If the prepruning is containment, we already "prune" the augmented dataset while creating it
+    augmented_dataset = join_datasets(base_dataset, dataset_directory, key, rename_numerical=rename_numerical, separator=separator, prepruning=prepruning)
     augmented_dataset = augmented_dataset.loc[:,~augmented_dataset.columns.duplicated()] #removing duplicate columns
     print('Done creating the augmented dataset')
     
@@ -474,8 +487,14 @@ def check_efficiency_with_ida(base_dataset,
     if prepruning == 'IDA':
         candidates_to_keep = prune_candidates_with_ida(training_data, augmented_dataset, base_dataset, target_name, key, gain_prob_threshold) 
         pruned_dataset = augmented_dataset[base_dataset.set_index(key).columns.to_list() + candidates_to_keep]
-    elif not prepruning:
+    elif not prepruning or prepruning == 'containment':
+        # if the prepruning is 'containment', the pruning is already done in the augmentation itself
         pruned_dataset = augmented_dataset
+    elif prepruning == 'random':
+        # if the prepruning is random, it will select sqrt(len(candidate_features)) features at random
+        candidate_features = set(augmented_dataset.columns.to_list()) - set(base_dataset.set_index(key).columns.to_list()) 
+        candidates_to_keep = random.sample(candidate_features, int(np.sqrt(len(candidate_features))))
+        pruned_dataset = augmented_dataset[base_dataset.set_index(key).columns.to_list() + candidates_to_keep]
 
     #Step 3: select features with selector over pruned dataset (if RIFS, we inject 20% of random features)
     time1 = time.time()
