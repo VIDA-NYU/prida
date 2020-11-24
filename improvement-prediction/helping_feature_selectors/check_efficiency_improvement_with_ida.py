@@ -584,8 +584,12 @@ def stepwise_selection(data, target):
     # Build RF regressor  to use in feature selection
     rf = RandomForestRegressor(n_estimators=10, n_jobs=-1, random_state=42)
     # Build step forward feature selection
+    if len(data.columns) < 5:
+        num_feats = len(data.columns)
+    else:
+        num_feats = 5
     sfs1 = sfs(rf,
-               k_features=5,
+               k_features=num_feats,
                forward=True,
                floating=False,
                scoring='r2',
@@ -683,84 +687,87 @@ if __name__ == '__main__':
 
     flight_query_dataset = pd.read_csv('arda_datasets/airline/flights.csv')
     flight_query_dataset = flight_query_dataset.set_index('key').select_dtypes(include=['int64', 'float64'])
-
-    print('******* RIFS ********')
-    check_efficiency_with_ida(flight_query_dataset.reset_index(), 
-                              'arda_datasets/airline/candidates/', 
-                              'key', 
-                              'population', 
-                              openml_training_high_containment, 
-                              rename_numerical=False, 
-                              separator=',')
-    
+          
     initial_college_dataset = pd.read_csv('datasets_for_use_cases/companion-datasets/college-debt-v2.csv')
     initial_college_dataset = initial_college_dataset.fillna(initial_college_dataset.mean())
-    check_efficiency_with_ida(initial_college_dataset, 
-                              'datasets_for_use_cases/companion-datasets/college-debt-single-column/', 
-                              'UNITID', 
-                              'DEBT_EARNINGS_RATIO', 
-                              openml_training_high_containment, 
-                              rename_numerical=False, 
-                              separator=',')
-    
+          
     crash_many_predictors = pd.read_csv('crash_many_predictors.csv', sep=SEPARATOR)
-    check_efficiency_with_ida(crash_many_predictors,
-                              'nyc_indicators/',
-                              'time',
-                              'crash_count',
-                              openml_training_high_containment)
+          
+    # print('******* RIFS ********')
+    # check_efficiency_with_ida(flight_query_dataset.reset_index(), 
+    #                           'arda_datasets/airline/candidates/', 
+    #                           'key', 
+    #                           'population', 
+    #                           openml_training_high_containment, 
+    #                           rename_numerical=False, 
+    #                           separator=',')
+    
+
+    # check_efficiency_with_ida(initial_college_dataset, 
+    #                           'datasets_for_use_cases/companion-datasets/college-debt-single-column/', 
+    #                           'UNITID', 
+    #                           'DEBT_EARNINGS_RATIO', 
+    #                           openml_training_high_containment, 
+    #                           rename_numerical=False, 
+    #                           separator=',')
+    
+    # check_efficiency_with_ida(crash_many_predictors,
+    #                           'nyc_indicators/',
+    #                           'time',
+    #                           'crash_count',
+    #                           openml_training_high_containment)
 
     
-    print('********** BORUTA **********')
-    check_efficiency_with_ida(flight_query_dataset.reset_index(), 
-                              'arda_datasets/airline/candidates/', 
-                              'key', 
-                              'population', 
-                              openml_training_high_containment, 
-                              rename_numerical=False, 
-                              separator=',',
-                              feature_selector=boruta_algorithm)
+    # print('********** BORUTA **********')
+    # check_efficiency_with_ida(flight_query_dataset.reset_index(), 
+    #                           'arda_datasets/airline/candidates/', 
+    #                           'key', 
+    #                           'population', 
+    #                           openml_training_high_containment, 
+    #                           rename_numerical=False, 
+    #                           separator=',',
+    #                           feature_selector=boruta_algorithm)
     
-    check_efficiency_with_ida(initial_college_dataset,
-                              'datasets_for_use_cases/companion-datasets/college-debt-single-column/',
-                              'UNITID',
-                              'DEBT_EARNINGS_RATIO',
-                              openml_training_high_containment,
-                              rename_numerical=False,
-                              separator=',',
-                              feature_selector=boruta_algorithm)
-    check_efficiency_with_ida(crash_many_predictors, 
-                              'nyc_indicators/', 
-                              'time', 
-                              'crash_count', 
-                              openml_training_high_containment, 
-                              feature_selector=boruta_algorithm)
+    # check_efficiency_with_ida(initial_college_dataset,
+    #                           'datasets_for_use_cases/companion-datasets/college-debt-single-column/',
+    #                           'UNITID',
+    #                           'DEBT_EARNINGS_RATIO',
+    #                           openml_training_high_containment,
+    #                           rename_numerical=False,
+    #                           separator=',',
+    #                           feature_selector=boruta_algorithm)
+    # check_efficiency_with_ida(crash_many_predictors, 
+    #                           'nyc_indicators/', 
+    #                           'time', 
+    #                           'crash_count', 
+    #                           openml_training_high_containment, 
+    #                           feature_selector=boruta_algorithm)
 
 
-    print('******* RFE ********')
-    check_efficiency_with_ida(flight_query_dataset.reset_index(),
-                              'arda_datasets/airline/candidates/', 
-                              'key', 
-                              'population', 
-                              openml_training_high_containment, 
-                              rename_numerical=False, 
-                              separator=',',
-                              feature_selector=recursive_feature_elimination)
-    check_efficiency_with_ida(initial_college_dataset,
-                              'datasets_for_use_cases/companion-datasets/college-debt-single-column/',
-                              'UNITID',
-                              'DEBT_EARNINGS_RATIO',
-                              openml_training_high_containment,
-                              rename_numerical=False,
-                              separator=',',
-                              feature_selector=recursive_feature_elimination)
+    # print('******* RFE ********')
+    # check_efficiency_with_ida(flight_query_dataset.reset_index(),
+    #                           'arda_datasets/airline/candidates/', 
+    #                           'key', 
+    #                           'population', 
+    #                           openml_training_high_containment, 
+    #                           rename_numerical=False, 
+    #                           separator=',',
+    #                           feature_selector=recursive_feature_elimination)
+    # check_efficiency_with_ida(initial_college_dataset,
+    #                           'datasets_for_use_cases/companion-datasets/college-debt-single-column/',
+    #                           'UNITID',
+    #                           'DEBT_EARNINGS_RATIO',
+    #                           openml_training_high_containment,
+    #                           rename_numerical=False,
+    #                           separator=',',
+    #                           feature_selector=recursive_feature_elimination)
     
-    check_efficiency_with_ida(crash_many_predictors, 
-                              'nyc_indicators/', 
-                              'time', 
-                              'crash_count', 
-                              openml_training_high_containment, 
-                              feature_selector=recursive_feature_elimination)
+    # check_efficiency_with_ida(crash_many_predictors, 
+    #                           'nyc_indicators/', 
+    #                           'time', 
+    #                           'crash_count', 
+    #                           openml_training_high_containment, 
+    #                           feature_selector=recursive_feature_elimination)
     
 
     print('********* STEPWISE ***********')
