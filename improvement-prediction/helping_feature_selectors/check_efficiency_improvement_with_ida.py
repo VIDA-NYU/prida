@@ -19,6 +19,7 @@ def join_datasets(base_dataset, dataset_directory, key, mean_data_imputation=Tru
     
     augmented_dataset = base_dataset
     dataset_names = [f for f in os.listdir(dataset_directory) if '.csv' in f]
+    containments = {}
     for name in dataset_names:
         try:
             ### Step 1: read the dataset in the directory
@@ -31,22 +32,40 @@ def join_datasets(base_dataset, dataset_directory, key, mean_data_imputation=Tru
                 dataset = dataset.rename(columns={numerical_column: name.split('.')[0]})
     
             ### Step 3: augment the table
-            augment = True
             if prepruning == 'containment':
                 base_keys = set(base_dataset[key])
                 candidate_keys = set(dataset[key])
                 intersection_size = len(base_keys & candidate_keys)
                 containment_ratio = intersection_size/len(base_keys)
-                if containment_ratio < 0.7:
-                    augment = False
-                    
-            if augment:
+                containments[name] = containment_ratio
+            else:
                 augmented_dataset = pd.merge(augmented_dataset, 
                                              dataset,
                                              how='left',
                                              on=key)
         except pd.errors.EmptyDataError:
             continue
+
+    if prepruning == 'containment':
+        chosen_candidates = [elem[0] for elem in sorted(containments.items(), key= lambda x: x[1], reverse=True)[:np.sqrt(len(dataset_names))]]
+        for name in chosen_candidates:
+            try:
+                ### Step 1: read the dataset in the directory
+                dataset = pd.read_csv(os.path.join(dataset_directory, name), 
+                                      sep=separator)
+                
+                ### Step 2 (optional):  rename the numerical column in the dataset
+                if rename_numerical:
+                    numerical_column = [i for i in dataset.columns if i != key][0]
+                    dataset = dataset.rename(columns={numerical_column: name.split('.')[0]})
+                
+                ### Step 3: augment the table
+                augmented_dataset = pd.merge(augmented_dataset, 
+                                             dataset,
+                                             how='left',
+                                             on=key)
+            except pd.errors.EmptyDataError:
+                continue
     
     augmented_dataset = augmented_dataset.set_index(key)
     augmented_dataset = augmented_dataset.select_dtypes(include=['int64', 'float64'])
@@ -57,6 +76,7 @@ def join_datasets(base_dataset, dataset_directory, key, mean_data_imputation=Tru
         new_data.columns = augmented_dataset.columns
         return new_data
     
+    print('number of initial features', len(base_dataset.columns), 'augmented dataset', len(augmented_dataset.columns))
     return augmented_dataset
 
 from sklearn.svm import SVC
@@ -229,7 +249,6 @@ def normalize_features(features, scaler=None):
     return scaler.transform(features)
 
 
-from sparsereg.model.base import STRidge # the stype of sparsereg they use is not clear in the ARDA paper
 from sklearn.linear_model import Lasso
 from sklearn.model_selection import train_test_split
 
