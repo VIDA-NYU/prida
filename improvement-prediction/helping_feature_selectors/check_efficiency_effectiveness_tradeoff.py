@@ -720,12 +720,12 @@ if __name__ == '__main__':
     Given a pruning percentage and a pruner strategy, this script shows efficiency and 
     effectiveness values for different case studies using them.
     '''
-
+    
     percentage = float(sys.argv[1])
     if percentage < 0.0 or percentage > 1.0:
         print('Pruning percentage has to be in interval [0.0, 1.0].')
         exit()
-
+    print('********* PERCENTAGE FOR PRUNING *********', percentage)
     pruner = sys.argv[2]
     if pruner not in PRUNERS:
         print('Pruner has to be in', PRUNERS)
