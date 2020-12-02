@@ -586,7 +586,7 @@ def boruta_algorithm(dataset, target_name):
     feat_names = dataset.drop([target_name], axis=1).columns
     return [name for name, mask in zip(feat_names, generously_selected) if mask]
 
-def compute_user_model_performance(dataset, target_name, features, model_type='random_forest'):
+def compute_user_model_performance(dataset, target_name, features, model_type='linear_regression'):
     '''
     This function checks how well a random forest (assumed to be the user's model), 
     trained on a given set of features, performs in the prediction of a target
