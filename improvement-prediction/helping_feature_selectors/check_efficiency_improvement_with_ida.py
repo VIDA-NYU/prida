@@ -1,4 +1,4 @@
-
+import time
 import pandas as pd
 import json
 import os
@@ -16,7 +16,8 @@ def join_datasets(base_dataset, dataset_directory, key, mean_data_imputation=Tru
 
     If prepruning == 'containment', the augmentation only happens if the key overlap is of 70% at least
     '''
-    
+
+    time1 = time.time()
     augmented_dataset = base_dataset
     dataset_names = [f for f in os.listdir(dataset_directory) if '.csv' in f]
     containments = {}
@@ -47,7 +48,7 @@ def join_datasets(base_dataset, dataset_directory, key, mean_data_imputation=Tru
             continue
 
     if prepruning == 'containment':
-        chosen_candidates = [elem[0] for elem in sorted(containments.items(), key= lambda x: x[1], reverse=True)[:np.sqrt(len(dataset_names))]]
+        chosen_candidates = [elem[0] for elem in sorted(containments.items(), key= lambda x: x[1], reverse=True)[:int(np.sqrt(len(dataset_names)))]]
         for name in chosen_candidates:
             try:
                 ### Step 1: read the dataset in the directory
@@ -74,8 +75,13 @@ def join_datasets(base_dataset, dataset_directory, key, mean_data_imputation=Tru
         new_data = pd.DataFrame(fill_NaN.fit_transform(augmented_dataset))
         new_data.index = augmented_dataset.index
         new_data.columns = augmented_dataset.columns
+        time2 = time.time()
+        print('time to perform join', (time2-time1)*1000.0, 'ms')
+        print('number of initial features', len(base_dataset.columns), 'augmented dataset', len(augmented_dataset.columns))
         return new_data
-    
+
+    time2 = time.time()
+    print('time to perform join', (time2-time1)*1000.0, 'ms')
     print('number of initial features', len(base_dataset.columns), 'augmented dataset', len(augmented_dataset.columns))
     return augmented_dataset
 
@@ -417,8 +423,6 @@ def compute_model_performance(dataset,
     y_pred = model.predict(X_test[features])
     print('R2-score', r2_score(y_test, y_pred))
     
-import time
-
 def prune_candidates_with_ida(training_data,
                               augmented_dataset,
                               base_dataset,
@@ -712,81 +716,81 @@ if __name__ == '__main__':
           
     crash_many_predictors = pd.read_csv('crash_many_predictors.csv', sep=SEPARATOR)
           
-    # print('******* RIFS ********')
-    # check_efficiency_with_ida(flight_query_dataset.reset_index(), 
-    #                           'arda_datasets/airline/candidates/', 
-    #                           'key', 
-    #                           'population', 
-    #                           openml_training_high_containment, 
-    #                           rename_numerical=False, 
-    #                           separator=',')
+    print('******* RIFS ********')
+    check_efficiency_with_ida(flight_query_dataset.reset_index(), 
+                              'arda_datasets/airline/candidates/', 
+                              'key', 
+                              'population', 
+                              openml_training_high_containment, 
+                              rename_numerical=False, 
+                              separator=',')
     
 
-    # check_efficiency_with_ida(initial_college_dataset, 
-    #                           'datasets_for_use_cases/companion-datasets/college-debt-single-column/', 
-    #                           'UNITID', 
-    #                           'DEBT_EARNINGS_RATIO', 
-    #                           openml_training_high_containment, 
-    #                           rename_numerical=False, 
-    #                           separator=',')
+    check_efficiency_with_ida(initial_college_dataset, 
+                              'datasets_for_use_cases/companion-datasets/college-debt-single-column/', 
+                              'UNITID', 
+                              'DEBT_EARNINGS_RATIO', 
+                              openml_training_high_containment, 
+                              rename_numerical=False, 
+                              separator=',')
     
-    # check_efficiency_with_ida(crash_many_predictors,
-    #                           'nyc_indicators/',
-    #                           'time',
-    #                           'crash_count',
-    #                           openml_training_high_containment)
+    check_efficiency_with_ida(crash_many_predictors,
+                              'nyc_indicators/',
+                              'time',
+                              'crash_count',
+                              openml_training_high_containment)
 
     
-    # print('********** BORUTA **********')
-    # check_efficiency_with_ida(flight_query_dataset.reset_index(), 
-    #                           'arda_datasets/airline/candidates/', 
-    #                           'key', 
-    #                           'population', 
-    #                           openml_training_high_containment, 
-    #                           rename_numerical=False, 
-    #                           separator=',',
-    #                           feature_selector=boruta_algorithm)
+    print('********** BORUTA **********')
+    check_efficiency_with_ida(flight_query_dataset.reset_index(), 
+                              'arda_datasets/airline/candidates/', 
+                              'key', 
+                              'population', 
+                              openml_training_high_containment, 
+                              rename_numerical=False, 
+                              separator=',',
+                              feature_selector=boruta_algorithm)
     
-    # check_efficiency_with_ida(initial_college_dataset,
-    #                           'datasets_for_use_cases/companion-datasets/college-debt-single-column/',
-    #                           'UNITID',
-    #                           'DEBT_EARNINGS_RATIO',
-    #                           openml_training_high_containment,
-    #                           rename_numerical=False,
-    #                           separator=',',
-    #                           feature_selector=boruta_algorithm)
-    # check_efficiency_with_ida(crash_many_predictors, 
-    #                           'nyc_indicators/', 
-    #                           'time', 
-    #                           'crash_count', 
-    #                           openml_training_high_containment, 
-    #                           feature_selector=boruta_algorithm)
+    check_efficiency_with_ida(initial_college_dataset,
+                              'datasets_for_use_cases/companion-datasets/college-debt-single-column/',
+                              'UNITID',
+                              'DEBT_EARNINGS_RATIO',
+                              openml_training_high_containment,
+                              rename_numerical=False,
+                              separator=',',
+                              feature_selector=boruta_algorithm)
+    check_efficiency_with_ida(crash_many_predictors, 
+                              'nyc_indicators/', 
+                              'time', 
+                              'crash_count', 
+                              openml_training_high_containment, 
+                              feature_selector=boruta_algorithm)
 
 
-    # print('******* RFE ********')
-    # check_efficiency_with_ida(flight_query_dataset.reset_index(),
-    #                           'arda_datasets/airline/candidates/', 
-    #                           'key', 
-    #                           'population', 
-    #                           openml_training_high_containment, 
-    #                           rename_numerical=False, 
-    #                           separator=',',
-    #                           feature_selector=recursive_feature_elimination)
-    # check_efficiency_with_ida(initial_college_dataset,
-    #                           'datasets_for_use_cases/companion-datasets/college-debt-single-column/',
-    #                           'UNITID',
-    #                           'DEBT_EARNINGS_RATIO',
-    #                           openml_training_high_containment,
-    #                           rename_numerical=False,
-    #                           separator=',',
-    #                           feature_selector=recursive_feature_elimination)
+    print('******* RFE ********')
+    check_efficiency_with_ida(flight_query_dataset.reset_index(),
+                              'arda_datasets/airline/candidates/', 
+                              'key', 
+                              'population', 
+                              openml_training_high_containment, 
+                              rename_numerical=False, 
+                              separator=',',
+                              feature_selector=recursive_feature_elimination)
+    check_efficiency_with_ida(initial_college_dataset,
+                              'datasets_for_use_cases/companion-datasets/college-debt-single-column/',
+                              'UNITID',
+                              'DEBT_EARNINGS_RATIO',
+                              openml_training_high_containment,
+                              rename_numerical=False,
+                              separator=',',
+                              feature_selector=recursive_feature_elimination)
     
-    # check_efficiency_with_ida(crash_many_predictors, 
-    #                           'nyc_indicators/', 
-    #                           'time', 
-    #                           'crash_count', 
-    #                           openml_training_high_containment, 
-    #                           feature_selector=recursive_feature_elimination)
+    check_efficiency_with_ida(crash_many_predictors, 
+                              'nyc_indicators/', 
+                              'time', 
+                              'crash_count', 
+                              openml_training_high_containment, 
+                              feature_selector=recursive_feature_elimination)
     
 
     print('********* STEPWISE ***********')
