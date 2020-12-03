@@ -492,6 +492,7 @@ def prune_candidates_with_ida(training_data,
     candidates_to_keep = [elem[0] for elem in pruned if elem[1] > 0.5] # if elem[1] > 0.5, it was classified as 'keepable'
     time2 = time.time()
     print('time to predict what candidates to keep', (time2-time1)*1000.0, 'ms')
+    print('initial number of candidates', len(candidate_names), 'final number of candidates', len(candidates_to_keep))
     return candidates_to_keep    
 
 import random
