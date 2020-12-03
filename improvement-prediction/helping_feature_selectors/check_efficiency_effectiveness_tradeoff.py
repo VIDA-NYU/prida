@@ -106,13 +106,26 @@ def train_rbf_svm(features, classes):
     '''
     Builds a model using features to predict associated classes,
     '''
-
+    print('using rbf')
     feature_scaler = MinMaxScaler().fit(features)
     features_train = feature_scaler.transform(features)
     clf = SVC(max_iter=1000, gamma='auto', probability=True)
     clf.fit(features_train, classes)
 
     return feature_scaler, clf
+
+from sklearn.ensemble import RandomForestClassifier
+def train_random_forest(features, classes):
+    '''
+    Builds a model using features to predict associated classes
+    '''
+    print('using random forest')
+    feature_scaler = MinMaxScaler().fit(features)
+    features_train = feature_scaler.transform(features)
+    clf = RandomForestClassifier(n_estimators=100, random_state=42)
+    clf.fit(features_train, classes)
+    return feature_scaler, clf
+    
 
 # The next two lines are important for importing files that are in the parent directory, 
 # necessary to generate the features
@@ -438,7 +451,7 @@ def prune_candidates_with_ida(training_data,
     
     #Let's train our IDA model over the training dataset
     time1 = time.time()
-    feature_scaler, model = train_rbf_svm(training_data[FEATURES], training_data['class_pos_neg'])
+    feature_scaler, model = train_random_forest(training_data[FEATURES], training_data['class_pos_neg']) #train_rbf_svm(training_data[FEATURES], training_data['class_pos_neg'])
     time2 = time.time()
     print('time to train our model', (time2-time1)*1000.0, 'ms')
     
@@ -735,9 +748,6 @@ if __name__ == '__main__':
     openml_training['class_pos_neg'] = ['gain' if row['gain_in_r2_score'] > 0 else 'loss'
                                         for index, row in openml_training.iterrows()]
     openml_training_high_containment = openml_training.loc[openml_training['containment_fraction'] >= THETA]
-
-    feature_scaler, model = train_rbf_svm(openml_training_high_containment[FEATURES], 
-                                          openml_training_high_containment['class_pos_neg'])
 
     flight_query_dataset = pd.read_csv('arda_datasets/airline/flights.csv')
     flight_query_dataset = flight_query_dataset.set_index('key').select_dtypes(include=['int64', 'float64'])
