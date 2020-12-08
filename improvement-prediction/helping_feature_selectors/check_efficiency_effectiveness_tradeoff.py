@@ -7,12 +7,19 @@ from sklearn.impute import SimpleImputer
 import numpy as np
 from sklearn.linear_model import LinearRegression
 
-def join_datasets(base_dataset, dataset_directory, key, mean_data_imputation=True, rename_numerical=True, separator='|', prepruning=None, percentage=0.5):
+def join_datasets(base_dataset, 
+                  dataset_directory, 
+                  base_key, 
+                  mean_data_imputation=True, 
+                  rename_numerical=True, 
+                  separator='|', 
+                  prepruning=None, 
+                  percentage=0.5, 
+                  candidate_key_columns=None):
     '''
     Given (1) a base dataset, (2) a directory with datasets that only have two 
-    columns (one key and one numerical attribute), and (3) a key that is present 
-    in all of them and helps for joining purposes, this function generates a big
-    table composed of all joined datasets.
+    columns (one key and one numerical attribute), and (3) keys  for joining purposes, 
+    this function generates a big table composed of all joined datasets.
 
     If prepruning == 'containment', the augmentation only happens including the 
     top 'percentage' overlapping candidates.
@@ -20,7 +27,7 @@ def join_datasets(base_dataset, dataset_directory, key, mean_data_imputation=Tru
 
     time1 = time.time()
     augmented_dataset = base_dataset
-    dataset_names = [f for f in os.listdir(dataset_directory) if '.csv' in f]
+    dataset_names = [f for f in os.listdir(dataset_directory)]
     containments = {}
     for name in dataset_names:
         try:
@@ -30,21 +37,31 @@ def join_datasets(base_dataset, dataset_directory, key, mean_data_imputation=Tru
             
             ### Step 2 (optional):  rename the numerical column in the dataset
             if rename_numerical:
-                numerical_column = [i for i in dataset.columns if i != key][0]
+                numerical_column = [i for i in dataset.columns if i != base_key][0]
                 dataset = dataset.rename(columns={numerical_column: name.split('.')[0]})
     
             ### Step 3: augment the table
             if prepruning == 'containment':
-                base_keys = set(base_dataset[key])
-                candidate_keys = set(dataset[key])
+                base_keys = set(base_dataset[base_key])
+                if candidate_key_columns:
+                    candidate_keys = set(dataset[candidate_key_columns[name]])
+                else:
+                    candidate_keys = set(dataset[base_key])
                 intersection_size = len(base_keys & candidate_keys)
                 containment_ratio = intersection_size/len(base_keys)
                 containments[name] = containment_ratio
             else:
-                augmented_dataset = pd.merge(augmented_dataset, 
-                                             dataset,
-                                             how='left',
-                                             on=key)
+                if candidate_key_columns:
+                    augmented_dataset = pd.merge(augmented_dataset,
+                                                 dataset,
+                                                 how='left',
+                                                 left_on=[base_key],
+                                                 right_on=[candidate_key_columns[name]])
+                else:
+                    augmented_dataset = pd.merge(augmented_dataset, 
+                                                 dataset,
+                                                 how='left',
+                                                 on=base_key)
         except pd.errors.EmptyDataError:
             continue
 
@@ -56,21 +73,28 @@ def join_datasets(base_dataset, dataset_directory, key, mean_data_imputation=Tru
                 ### Step 1: read the dataset in the directory
                 dataset = pd.read_csv(os.path.join(dataset_directory, name), 
                                       sep=separator)
-                
                 ### Step 2 (optional):  rename the numerical column in the dataset
                 if rename_numerical:
-                    numerical_column = [i for i in dataset.columns if i != key][0]
+                    numerical_column = [i for i in dataset.columns if i != base_key][0]
                     dataset = dataset.rename(columns={numerical_column: name.split('.')[0]})
-                
+            
                 ### Step 3: augment the table
-                augmented_dataset = pd.merge(augmented_dataset, 
-                                             dataset,
-                                             how='left',
-                                             on=key)
+                if candidate_key_columns:
+                    augmented_dataset = pd.merge(augmented_dataset,
+                                                 dataset,
+                                                 how='left',
+                                                 left_on=[base_key],
+                                                 right_on=[candidate_key_columns[name]])
+                else:
+                    augmented_dataset = pd.merge(augmented_dataset, 
+                                                 dataset,
+                                                 how='left',
+                                                 on=base_key)
+                
             except pd.errors.EmptyDataError:
                 continue
     
-    augmented_dataset = augmented_dataset.set_index(key)
+    augmented_dataset = augmented_dataset.set_index(base_key)
     augmented_dataset = augmented_dataset.select_dtypes(include=['int64', 'float64'])
     if mean_data_imputation:
         fill_NaN = SimpleImputer(missing_values=np.nan, strategy='mean')
@@ -510,7 +534,8 @@ def check_efficiency_with_ida(base_dataset,
                               feature_selector=wrapper_algorithm,
                               gain_prob_threshold=0.5,
                               prepruning='containment', 
-                              percentage=0.5):
+                              percentage=0.5, 
+                              candidate_key_columns=None):
     '''
     This function gets the time to run a feature selector without pre-pruning 
     or with pre-pruning using either IDA or a pruning baseline
@@ -526,7 +551,8 @@ def check_efficiency_with_ida(base_dataset,
                                       rename_numerical=rename_numerical, 
                                       separator=separator, 
                                       prepruning=prepruning,
-                                      percentage=percentage)
+                                      percentage=percentage,
+                                      candidate_key_columns=candidate_key_columns)
     augmented_dataset = augmented_dataset.loc[:,~augmented_dataset.columns.duplicated()] #removing duplicate columns
     print('Done creating the augmented dataset')
     
@@ -539,7 +565,7 @@ def check_efficiency_with_ida(base_dataset,
                                                        key, 
                                                        percentage=percentage)
         pruned_dataset = augmented_dataset[base_dataset.set_index(key).columns.to_list() + candidates_to_keep]
-    elif not prepruning or prepruning == 'containment':
+    elif prepruning == 'none' or prepruning == 'containment':
         # if the prepruning is 'containment', the pruning is already done in the augmentation itself
         pruned_dataset = augmented_dataset
     elif prepruning == 'random':
@@ -727,7 +753,7 @@ def plot_histogram(data, xlabel, ylabel, title, figname):
     plt.title(title)
     plt.savefig(figname, dpi=600)
 
-PRUNERS = ['ida', 'containment', 'random']
+PRUNERS = ['ida', 'containment', 'random', 'none']
 
 if __name__ == '__main__':
     '''
@@ -750,43 +776,25 @@ if __name__ == '__main__':
                                         for index, row in openml_training.iterrows()]
     openml_training_high_containment = openml_training.loc[openml_training['containment_fraction'] >= THETA]
 
-    flight_query_dataset = pd.read_csv('arda_datasets/airline/flights.csv')
-    flight_query_dataset = flight_query_dataset.set_index('key').select_dtypes(include=['int64', 'float64'])
+#     flight_query_dataset = pd.read_csv('arda_datasets/airline/flights.csv')
+#     flight_query_dataset = flight_query_dataset.set_index('key').select_dtypes(include=['int64', 'float64'])
           
-    initial_college_dataset = pd.read_csv('datasets_for_use_cases/companion-datasets/college-debt-v2.csv')
-    initial_college_dataset = initial_college_dataset.fillna(initial_college_dataset.mean())
+#     initial_college_dataset = pd.read_csv('datasets_for_use_cases/companion-datasets/college-debt-v2.csv')
+#     initial_college_dataset = initial_college_dataset.fillna(initial_college_dataset.mean())
           
-    crash_many_predictors = pd.read_csv('crash_many_predictors.csv', sep=SEPARATOR)
-          
-    print('********* STEPWISE ***********')
-    check_efficiency_with_ida(flight_query_dataset.reset_index(),
-                              'arda_datasets/airline/candidates/',
-                              'key',
-                              'population',
+#     crash_many_predictors = pd.read_csv('crash_many_predictors.csv', sep=SEPARATOR)
+   
+    poverty_estimation = pd.read_csv('datasets_for_use_cases/poverty-estimation-v2.csv')
+    poverty_candidate_keys = eval(open('datasets_for_use_cases/poverty_candidates_and_keys.txt').read())
+
+    print('********* RIFS ***********')
+    check_efficiency_with_ida(poverty_estimation,
+                              'datasets_for_use_cases/top_25_prob_folder/',
+                              'FIPS',
+                              'POVALL_2016',
                               openml_training_high_containment,
                               rename_numerical=False,
                               separator=',',
-                              feature_selector=stepwise_selection, 
                               prepruning=pruner,
-                              percentage=percentage)
-
-    check_efficiency_with_ida(initial_college_dataset,
-                              'datasets_for_use_cases/companion-datasets/college-debt-single-column/',
-                              'UNITID',
-                              'DEBT_EARNINGS_RATIO',
-                              openml_training_high_containment,
-                              rename_numerical=False,
-                              separator=',',
-                              feature_selector=stepwise_selection,
-                              prepruning=pruner,
-                              percentage=percentage)
-    
-    check_efficiency_with_ida(crash_many_predictors, 
-                              'nyc_indicators/', 
-                              'time', 
-                              'crash_count', 
-                              openml_training_high_containment, 
-                              feature_selector=stepwise_selection,
-                              prepruning=pruner,
-                              percentage=percentage)
-
+                              percentage=percentage,
+                              candidate_key_columns=poverty_candidate_keys)
