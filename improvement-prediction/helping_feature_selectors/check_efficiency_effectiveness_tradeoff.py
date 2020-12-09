@@ -52,6 +52,7 @@ def join_datasets(base_dataset,
                 containments[name] = containment_ratio
             else:
                 if candidate_key_columns:
+                    #print(name, dataset.columns, candidate_key_columns[name])
                     augmented_dataset = pd.merge(augmented_dataset,
                                                  dataset,
                                                  how='left',
@@ -62,7 +63,7 @@ def join_datasets(base_dataset,
                                                  dataset,
                                                  how='left',
                                                  on=base_key)
-        except pd.errors.EmptyDataError:
+        except (pd.errors.EmptyDataError, KeyError):
             continue
 
     if prepruning == 'containment':
@@ -91,7 +92,7 @@ def join_datasets(base_dataset,
                                                  how='left',
                                                  on=base_key)
                 
-            except pd.errors.EmptyDataError:
+            except (pd.errors.EmptyDataError, KeyError):
                 continue
     
     augmented_dataset = augmented_dataset.set_index(base_key)
@@ -789,7 +790,7 @@ if __name__ == '__main__':
 
     print('********* RIFS ***********')
     check_efficiency_with_ida(poverty_estimation,
-                              'datasets_for_use_cases/top_25_prob_folder/',
+                              'datasets_for_use_cases/top_1_percent_prob_folder/',
                               'FIPS',
                               'POVALL_2016',
                               openml_training_high_containment,
