@@ -63,7 +63,7 @@ def join_datasets(base_dataset,
                                                  dataset,
                                                  how='left',
                                                  on=base_key)
-        except (pd.errors.EmptyDataError, KeyError):
+        except (pd.errors.EmptyDataError, KeyError, ValueError):
             continue
 
     if prepruning == 'containment':
@@ -92,7 +92,7 @@ def join_datasets(base_dataset,
                                                  how='left',
                                                  on=base_key)
                 
-            except (pd.errors.EmptyDataError, KeyError):
+            except (pd.errors.EmptyDataError, KeyError, ValueError):
                 continue
     
     augmented_dataset = augmented_dataset.set_index(base_key)
@@ -541,6 +541,8 @@ def check_efficiency_with_ida(base_dataset,
     This function gets the time to run a feature selector without pre-pruning 
     or with pre-pruning using either IDA or a pruning baseline
     '''
+    print('Initial performance')
+    compute_user_model_performance(base_dataset, target_name, base_dataset.drop([target_name], axis=1).columns)
 
     print('******* PREPRUNING STRATEGY ********', prepruning)
     #Step 1: do the join with every candidate dataset in dataset_directory. 
@@ -607,6 +609,7 @@ def check_efficiency_with_ida(base_dataset,
         time2 = time.time()
         print('time to create and assess user\'s model with pruner', prepruning, (time2-time1)*1000.0, 'ms')
     
+        
     #print('size of entire dataset', augmented_dataset.shape[1], 'size of pruned', pruned.shape[1])
     #print('size of selected features when you use prepruner', prepruning, len(selected_pruned))
     #return selected_all, candidates_to_keep, selected_pruned, model, probs_dictionary
@@ -627,7 +630,7 @@ def boruta_algorithm(dataset, target_name):
     feat_names = dataset.drop([target_name], axis=1).columns
     return [name for name, mask in zip(feat_names, generously_selected) if mask]
 
-def compute_user_model_performance(dataset, target_name, features, model_type='linear_regression'):
+def compute_user_model_performance(dataset, target_name, features, model_type='random_forest'):
     '''
     This function checks how well a random forest (assumed to be the user's model), 
     trained on a given set of features, performs in the prediction of a target
@@ -790,7 +793,18 @@ if __name__ == '__main__':
 
     print('********* RIFS ***********')
     check_efficiency_with_ida(poverty_estimation,
-                              'datasets_for_use_cases/top_1_percent_prob_folder/',
+                              'datasets_for_use_cases/top_1_percent_probs_folder/',
+                              'FIPS',
+                              'POVALL_2016',
+                              openml_training_high_containment,
+                              rename_numerical=False,
+                              separator=',',
+                              prepruning=pruner,
+                              percentage=percentage,
+                              candidate_key_columns=poverty_candidate_keys)
+    
+    check_efficiency_with_ida(poverty_estimation,
+                              'datasets_for_use_cases/top_10_percent_probs_folder/',
                               'FIPS',
                               'POVALL_2016',
                               openml_training_high_containment,
