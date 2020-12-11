@@ -435,6 +435,8 @@ def wrapper_algorithm(augmented_dataset, target_name, key, thresholds_T, eta, k_
                                                       eta, 
                                                       k_random_seeds)
         #print('got out of random injection')
+        if not selected:
+            break
         linreg.fit(X_train[selected], y_train)
         y_pred = linreg.predict(X_test[selected])
         new_r2_score = r2_score(y_test, y_pred)
@@ -476,7 +478,8 @@ def prune_candidates_with_ida(training_data,
     
     #Let's train our IDA model over the training dataset
     time1 = time.time()
-    feature_scaler, model = train_random_forest(training_data[FEATURES], training_data['class_pos_neg']) #train_rbf_svm(training_data[FEATURES], training_data['class_pos_neg'])
+    #feature_scaler, model = train_random_forest(training_data[FEATURES], training_data['class_pos_neg']) 
+    feature_scaler, model = train_rbf_svm(training_data[FEATURES], training_data['class_pos_neg'])
     time2 = time.time()
     print('time to train our model', (time2-time1)*1000.0, 'ms')
     
@@ -520,6 +523,84 @@ def prune_candidates_with_ida(training_data,
     print('initial number of candidates', len(candidate_names), 'final number of candidates', len(candidates_to_keep))
     return candidates_to_keep    
 
+
+from boruta import BorutaPy
+from sklearn.ensemble import RandomForestClassifier
+def boruta_algorithm(dataset, target_name):
+    '''
+    This function selects features in the dataset using an implementation 
+    of the boruta algorithm
+    '''
+    print('USING BORUTA')
+    rf = RandomForestClassifier(n_estimators=100, random_state=42)
+    feat_selector = BorutaPy(rf, n_estimators='auto', random_state=1)
+    feat_selector.fit(dataset.drop([target_name], axis=1).values, dataset[target_name].values.ravel())
+    filtered = feat_selector.transform(dataset.drop([target_name], axis=1).values)
+    generously_selected = feat_selector.support_weak_
+    feat_names = dataset.drop([target_name], axis=1).columns
+    return [name for name, mask in zip(feat_names, generously_selected) if mask]
+
+def compute_user_model_performance(dataset, target_name, features, model_type='linear_regression'):
+    '''
+    This function checks how well a random forest (assumed to be the user's model), 
+    trained on a given set of features, performs in the prediction of a target
+    '''
+
+    time1 = time.time()
+    # Now let's split the data
+    X_train, X_test, y_train, y_test = train_test_split(dataset.drop([target_name], axis=1),
+                                                        dataset[target_name],
+                                                        test_size=0.33,
+                                                        random_state=42)
+    if model_type == 'random_forest':
+        model = RandomForestRegressor(n_estimators=100, random_state=42)
+        model.fit(X_train[features], y_train.ravel())
+        y_pred = model.predict(X_test[features])
+    elif model_type == 'linear_regression':
+        model = LinearRegression()
+        model.fit(X_train[features], y_train.ravel())
+        y_pred = model.predict(X_test[features])
+    else:
+        print('Specified user model is not implemented')
+        exit()
+    time2 = time.time()
+    print('time to create user\'s model with chosen candidates', (time2-time1)*1000.0, 'ms')
+    print('R2-score of user model', r2_score(y_test, y_pred))
+    print('MAE of user model', mean_absolute_error(y_test, y_pred))
+    print('MSE of user model', mean_squared_error(y_test, y_pred))
+    
+        
+from mlxtend.feature_selection import SequentialFeatureSelector as sfs
+def stepwise_selection(data, target):
+    print('USING STEPWISE_SELECTION')
+    # Build RF regressor  to use in feature selection
+    rf = RandomForestRegressor(n_estimators=10, n_jobs=-1, random_state=42)
+    # Build step forward feature selection
+    if len(data.columns) < 5:
+        num_feats = len(data.columns)
+    else:
+        num_feats = 5
+    sfs1 = sfs(rf,
+               k_features=num_feats,
+               forward=True,
+               floating=False,
+               scoring='r2',
+               cv=5)
+
+    # Perform SFFS
+    sfs1 = sfs1.fit(data, target)
+    all_features = data.columns.tolist()
+    chosen_features = list(sfs1.k_feature_idx_)
+    return [all_features[i] for i in chosen_features]
+
+from sklearn.feature_selection import RFE
+def recursive_feature_elimination(data, target):
+    estimator = LinearRegression()
+    selector = RFE(estimator)
+    reduced = selector.fit(data, target)
+    return [elem for elem, label in zip(list(data.columns), list(reduced.support_)) if label]
+
+
 import random
 def check_efficiency_with_ida(base_dataset, 
                               dataset_directory, 
@@ -542,7 +623,7 @@ def check_efficiency_with_ida(base_dataset,
     or with pre-pruning using either IDA or a pruning baseline
     '''
     print('Initial performance')
-    compute_user_model_performance(base_dataset, target_name, base_dataset.drop([target_name], axis=1).columns)
+    compute_user_model_performance(base_dataset, target_name, base_dataset.drop([key, target_name], axis=1).columns)
 
     print('******* PREPRUNING STRATEGY ********', prepruning)
     #Step 1: do the join with every candidate dataset in dataset_directory. 
@@ -613,82 +694,6 @@ def check_efficiency_with_ida(base_dataset,
     #print('size of entire dataset', augmented_dataset.shape[1], 'size of pruned', pruned.shape[1])
     #print('size of selected features when you use prepruner', prepruning, len(selected_pruned))
     #return selected_all, candidates_to_keep, selected_pruned, model, probs_dictionary
-
-from boruta import BorutaPy
-from sklearn.ensemble import RandomForestClassifier
-def boruta_algorithm(dataset, target_name):
-    '''
-    This function selects features in the dataset using an implementation 
-    of the boruta algorithm
-    '''
-    print('USING BORUTA')
-    rf = RandomForestClassifier(n_estimators=100, random_state=42)
-    feat_selector = BorutaPy(rf, n_estimators='auto', random_state=1)
-    feat_selector.fit(dataset.drop([target_name], axis=1).values, dataset[target_name].values.ravel())
-    filtered = feat_selector.transform(dataset.drop([target_name], axis=1).values)
-    generously_selected = feat_selector.support_weak_
-    feat_names = dataset.drop([target_name], axis=1).columns
-    return [name for name, mask in zip(feat_names, generously_selected) if mask]
-
-def compute_user_model_performance(dataset, target_name, features, model_type='random_forest'):
-    '''
-    This function checks how well a random forest (assumed to be the user's model), 
-    trained on a given set of features, performs in the prediction of a target
-    '''
-
-    time1 = time.time()
-    # Now let's split the data
-    X_train, X_test, y_train, y_test = train_test_split(dataset.drop([target_name], axis=1),
-                                                        dataset[target_name],
-                                                        test_size=0.33,
-                                                        random_state=42)
-    if model_type == 'random_forest':
-        model = RandomForestRegressor(n_estimators=100, random_state=42)
-        model.fit(X_train[features], y_train.ravel())
-        y_pred = model.predict(X_test[features])
-    elif model_type == 'linear_regression':
-        model = LinearRegression()
-        model.fit(X_train[features], y_train.ravel())
-        y_pred = model.predict(X_test[features])
-    else:
-        print('Specified user model is not implemented')
-        exit()
-    time2 = time.time()
-    print('time to create user\'s model with chosen candidates', (time2-time1)*1000.0, 'ms')
-    print('R2-score of user model', r2_score(y_test, y_pred))
-    print('MAE of user model', mean_absolute_error(y_test, y_pred))
-    print('MSE of user model', mean_squared_error(y_test, y_pred))
-    
-        
-from mlxtend.feature_selection import SequentialFeatureSelector as sfs
-def stepwise_selection(data, target):
-    print('USING STEPWISE_SELECTION')
-    # Build RF regressor  to use in feature selection
-    rf = RandomForestRegressor(n_estimators=10, n_jobs=-1, random_state=42)
-    # Build step forward feature selection
-    if len(data.columns) < 5:
-        num_feats = len(data.columns)
-    else:
-        num_feats = 5
-    sfs1 = sfs(rf,
-               k_features=num_feats,
-               forward=True,
-               floating=False,
-               scoring='r2',
-               cv=5)
-
-    # Perform SFFS
-    sfs1 = sfs1.fit(data, target)
-    all_features = data.columns.tolist()
-    chosen_features = list(sfs1.k_feature_idx_)
-    return [all_features[i] for i in chosen_features]
-
-from sklearn.feature_selection import RFE
-def recursive_feature_elimination(data, target):
-    estimator = LinearRegression()
-    selector = RFE(estimator)
-    reduced = selector.fit(data, target)
-    return [elem for elem, label in zip(list(data.columns), list(reduced.support_)) if label]
 
 def assess_classifier_quality(classifier, 
                               base_dataset, 
@@ -788,28 +793,73 @@ if __name__ == '__main__':
           
 #     crash_many_predictors = pd.read_csv('crash_many_predictors.csv', sep=SEPARATOR)
    
-    poverty_estimation = pd.read_csv('datasets_for_use_cases/poverty-estimation-v2.csv')
-    poverty_candidate_keys = eval(open('datasets_for_use_cases/poverty_candidates_and_keys.txt').read())
+#    poverty_estimation = pd.read_csv('datasets_for_use_cases/poverty-estimation-v2.csv')
+#    poverty_candidate_keys = eval(open('datasets_for_use_cases/poverty_candidates_and_keys.txt').read())
 
+    taxi_collision = pd.read_csv('datasets_for_use_cases/taxi-vehicle-collision-v2.csv')
     print('********* RIFS ***********')
-    check_efficiency_with_ida(poverty_estimation,
-                              'datasets_for_use_cases/top_1_percent_probs_folder/',
-                              'FIPS',
-                              'POVALL_2016',
+    print('pruning 20%')
+    check_efficiency_with_ida(taxi_collision,
+                              'datasets_for_use_cases/companion-datasets/taxi-vehicle-collision-single-column/',
+                              'datetime', 
+                              'n. collisions',
                               openml_training_high_containment,
                               rename_numerical=False,
                               separator=',',
                               prepruning=pruner,
-                              percentage=percentage,
-                              candidate_key_columns=poverty_candidate_keys)
+                              percentage=0.2)
+    print('pruning 40%')
+    check_efficiency_with_ida(taxi_collision,
+                              'datasets_for_use_cases/companion-datasets/taxi-vehicle-collision-single-column/',
+                              'datetime', 
+                              'n. collisions',
+                              openml_training_high_containment,
+                              rename_numerical=False,
+                              separator=',',
+                              prepruning=pruner,
+                              percentage=0.4)
+
+    print('pruning 60%')
+    check_efficiency_with_ida(taxi_collision,
+                              'datasets_for_use_cases/companion-datasets/taxi-vehicle-collision-single-column/',
+                              'datetime', 
+                              'n. collisions',
+                              openml_training_high_containment,
+                              rename_numerical=False,
+                              separator=',',
+                              prepruning=pruner,
+                              percentage=0.6)
+
+    print('pruning 80%')
+    check_efficiency_with_ida(taxi_collision,
+                              'datasets_for_use_cases/companion-datasets/taxi-vehicle-collision-single-column/',
+                              'datetime', 
+                              'n. collisions',
+                              openml_training_high_containment,
+                              rename_numerical=False,
+                              separator=',',
+                              prepruning=pruner,
+                              percentage=0.8)
+
+    print('pruning 90%')
+    check_efficiency_with_ida(taxi_collision,
+                              'datasets_for_use_cases/companion-datasets/taxi-vehicle-collision-single-column/',
+                              'datetime', 
+                              'n. collisions',
+                              openml_training_high_containment,
+                              rename_numerical=False,
+                              separator=',',
+                              prepruning=pruner,
+                              percentage=0.9)
+
+    print('pruning 95%')
+    check_efficiency_with_ida(taxi_collision,
+                              'datasets_for_use_cases/companion-datasets/taxi-vehicle-collision-single-column/',
+                              'datetime', 
+                              'n. collisions',
+                              openml_training_high_containment,
+                              rename_numerical=False,
+                              separator=',',
+                              prepruning=pruner,
+                              percentage=0.95)
     
-    check_efficiency_with_ida(poverty_estimation,
-                              'datasets_for_use_cases/top_10_percent_probs_folder/',
-                              'FIPS',
-                              'POVALL_2016',
-                              openml_training_high_containment,
-                              rename_numerical=False,
-                              separator=',',
-                              prepruning=pruner,
-                              percentage=percentage,
-                              candidate_key_columns=poverty_candidate_keys)

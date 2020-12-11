@@ -40,6 +40,8 @@ def detect_datasets(dataset_ids, dataset_ids_to_find, new_folder):
     return not_identified 
 
 
+import os
+
 if __name__ == '__main__':
 
     all_datasets = codecs.open(sys.argv[1], 'r', encoding='utf-8', errors='ignore').readlines()
@@ -48,7 +50,7 @@ if __name__ == '__main__':
 
     not_identified = detect_datasets(all_datasets, datasets_to_find, folder_for_datasets)
 
-    f = open('not_identified_' + folder_for_datasets + '.txt', 'w')
+    f = open('not_identified_' + os.path.basename(folder_for_datasets) + '.txt', 'w')
     for dataset in not_identified:
         f.write(dataset + '\n')
     f.close()
