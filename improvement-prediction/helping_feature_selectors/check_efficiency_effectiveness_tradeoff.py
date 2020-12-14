@@ -24,17 +24,18 @@ def join_datasets(base_dataset,
     If prepruning == 'containment', the augmentation only happens including the 
     top 'percentage' overlapping candidates.
     '''
-
     time1 = time.time()
     augmented_dataset = base_dataset
     dataset_names = [f for f in os.listdir(dataset_directory)]
+    
     containments = {}
     for name in dataset_names:
         try:
             ### Step 1: read the dataset in the directory
             dataset = pd.read_csv(os.path.join(dataset_directory, name), 
                                   sep=separator)
-            
+            dataset = dataset.replace([np.inf, -np.inf], np.nan).dropna(how="all")
+            dataset = dataset.replace([np.nan], 0.0).dropna(how="all")
             ### Step 2 (optional):  rename the numerical column in the dataset
             if rename_numerical:
                 numerical_column = [i for i in dataset.columns if i != base_key][0]
@@ -59,11 +60,13 @@ def join_datasets(base_dataset,
                                                  left_on=[base_key],
                                                  right_on=[candidate_key_columns[name]])
                 else:
+                    #print(dataset.columns)
                     augmented_dataset = pd.merge(augmented_dataset, 
                                                  dataset,
                                                  how='left',
                                                  on=base_key)
-        except (pd.errors.EmptyDataError, KeyError, ValueError):
+        except (pd.errors.EmptyDataError, KeyError, ValueError) as e:
+            print('there was an error for dataset', name, e)
             continue
 
     if prepruning == 'containment':
@@ -97,9 +100,15 @@ def join_datasets(base_dataset,
     
     augmented_dataset = augmented_dataset.set_index(base_key)
     augmented_dataset = augmented_dataset.select_dtypes(include=['int64', 'float64'])
+    augmented_dataset = augmented_dataset.replace([np.inf, -np.inf], np.nan)
+    #print('augmented data shape', augmented_dataset.shape)
     if mean_data_imputation:
-        fill_NaN = SimpleImputer(missing_values=np.nan, strategy='mean')
-        new_data = pd.DataFrame(fill_NaN.fit_transform(augmented_dataset))
+        mean = augmented_dataset.mean().replace(np.nan, 0.0)
+        #print(mean)
+        new_data = augmented_dataset.fillna(mean)
+        #fill_NaN = SimpleImputer(missing_values=np.nan, strategy='mean')
+        #new_data = pd.DataFrame(fill_NaN.fit_transform(augmented_dataset))
+        #print('new data shape', new_data.shape)
         new_data.index = augmented_dataset.index
         new_data.columns = augmented_dataset.columns
         time2 = time.time()
@@ -191,9 +200,12 @@ def compute_features(query_key_values,
                                      how='left',
                                      on=key)
     #augmented_dataset = augmented_dataset.set_index(key)
+    #augmented_dataset = augmented_dataset.replace([np.inf, -np.inf], np.nan).dropna(how="all")
     if mean_data_imputation:
-        fill_NaN = SimpleImputer(missing_values=np.nan, strategy='mean')
-        new_dataset = pd.DataFrame(fill_NaN.fit_transform(augmented_dataset))
+        #print(augmented_dataset.mean())
+        #fill_NaN = SimpleImputer(missing_values=np.nan, strategy='mean')
+        #pd.DataFrame(fill_NaN.fit_transform(augmented_dataset))
+        new_dataset = augmented_dataset.fillna(augmented_dataset.mean())
         new_dataset.columns = augmented_dataset.columns
         new_dataset.index = augmented_dataset.index
         augmented_dataset = new_dataset
@@ -203,8 +215,7 @@ def compute_features(query_key_values,
     ## max_query_candidate_covariance, max_query_candidate_mutual_info
     column_names = candidate_dataset.columns.tolist() + [target_name]
     feature_factory_candidate_target = FeatureFactory(augmented_dataset[column_names])
-    candidate_features_target = feature_factory_candidate_target.get_pairwise_features_with_target(target_name,
-                                                                                                   func=max_in_modulus)
+    candidate_features_target = feature_factory_candidate_target.get_pairwise_features_with_target(target_name, func=max_in_modulus)
      # Step 4: get query-candidate feature "containment ratio". We may not use it in models, but it's 
     ## important to have this value in order to filter candidates in baselines, for example.
     candidate_key_values = candidate_dataset.index.values
@@ -695,7 +706,6 @@ def check_efficiency_with_ida(base_dataset,
     #print('size of selected features when you use prepruner', prepruning, len(selected_pruned))
     #return selected_all, candidates_to_keep, selected_pruned, model, probs_dictionary
 
-<<<<<<< HEAD
 from boruta import BorutaPy
 from sklearn.ensemble import RandomForestClassifier
 def boruta_algorithm(dataset, target_name):
@@ -921,10 +931,73 @@ if __name__ == '__main__':
     #                           percentage=percentage,
     #                           candidate_key_columns=poverty_candidate_keys)
 
-    taxi_demand = pd.read_csv('datasets_for_use_cases/taxi-demand/pickup.csv')
-
+    print('20%')
+    taxi_demand = pd.read_csv('datasets_for_use_cases/taxi-demand/initial_dataset.csv')
     check_efficiency_with_ida(taxi_demand,
-                              'datasets_for_use_cases/taxi-demand/single-column/',
-                              'tpep_pickup_datetime',
+                              'datasets_for_use_cases/taxi-demand/nyc_indicators/',
+                              'time',
+                              'num_pickups',
+                              openml_training_high_containment,
+                              rename_numerical=True,
+                              separator=',',
                               prepruning=pruner,
-                              percentage=percentage)
+                              percentage=0.2)
+
+    print('40%')
+    check_efficiency_with_ida(taxi_demand,
+                              'datasets_for_use_cases/taxi-demand/nyc_indicators/',
+                              'time',
+                              'num_pickups',
+                              openml_training_high_containment,
+                              rename_numerical=True,
+                              separator=',',
+                              prepruning=pruner,
+                              percentage=0.4)
+
+    
+    print('60%')
+    check_efficiency_with_ida(taxi_demand,
+                              'datasets_for_use_cases/taxi-demand/nyc_indicators/',
+                              'time',
+                              'num_pickups',
+                              openml_training_high_containment,
+                              rename_numerical=True,
+                              separator=',',
+                              prepruning=pruner,
+                              percentage=0.6)
+
+
+    print('80%')
+    check_efficiency_with_ida(taxi_demand,
+                              'datasets_for_use_cases/taxi-demand/nyc_indicators/',
+                              'time',
+                              'num_pickups',
+                              openml_training_high_containment,
+                              rename_numerical=True,
+                              separator=',',
+                              prepruning=pruner,
+                              percentage=0.8)
+
+    
+    print('90%')
+    check_efficiency_with_ida(taxi_demand,
+                              'datasets_for_use_cases/taxi-demand/nyc_indicators/',
+                              'time',
+                              'num_pickups',
+                              openml_training_high_containment,
+                              rename_numerical=True,
+                              separator=',',
+                              prepruning=pruner,
+                              percentage=0.9)
+
+    
+    print('95%')
+    check_efficiency_with_ida(taxi_demand,
+                              'datasets_for_use_cases/taxi-demand/nyc_indicators/',
+                              'time',
+                              'num_pickups',
+                              openml_training_high_containment,
+                              rename_numerical=True,
+                              separator=',',
+                              prepruning=pruner,
+                              percentage=0.95)
