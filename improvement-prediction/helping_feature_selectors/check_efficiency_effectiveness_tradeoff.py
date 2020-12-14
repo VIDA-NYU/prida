@@ -630,7 +630,7 @@ def boruta_algorithm(dataset, target_name):
     feat_names = dataset.drop([target_name], axis=1).columns
     return [name for name, mask in zip(feat_names, generously_selected) if mask]
 
-def compute_user_model_performance(dataset, target_name, features, model_type='random_forest'):
+def compute_user_model_performance(dataset, target_name, features, model_type='linear_regression'):
     '''
     This function checks how well a random forest (assumed to be the user's model), 
     trained on a given set of features, performs in the prediction of a target
@@ -788,28 +788,65 @@ if __name__ == '__main__':
           
 #     crash_many_predictors = pd.read_csv('crash_many_predictors.csv', sep=SEPARATOR)
    
-    poverty_estimation = pd.read_csv('datasets_for_use_cases/poverty-estimation-v2.csv')
-    poverty_candidate_keys = eval(open('datasets_for_use_cases/poverty_candidates_and_keys.txt').read())
+#    poverty_estimation = pd.read_csv('datasets_for_use_cases/poverty-estimation-v2.csv')
+#    poverty_candidate_keys = eval(open('datasets_for_use_cases/poverty_candidates_and_keys.txt').read())
 
-    print('********* RIFS ***********')
-    check_efficiency_with_ida(poverty_estimation,
-                              'datasets_for_use_cases/top_1_percent_probs_folder/',
-                              'FIPS',
-                              'POVALL_2016',
-                              openml_training_high_containment,
-                              rename_numerical=False,
-                              separator=',',
-                              prepruning=pruner,
-                              percentage=percentage,
-                              candidate_key_columns=poverty_candidate_keys)
+    # print('********* RIFS ***********')
+    # print('top-10')
+    # check_efficiency_with_ida(poverty_estimation,
+    #                           'datasets_for_use_cases/top_10_probs/',
+    #                           'FIPS',
+    #                           'POVALL_2016',
+    #                           openml_training_high_containment,
+    #                           rename_numerical=False,
+    #                           separator=',',
+    #                           prepruning=pruner,
+    #                           percentage=percentage,
+    #                           candidate_key_columns=poverty_candidate_keys)
+
+    # print('top-25')
+    # check_efficiency_with_ida(poverty_estimation,
+    #                           'datasets_for_use_cases/top_25_probs/',
+    #                           'FIPS',
+    #                           'POVALL_2016',
+    #                           openml_training_high_containment,
+    #                           rename_numerical=False,
+    #                           separator=',',
+    #                           prepruning=pruner,
+    #                           percentage=percentage,
+    #                           candidate_key_columns=poverty_candidate_keys)
     
-    check_efficiency_with_ida(poverty_estimation,
-                              'datasets_for_use_cases/top_10_percent_probs_folder/',
-                              'FIPS',
-                              'POVALL_2016',
+    # print('top-50')
+    # check_efficiency_with_ida(poverty_estimation,
+    #                           'datasets_for_use_cases/top_50_probs/',
+    #                           'FIPS',
+    #                           'POVALL_2016',
+    #                           openml_training_high_containment,
+    #                           rename_numerical=False,
+    #                           separator=',',
+    #                           prepruning=pruner,
+    #                           percentage=percentage,
+    #                           candidate_key_columns=poverty_candidate_keys)
+    # print('top-100')
+    # check_efficiency_with_ida(poverty_estimation,
+    #                           'datasets_for_use_cases/top_100_probs/',
+    #                           'FIPS',
+    #                           'POVALL_2016',
+    #                           openml_training_high_containment,
+    #                           rename_numerical=False,
+    #                           separator=',',
+    #                           prepruning=pruner,
+    #                           percentage=percentage,
+    #                           candidate_key_columns=poverty_candidate_keys)
+
+    taxi_demand = pd.read_csv('datasets_for_use_cases/taxi-demand/pickup.csv')
+
+    check_efficiency_with_ida(taxi_demand,
+                              'datasets_for_use_cases/taxi-demand/single-column/',
+                              'tpep_pickup_datetime',
+                              'num_pickups',
                               openml_training_high_containment,
                               rename_numerical=False,
                               separator=',',
                               prepruning=pruner,
-                              percentage=percentage,
-                              candidate_key_columns=poverty_candidate_keys)
+                              percentage=percentage)
