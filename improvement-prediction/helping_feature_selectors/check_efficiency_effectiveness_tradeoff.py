@@ -24,17 +24,18 @@ def join_datasets(base_dataset,
     If prepruning == 'containment', the augmentation only happens including the 
     top 'percentage' overlapping candidates.
     '''
-
     time1 = time.time()
     augmented_dataset = base_dataset
     dataset_names = [f for f in os.listdir(dataset_directory)]
+    
     containments = {}
     for name in dataset_names:
         try:
             ### Step 1: read the dataset in the directory
             dataset = pd.read_csv(os.path.join(dataset_directory, name), 
                                   sep=separator)
-            
+            dataset = dataset.replace([np.inf, -np.inf], np.nan).dropna(how="all")
+            dataset = dataset.replace([np.nan], 0.0).dropna(how="all")
             ### Step 2 (optional):  rename the numerical column in the dataset
             if rename_numerical:
                 numerical_column = [i for i in dataset.columns if i != base_key][0]
@@ -59,21 +60,30 @@ def join_datasets(base_dataset,
                                                  left_on=[base_key],
                                                  right_on=[candidate_key_columns[name]])
                 else:
+                    #print(dataset.columns)
                     augmented_dataset = pd.merge(augmented_dataset, 
                                                  dataset,
                                                  how='left',
                                                  on=base_key)
-        except (pd.errors.EmptyDataError, KeyError, ValueError):
+        except (pd.errors.EmptyDataError, KeyError, ValueError) as e:
+            print('there was an error for dataset', name, e)
             continue
 
     if prepruning == 'containment':
-        chosen_candidates = [elem[0] for elem in sorted(containments.items(), key= lambda x: x[1], reverse=True)[:int((1.0 - percentage)*len(containments.items()))]]
-        #print('initial', len(containments.items()), 'final', len(chosen_candidates))
+        print('all containments')
+        print([elem for elem in sorted(containments.items(), key= lambda x: x[1], reverse=True)])
+        if percentage < 1:
+            chosen_candidates = [elem[0] for elem in sorted(containments.items(), key= lambda x: x[1], reverse=True)[:int((1.0 - percentage)*len(containments.items()))]]
+        else:
+            chosen_candidates = [elem[0] for elem in sorted(containments.items(), key= lambda x: x[1], reverse=True)[:percentage]]
+        #print('&&&& initial', len(containments.items()), 'final', len(chosen_candidates))
         for name in chosen_candidates:
             try:
                 ### Step 1: read the dataset in the directory
                 dataset = pd.read_csv(os.path.join(dataset_directory, name), 
                                       sep=separator)
+                dataset = dataset.replace([np.inf, -np.inf], np.nan).dropna(how="all")
+                dataset = dataset.replace([np.nan], 0.0).dropna(how="all")
                 ### Step 2 (optional):  rename the numerical column in the dataset
                 if rename_numerical:
                     numerical_column = [i for i in dataset.columns if i != base_key][0]
@@ -97,19 +107,28 @@ def join_datasets(base_dataset,
     
     augmented_dataset = augmented_dataset.set_index(base_key)
     augmented_dataset = augmented_dataset.select_dtypes(include=['int64', 'float64'])
+    augmented_dataset = augmented_dataset.replace([np.inf, -np.inf], np.nan)
+    augmented_dataset.columns = augmented_dataset.columns.str.rstrip('_x')
+    print('augmented data shape', augmented_dataset.shape)
     if mean_data_imputation:
-        fill_NaN = SimpleImputer(missing_values=np.nan, strategy='mean')
-        new_data = pd.DataFrame(fill_NaN.fit_transform(augmented_dataset))
+        mean = augmented_dataset.mean().replace(np.nan, 0.0)
+        #print(mean)
+        new_data = augmented_dataset.fillna(mean)
+        #fill_NaN = SimpleImputer(missing_values=np.nan, strategy='mean')
+        #new_data = pd.DataFrame(fill_NaN.fit_transform(augmented_dataset))
+        #print('new data shape', new_data.shape)
         new_data.index = augmented_dataset.index
         new_data.columns = augmented_dataset.columns
         time2 = time.time()
         print('time to perform join', (time2-time1)*1000.0, 'ms')
         print('number of initial features', len(base_dataset.columns), 'augmented dataset', len(augmented_dataset.columns))
+        #print('kept', augmented_dataset.columns.tolist())
         return new_data
 
     time2 = time.time()
     print('time to perform join', (time2-time1)*1000.0, 'ms')
     print('number of initial features', len(base_dataset.columns), 'augmented dataset', len(augmented_dataset.columns))
+    print('kept', augmented_dataset.columns.tolist())
     return augmented_dataset
 
 from sklearn.svm import SVC
@@ -124,8 +143,8 @@ FEATURES = ['query_num_of_columns', 'query_num_of_rows', 'query_row_column_ratio
             'query_target_max_spearman', 'query_target_max_covariance', 
             'query_target_max_mutual_info', 'candidate_target_max_pearson', 
             'candidate_target_max_spearman', 'candidate_target_max_covariance', 
-            'candidate_target_max_mutual_info']
-THETA = 1
+            'candidate_target_max_mutual_info', 'containment_fraction']
+THETA = 0.7
 
 def train_rbf_svm(features, classes):
     '''
@@ -191,9 +210,12 @@ def compute_features(query_key_values,
                                      how='left',
                                      on=key)
     #augmented_dataset = augmented_dataset.set_index(key)
+    #augmented_dataset = augmented_dataset.replace([np.inf, -np.inf], np.nan).dropna(how="all")
     if mean_data_imputation:
-        fill_NaN = SimpleImputer(missing_values=np.nan, strategy='mean')
-        new_dataset = pd.DataFrame(fill_NaN.fit_transform(augmented_dataset))
+        #print(augmented_dataset.mean())
+        #fill_NaN = SimpleImputer(missing_values=np.nan, strategy='mean')
+        #pd.DataFrame(fill_NaN.fit_transform(augmented_dataset))
+        new_dataset = augmented_dataset.fillna(augmented_dataset.mean())
         new_dataset.columns = augmented_dataset.columns
         new_dataset.index = augmented_dataset.index
         augmented_dataset = new_dataset
@@ -203,8 +225,7 @@ def compute_features(query_key_values,
     ## max_query_candidate_covariance, max_query_candidate_mutual_info
     column_names = candidate_dataset.columns.tolist() + [target_name]
     feature_factory_candidate_target = FeatureFactory(augmented_dataset[column_names])
-    candidate_features_target = feature_factory_candidate_target.get_pairwise_features_with_target(target_name,
-                                                                                                   func=max_in_modulus)
+    candidate_features_target = feature_factory_candidate_target.get_pairwise_features_with_target(target_name, func=max_in_modulus)
      # Step 4: get query-candidate feature "containment ratio". We may not use it in models, but it's 
     ## important to have this value in order to filter candidates in baselines, for example.
     candidate_key_values = candidate_dataset.index.values
@@ -317,6 +338,8 @@ def augment_with_random_features(dataset, target_name, number_of_random_features
     for i in range(number_of_random_features):
         dataset[RANDOM_PREFIX + str(i)] = features[i,:]
     #print('leaving augment_with_random_features')
+    dataset = dataset.replace([np.inf, -np.inf], np.nan)
+    dataset = dataset.dropna()
     return dataset
 
 def combine_rankings(rf_coefs, regression_coefs, feature_names, lin_comb_coef=0.5):
@@ -419,6 +442,10 @@ def wrapper_algorithm(augmented_dataset, target_name, key, thresholds_T, eta, k_
     '''
     This function searches for the best subset of features by doing an exponential search
     '''
+    
+    augmented_dataset.dropna(inplace=True)
+    indices_to_keep = ~augmented_dataset.isin([np.nan, np.inf, -np.inf]).any(1)
+    augmented_dataset = augmented_dataset[indices_to_keep].astype(np.float64)
     X_train, X_test, y_train, y_test = train_test_split(augmented_dataset.drop(target_name, axis=1), 
                                                         augmented_dataset[target_name], 
                                                         test_size=0.33,
@@ -512,7 +539,7 @@ def prune_candidates_with_ida(training_data,
                                                                                             key, 
                                                                                             target_name, 
                                                                                             augmented_dataset=augmented_dataset)
-        feature_vectors.append(query_features + candidate_features + query_features_target + candidate_features_target)
+        feature_vectors.append(query_features + candidate_features + query_features_target + candidate_features_target + containment_ratio)
     predictions = model.predict(normalize_features(np.array(feature_vectors))) 
     gain_pred_probas = [elem[0] for elem in model.predict_proba(normalize_features(np.array(feature_vectors)))]
     probs_dictionary = {name: prob for name, prob in zip(candidate_names, list(gain_pred_probas))}
@@ -648,7 +675,9 @@ def check_efficiency_with_ida(base_dataset,
                                                        target_name, 
                                                        key, 
                                                        percentage=percentage)
-        pruned_dataset = augmented_dataset[base_dataset.set_index(key).columns.to_list() + candidates_to_keep]
+        
+        pruned_dataset = augmented_dataset[base_dataset.drop([key], axis=1).columns.to_list() + candidates_to_keep]
+        print('candidates kept by ida', base_dataset.drop([key], axis=1).columns.to_list() + candidates_to_keep)
     elif prepruning == 'none' or prepruning == 'containment':
         # if the prepruning is 'containment', the pruning is already done in the augmentation itself
         pruned_dataset = augmented_dataset
@@ -695,7 +724,6 @@ def check_efficiency_with_ida(base_dataset,
     #print('size of selected features when you use prepruner', prepruning, len(selected_pruned))
     #return selected_all, candidates_to_keep, selected_pruned, model, probs_dictionary
 
-<<<<<<< HEAD
 from boruta import BorutaPy
 from sklearn.ensemble import RandomForestClassifier
 def boruta_algorithm(dataset, target_name):
@@ -712,7 +740,7 @@ def boruta_algorithm(dataset, target_name):
     feat_names = dataset.drop([target_name], axis=1).columns
     return [name for name, mask in zip(feat_names, generously_selected) if mask]
 
-def compute_user_model_performance(dataset, target_name, features, model_type='linear_regression'):
+def compute_user_model_performance(dataset, target_name, features, model_type='random_forest'):
     '''
     This function checks how well a random forest (assumed to be the user's model), 
     trained on a given set of features, performs in the prediction of a target
@@ -720,6 +748,9 @@ def compute_user_model_performance(dataset, target_name, features, model_type='l
 
     time1 = time.time()
     # Now let's split the data
+    dataset.dropna(inplace=True)
+    indices_to_keep = ~dataset.isin([np.nan, np.inf, -np.inf]).any(1)
+    dataset = dataset[indices_to_keep]#.astype(np.float64)
     X_train, X_test, y_train, y_test = train_test_split(dataset.drop([target_name], axis=1),
                                                         dataset[target_name],
                                                         test_size=0.33,
@@ -843,88 +874,86 @@ PRUNERS = ['ida', 'containment', 'random', 'none']
 
 if __name__ == '__main__':
     '''
-    Given a pruning percentage and a pruner strategy, this script shows efficiency and 
-    effectiveness values for different case studies using them.
+    Given a base table, a path to candidates, the name of the key and of the 
+    target, this script shows efficiency and effectiveness values for different 
+    percentages of pruning.
     '''
     
-    percentage = float(sys.argv[1])
-    if percentage < 0.0 or percentage > 1.0:
-        print('Pruning percentage has to be in interval [0.0, 1.0].')
-        exit()
-    print('********* PERCENTAGE FOR PRUNING *********', percentage)
-    pruner = sys.argv[2]
-    if pruner not in PRUNERS:
-        print('Pruner has to be in', PRUNERS)
-        exit()
+    path_to_base_table = sys.argv[1]
+    path_to_candidates = sys.argv[2]
+    key = sys.argv[3]
+    target = sys.argv[4]
 
     openml_training = pd.read_csv('../classification/training-simplified-data-generation.csv')
     openml_training['class_pos_neg'] = ['gain' if row['gain_in_r2_score'] > 0 else 'loss'
                                         for index, row in openml_training.iterrows()]
     openml_training_high_containment = openml_training.loc[openml_training['containment_fraction'] >= THETA]
 
-#     flight_query_dataset = pd.read_csv('arda_datasets/airline/flights.csv')
-#     flight_query_dataset = flight_query_dataset.set_index('key').select_dtypes(include=['int64', 'float64'])
-          
-#     initial_college_dataset = pd.read_csv('datasets_for_use_cases/companion-datasets/college-debt-v2.csv')
-#     initial_college_dataset = initial_college_dataset.fillna(initial_college_dataset.mean())
-          
-#     crash_many_predictors = pd.read_csv('crash_many_predictors.csv', sep=SEPARATOR)
-   
-#    poverty_estimation = pd.read_csv('datasets_for_use_cases/poverty-estimation-v2.csv')
-#    poverty_candidate_keys = eval(open('datasets_for_use_cases/poverty_candidates_and_keys.txt').read())
 
-    # print('********* RIFS ***********')
-    # print('top-10')
-    # check_efficiency_with_ida(poverty_estimation,
-    #                           'datasets_for_use_cases/top_10_probs/',
-    #                           'FIPS',
-    #                           'POVALL_2016',
-    #                           openml_training_high_containment,
-    #                           rename_numerical=False,
-    #                           separator=',',
-    #                           prepruning=pruner,
-    #                           percentage=percentage,
-    #                           candidate_key_columns=poverty_candidate_keys)
+    base_table = pd.read_csv(path_to_base_table)
 
-    # print('top-25')
-    # check_efficiency_with_ida(poverty_estimation,
-    #                           'datasets_for_use_cases/top_25_probs/',
-    #                           'FIPS',
-    #                           'POVALL_2016',
-    #                           openml_training_high_containment,
-    #                           rename_numerical=False,
-    #                           separator=',',
-    #                           prepruning=pruner,
-    #                           percentage=percentage,
-    #                           candidate_key_columns=poverty_candidate_keys)
-    
-    # print('top-50')
-    # check_efficiency_with_ida(poverty_estimation,
-    #                           'datasets_for_use_cases/top_50_probs/',
-    #                           'FIPS',
-    #                           'POVALL_2016',
-    #                           openml_training_high_containment,
-    #                           rename_numerical=False,
-    #                           separator=',',
-    #                           prepruning=pruner,
-    #                           percentage=percentage,
-    #                           candidate_key_columns=poverty_candidate_keys)
-    # print('top-100')
-    # check_efficiency_with_ida(poverty_estimation,
-    #                           'datasets_for_use_cases/top_100_probs/',
-    #                           'FIPS',
-    #                           'POVALL_2016',
-    #                           openml_training_high_containment,
-    #                           rename_numerical=False,
-    #                           separator=',',
-    #                           prepruning=pruner,
-    #                           percentage=percentage,
-    #                           candidate_key_columns=poverty_candidate_keys)
+    print('query', path_to_base_table)
+    print('20%')
+    check_efficiency_with_ida(base_table,
+                              path_to_candidates, 
+                              key, 
+                              target,
+                              openml_training_high_containment,
+                              rename_numerical=True,
+                              separator=',',
+                              prepruning='ida',
+                              percentage=0.2)
 
-    taxi_demand = pd.read_csv('datasets_for_use_cases/taxi-demand/pickup.csv')
+#     print('40%')
+#     check_efficiency_with_ida(base_table,
+#                               path_to_candidates, 
+#                               key, 
+#                               target,
+#                               openml_training_high_containment,
+#                               rename_numerical=False,
+#                               separator=',',
+#                               prepruning='containment',
+#                               percentage=105)
+#     print('60%')
+#     check_efficiency_with_ida(base_table,
+#                               path_to_candidates, 
+#                               key, 
+#                               target,
+#                               openml_training_high_containment,
+#                               rename_numerical=False,
+#                               separator=',',
+#                               prepruning='containment',
+#                               percentage=70)
 
-    check_efficiency_with_ida(taxi_demand,
-                              'datasets_for_use_cases/taxi-demand/single-column/',
-                              'tpep_pickup_datetime',
-                              prepruning=pruner,
-                              percentage=percentage)
+#     print('80%')
+#     check_efficiency_with_ida(base_table,
+#                               path_to_candidates, 
+#                               key, 
+#                               target,
+#                               openml_training_high_containment,
+#                               rename_numerical=False,
+#                               separator=',',
+#                               prepruning='containment',
+#                               percentage=34)
+
+#     print('90%')
+#     check_efficiency_with_ida(base_table,
+#                               path_to_candidates, 
+#                               key, 
+#                               target,
+#                               openml_training_high_containment,
+#                               rename_numerical=False,
+#                               separator=',',
+#                               prepruning='containment',
+#                               percentage=17)
+
+#     print('95%')
+#     check_efficiency_with_ida(base_table,
+#                               path_to_candidates, 
+#                               key, 
+#                               target,
+#                               openml_training_high_containment,
+#                               rename_numerical=False,
+#                               separator=',',
+#                               prepruning='containment',
+#                               percentage=8)
