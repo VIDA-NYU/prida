@@ -14,19 +14,58 @@ import sys
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
-abbrev = {'query_max_kurtosis': 'q_kurtosis', 'query_max_skewness': 'q_skewness', 'query_row_column_ratio': 'q_row_to_col', 'query_num_of_columns': 'q_cols', 
-          'query_max_unique': 'q_unique', 'query_num_of_rows': 'q_rows', 'query_target_max_mutual_info': 'q_mutinfo', 'query_target_max_covariance': 'q_covariance', 
-          'query_target_max_pearson': 'q_pearson', 'query_target_max_spearman': 'q_spearman', 'candidate_max_kurtosis': 'c_kurtosis', 'candidate_max_unique': 'c_unique', 
-          'candidate_num_rows': 'c_rows', 'candidate_row_column_ratio': 'c_row_to_col', 'candidate_max_skewness': 'c_skewness',  'candidate_num_of_columns': 'c_cols', 
-          'candidate_target_max_mutual_info': 'c_mutinfo', 'candidate_target_max_spearman': 'c_spearman', 'candidate_target_max_pearson': 'c_pearson', 
-          'candidate_target_max_covariance': 'c_covariance', 'containment_fraction': 'containment'}
+abbrev = {'query_max_mean': 'q_mean',          
+          'query_max_kurtosis': 'q_kurtosis', 
+          'query_max_skewness': 'q_skewness', 
+          'query_row_column_ratio': 'q_row_to_col', 
+          'query_num_of_columns': 'q_cols',
+          'query_max_unique': 'q_unique', 
+          'query_num_of_rows': 'q_rows', 
+          'query_max_outlier_percentage': 'q_out_perc',
+          'query_target_max_mutual_info': 'q_mutinfo', 
+          'query_target_max_covariance': 'q_covariance',
+          'query_target_max_pearson': 'q_pearson', 
+          'query_target_max_spearman': 'q_spearman', 
+          'candidate_max_kurtosis': 'c_kurtosis', 
+          'candidate_max_unique': 'c_unique', 
+          'candidate_num_rows': 'c_rows', 
+          'candidate_max_mean': 'c_mean', 
+          'candidate_max_outlier_percentage': 'c_out_perc', 
+          'candidate_row_column_ratio': 'c_row_to_col', 
+          'candidate_max_skewness': 'c_skewness', 
+          'candidate_num_of_columns': 'c_cols', 
+          'candidate_target_max_mutual_info': 'c_mutinfo', 
+          'candidate_target_max_spearman': 'c_spearman', 
+          'candidate_target_max_pearson': 'c_pearson', 
+          'candidate_target_max_covariance': 'c_covariance', 
+          'containment_fraction': 'containment'}
 
-color_dict = {'query_max_kurtosis': 'lightblue', 'query_max_skewness': 'lightblue', 'query_row_column_ratio': 'lightblue', 'query_num_of_columns': 'lightblue', 
-              'query_max_unique': 'lightblue', 'query_num_of_rows': 'lightblue', 'query_target_max_mutual_info': 'blue', 'query_target_max_covariance': 'blue', 
-              'query_target_max_pearson': 'blue', 'query_target_max_spearman': 'blue', 'candidate_max_kurtosis': 'pink', 'candidate_max_unique': 'pink', 
-              'candidate_num_rows': 'pink', 'candidate_row_column_ratio': 'pink', 'candidate_max_skewness': 'pink', 'candidate_num_of_columns': 'pink', 
-              'candidate_max_skewness': 'pink', 'candidate_target_max_mutual_info': 'red', 'candidate_target_max_spearman': 'red', 
-              'candidate_target_max_pearson': 'red', 'candidate_target_max_covariance': 'red', 'containment_fraction': 'green'}
+color_dict = {'query_max_mean': 'lightblue',
+              'query_max_outlier_percentage': 'lightblue',
+              'query_max_kurtosis': 'lightblue', 
+              'query_max_skewness': 'lightblue', 
+              'query_row_column_ratio': 'lightblue', 
+              'query_num_of_columns': 'lightblue',
+              'query_max_unique': 'lightblue', 
+              'query_num_of_rows': 'lightblue', 
+              'query_target_max_mutual_info': 'blue', 
+              'query_target_max_covariance': 'blue',
+              'query_target_max_pearson': 'blue', 
+              'query_target_max_spearman': 'blue', 
+              'candidate_max_kurtosis': 'pink', 
+              'candidate_max_unique': 'pink', 
+              'candidate_max_mean': 'pink',
+              'candidate_max_outlier_percentage': 'pink',
+              'candidate_num_rows': 'pink', 
+              'candidate_row_column_ratio': 'pink',
+              'candidate_max_skewness': 'pink', 
+              'candidate_num_of_columns': 'pink', 
+              'candidate_max_skewness': 'pink', 
+              'candidate_target_max_mutual_info': 'red', 
+              'candidate_target_max_spearman': 'red', 
+              'candidate_target_max_pearson': 'red', 
+              'candidate_target_max_covariance': 'red', 
+              'containment_fraction': 'green'}
 
 color_legend = {'lightblue': 'query', 'blue': 'query/target', 'pink': 'candidate', 'red': 'candidate/target', 'green': 'containment'}
 
@@ -73,7 +112,7 @@ def plot_boxplot(features_dict):
                 loc='upper right', prop={'size':22})
 
     #axes.legend([i for i in indices_for_caption.values()], [i for i in indices_for_caption.keys()], loc='upper right', prop={'size':22})
-    plt.savefig('feature-boxplot.png', bbox_inches='tight')
+    plt.savefig('feature-boxplot.png', dpi=600, bbox_inches='tight')
 
 lists = [eval(i.strip()) for i in open(sys.argv[1]).readlines() if '[(' in i]
 features = {}

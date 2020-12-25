@@ -70,8 +70,8 @@ def join_datasets(base_dataset,
             continue
 
     if prepruning == 'containment':
-        print('all containments')
-        print([elem for elem in sorted(containments.items(), key= lambda x: x[1], reverse=True)])
+        #print('all containments')
+        #print([elem for elem in sorted(containments.items(), key= lambda x: x[1], reverse=True)])
         if percentage < 1:
             chosen_candidates = [elem[0] for elem in sorted(containments.items(), key= lambda x: x[1], reverse=True)[:int((1.0 - percentage)*len(containments.items()))]]
         else:
@@ -128,7 +128,7 @@ def join_datasets(base_dataset,
     time2 = time.time()
     print('time to perform join', (time2-time1)*1000.0, 'ms')
     print('number of initial features', len(base_dataset.columns), 'augmented dataset', len(augmented_dataset.columns))
-    print('kept', augmented_dataset.columns.tolist())
+    #print('kept', augmented_dataset.columns.tolist())
     return augmented_dataset
 
 from sklearn.svm import SVC
@@ -136,21 +136,19 @@ from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 from sklearn.metrics import classification_report
 from sklearn.preprocessing import MinMaxScaler
 
-FEATURES = ['query_num_of_columns', 'query_num_of_rows', 'query_row_column_ratio',
-            'query_max_skewness', 'query_max_kurtosis', 'query_max_unique', 
-            'candidate_num_rows', 'candidate_max_skewness', 'candidate_max_kurtosis',
-            'candidate_max_unique', 'query_target_max_pearson', 
-            'query_target_max_spearman', 'query_target_max_covariance', 
-            'query_target_max_mutual_info', 'candidate_target_max_pearson', 
-            'candidate_target_max_spearman', 'candidate_target_max_covariance', 
-            'candidate_target_max_mutual_info', 'containment_fraction']
+FEATURES = ['query_num_of_columns', 'query_num_of_rows', 'query_row_column_ratio', 'query_max_mean', 'query_max_outlier_percentage', 
+            'query_max_skewness', 'query_max_kurtosis', 'query_max_unique', 'candidate_num_of_columns', 'candidate_num_rows', 
+            'candidate_row_column_ratio', 'candidate_max_mean', 'candidate_max_outlier_percentage', 'candidate_max_skewness', 
+            'candidate_max_kurtosis', 'candidate_max_unique', 'query_target_max_pearson', 'query_target_max_spearman', 
+            'query_target_max_covariance', 'query_target_max_mutual_info', 'candidate_target_max_pearson', 'candidate_target_max_spearman',
+            'candidate_target_max_covariance', 'candidate_target_max_mutual_info', 'containment_fraction']
 THETA = 0.7
 
 def train_rbf_svm(features, classes):
     '''
     Builds a model using features to predict associated classes,
     '''
-    print('using rbf')
+    #print('using rbf')
     feature_scaler = MinMaxScaler().fit(features)
     features_train = feature_scaler.transform(features)
     clf = SVC(max_iter=1000, gamma='auto', probability=True)
@@ -163,7 +161,7 @@ def train_random_forest(features, classes):
     '''
     Builds a model using features to predict associated classes
     '''
-    print('using random forest')
+    #print('using random forest')
     feature_scaler = MinMaxScaler().fit(features)
     features_train = feature_scaler.transform(features)
     clf = RandomForestClassifier(n_estimators=100, random_state=42)
@@ -201,7 +199,7 @@ def compute_features(query_key_values,
     candidate_dataset_individual_features = feature_factory_candidate.get_individual_features(func=max_in_modulus)
     ## For now, we're only using number_of_rows, max_skewness, max_kurtosis, max_number_of_unique_values, 
     ## so we remove the unnecessary elements in the lines below 
-    candidate_dataset_individual_features = [candidate_dataset_individual_features[index] for index in [1, 5, 6, 7]]
+    ## candidate_dataset_individual_features = [candidate_dataset_individual_features[index] for index in [1, 5, 6, 7]]
 
     # Step 2: join the datasets and compute pairwise features
     if augmented_dataset.empty:
@@ -522,7 +520,7 @@ def prune_candidates_with_ida(training_data,
 
     feature_factory_query = FeatureFactory(base_dataset.set_index(key).drop([target_name], axis=1))
     query_features = feature_factory_query.get_individual_features(func=max_in_modulus)
-    query_features = [query_features[index] for index in [0, 1, 2, 5, 6, 7]]
+    #query_features = [query_features[index] for index in [0, 1, 2, 5, 6, 7]]
         
     ## get query-target features 
     ## The features are, in order: max_query_target_pearson, max_query_target_spearman, 
@@ -696,6 +694,7 @@ def check_efficiency_with_ida(base_dataset,
                                             thresholds_tau, 
                                             eta, 
                                             k_random_seeds)
+        print('selected by rifs', selected_pruned)
     elif feature_selector == boruta_algorithm:
         selected_pruned = boruta_algorithm(pruned_dataset, target_name)
     elif feature_selector == stepwise_selection:
@@ -902,58 +901,64 @@ if __name__ == '__main__':
                               rename_numerical=True,
                               separator=',',
                               prepruning='ida',
+                              feature_selector=stepwise_selection,
                               percentage=0.2)
 
-#     print('40%')
-#     check_efficiency_with_ida(base_table,
-#                               path_to_candidates, 
-#                               key, 
-#                               target,
-#                               openml_training_high_containment,
-#                               rename_numerical=False,
-#                               separator=',',
-#                               prepruning='containment',
-#                               percentage=105)
-#     print('60%')
-#     check_efficiency_with_ida(base_table,
-#                               path_to_candidates, 
-#                               key, 
-#                               target,
-#                               openml_training_high_containment,
-#                               rename_numerical=False,
-#                               separator=',',
-#                               prepruning='containment',
-#                               percentage=70)
+    print('40%')
+    check_efficiency_with_ida(base_table,
+                              path_to_candidates, 
+                              key, 
+                              target,
+                              openml_training_high_containment,
+                              rename_numerical=True,
+                              separator=',',
+                              prepruning='ida',
+                              feature_selector=stepwise_selection,
+                              percentage=0.4)
+    print('60%')
+    check_efficiency_with_ida(base_table,
+                              path_to_candidates, 
+                              key, 
+                              target,
+                              openml_training_high_containment,
+                              rename_numerical=True,
+                              separator=',',
+                              feature_selector=stepwise_selection,
+                              prepruning='ida',
+                              percentage=0.6)
 
-#     print('80%')
-#     check_efficiency_with_ida(base_table,
-#                               path_to_candidates, 
-#                               key, 
-#                               target,
-#                               openml_training_high_containment,
-#                               rename_numerical=False,
-#                               separator=',',
-#                               prepruning='containment',
-#                               percentage=34)
+    print('80%')
+    check_efficiency_with_ida(base_table,
+                              path_to_candidates, 
+                              key, 
+                              target,
+                              openml_training_high_containment,
+                              rename_numerical=True,
+                              separator=',',
+                              feature_selector=stepwise_selection,
+                              prepruning='ida',
+                              percentage=0.8)
 
-#     print('90%')
-#     check_efficiency_with_ida(base_table,
-#                               path_to_candidates, 
-#                               key, 
-#                               target,
-#                               openml_training_high_containment,
-#                               rename_numerical=False,
-#                               separator=',',
-#                               prepruning='containment',
-#                               percentage=17)
+    print('90%')
+    check_efficiency_with_ida(base_table,
+                              path_to_candidates, 
+                              key, 
+                              target,
+                              openml_training_high_containment,
+                              rename_numerical=True,
+                              separator=',',
+                              prepruning='ida',
+                              feature_selector=stepwise_selection,
+                              percentage=0.9)
 
-#     print('95%')
-#     check_efficiency_with_ida(base_table,
-#                               path_to_candidates, 
-#                               key, 
-#                               target,
-#                               openml_training_high_containment,
-#                               rename_numerical=False,
-#                               separator=',',
-#                               prepruning='containment',
-#                               percentage=8)
+    print('95%')
+    check_efficiency_with_ida(base_table,
+                              path_to_candidates, 
+                              key, 
+                              target,
+                              openml_training_high_containment,
+                              rename_numerical=True,
+                              separator=',',
+                              feature_selector=stepwise_selection,
+                              prepruning='ida',
+                              percentage=0.95)
