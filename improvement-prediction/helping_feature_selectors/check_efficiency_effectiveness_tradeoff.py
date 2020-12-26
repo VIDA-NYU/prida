@@ -595,31 +595,9 @@ def compute_user_model_performance(dataset, target_name, features, model_type='l
     print('MSE of user model', mean_squared_error(y_test, y_pred))
     
         
-from mlxtend.feature_selection import SequentialFeatureSelector as sfs
+from sklearn.feature_selection import RFE
 def stepwise_selection(data, target):
     print('USING STEPWISE_SELECTION')
-    # Build RF regressor  to use in feature selection
-    rf = RandomForestRegressor(n_estimators=10, n_jobs=-1, random_state=42)
-    # Build step forward feature selection
-    if len(data.columns) < 5:
-        num_feats = len(data.columns)
-    else:
-        num_feats = 5
-    sfs1 = sfs(rf,
-               k_features=num_feats,
-               forward=True,
-               floating=False,
-               scoring='r2',
-               cv=5)
-
-    # Perform SFFS
-    sfs1 = sfs1.fit(data, target)
-    all_features = data.columns.tolist()
-    chosen_features = list(sfs1.k_feature_idx_)
-    return [all_features[i] for i in chosen_features]
-
-from sklearn.feature_selection import RFE
-def recursive_feature_elimination(data, target):
     estimator = LinearRegression()
     selector = RFE(estimator)
     reduced = selector.fit(data, target)
@@ -675,7 +653,7 @@ def check_efficiency_with_ida(base_dataset,
                                                        percentage=percentage)
         
         pruned_dataset = augmented_dataset[base_dataset.drop([key], axis=1).columns.to_list() + candidates_to_keep]
-        print('candidates kept by ida', base_dataset.drop([key], axis=1).columns.to_list() + candidates_to_keep)
+        #print('candidates kept by ida', base_dataset.drop([key], axis=1).columns.to_list() + candidates_to_keep)
     elif prepruning == 'none' or prepruning == 'containment':
         # if the prepruning is 'containment', the pruning is already done in the augmentation itself
         pruned_dataset = augmented_dataset
@@ -694,7 +672,7 @@ def check_efficiency_with_ida(base_dataset,
                                             thresholds_tau, 
                                             eta, 
                                             k_random_seeds)
-        print('selected by rifs', selected_pruned)
+        #print('selected by rifs', selected_pruned)
     elif feature_selector == boruta_algorithm:
         selected_pruned = boruta_algorithm(pruned_dataset, target_name)
     elif feature_selector == stepwise_selection:
