@@ -600,32 +600,10 @@ def compute_user_model_performance(dataset, target_name, features, model_type='r
     print('MAE of user model', mean_absolute_error(y_test, y_pred))
     print('MSE of user model', mean_squared_error(y_test, y_pred))
     
-        
-from mlxtend.feature_selection import SequentialFeatureSelector as sfs
-def stepwise_selection(data, target):
-    print('USING STEPWISE_SELECTION')
-    # Build RF regressor  to use in feature selection
-    rf = RandomForestRegressor(n_estimators=10, n_jobs=-1, random_state=42)
-    # Build step forward feature selection
-    if len(data.columns) < 5:
-        num_feats = len(data.columns)
-    else:
-        num_feats = 5
-    sfs1 = sfs(rf,
-               k_features=num_feats,
-               forward=True,
-               floating=False,
-               scoring='r2',
-               cv=5)
-
-    # Perform SFFS
-    sfs1 = sfs1.fit(data, target)
-    all_features = data.columns.tolist()
-    chosen_features = list(sfs1.k_feature_idx_)
-    return [all_features[i] for i in chosen_features]
 
 from sklearn.feature_selection import RFE
-def recursive_feature_elimination(data, target):
+def stepwise_selection(data, target):
+    print('USING STEPWISE_SELECTION')
     estimator = LinearRegression()
     selector = RFE(estimator)
     reduced = selector.fit(data, target)
