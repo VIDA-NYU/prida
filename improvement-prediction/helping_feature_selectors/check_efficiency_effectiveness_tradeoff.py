@@ -654,7 +654,7 @@ def check_efficiency_with_ida(base_dataset,
                                                        percentage=percentage)
         
         pruned_dataset = augmented_dataset[base_dataset.drop([key], axis=1).columns.to_list() + candidates_to_keep]
-        print('candidates kept by ida', base_dataset.drop([key], axis=1).columns.to_list() + candidates_to_keep)
+        #print('candidates kept by ida', base_dataset.drop([key], axis=1).columns.to_list() + candidates_to_keep)
     elif prepruning == 'none' or prepruning == 'containment':
         # if the prepruning is 'containment', the pruning is already done in the augmentation itself
         pruned_dataset = augmented_dataset
@@ -673,7 +673,7 @@ def check_efficiency_with_ida(base_dataset,
                                             thresholds_tau, 
                                             eta, 
                                             k_random_seeds)
-        print('selected by rifs', selected_pruned)
+        #print('selected by rifs', selected_pruned)
     elif feature_selector == boruta_algorithm:
         selected_pruned = boruta_algorithm(pruned_dataset, target_name)
     elif feature_selector == stepwise_selection:
