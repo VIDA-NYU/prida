@@ -25,7 +25,7 @@ def join_datasets(base_dataset,
     top 'percentage' overlapping candidates.
     '''
 
-    #print('inside join datasets. Prepruning is', prepruning)
+    print('inside join datasets. Prepruning is', prepruning)
     time1 = time.time()
     augmented_dataset = base_dataset
     #print(augmented_dataset.columns)
@@ -67,7 +67,7 @@ def join_datasets(base_dataset,
                 else:
                     #print('joining here')
                     dataset.set_index(base_key, inplace=True)
-                    augmented_dataset = augmented_dataset.join(dataset, how='left')  
+                    augmented_dataset = augmented_dataset.join(dataset, how='left', lsuffix='_x', rsuffix='_y')  
                     #augmented_dataset = pd.merge(augmented_dataset.set_index(base_key), 
                     #                             dataset.set_index(base_key),
                     #                             how='left',
