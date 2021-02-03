@@ -129,6 +129,8 @@ class FeatureFactory:
                    self.get_number_of_rows(),
                    self.get_row_to_column_ratio()]
 
+        #bla = self.get_means_of_numerical_columns()
+        #print(bla)
         features.append(func(self.get_means_of_numerical_columns().values()))
         # not using percentages_of_missing_values for now because the data comes with NaN's
         # either removed or "imputed"
@@ -233,6 +235,7 @@ class FeatureFactory:
             #print('COLUMN IN PEARSON', column, 'TARGET IN PEARSON', target_name)
             #print('numerical column:', self._is_numerical(column))
             #print('numerical target', self._is_numerical(target_name))
+            #print(np.isnan(self.data[column]), np.isnan(self.data[target_name]))
             if column != target_name and self._is_numerical(column) and self._is_numerical(target_name):
                 coefficient, pvalue = stats.pearsonr(self.data[column], self.data[target_name])
                 #for now, i am ignoring the pvalues

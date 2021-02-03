@@ -67,11 +67,14 @@ def join_datasets(base_dataset,
                 else:
                     #print('joining here')
                     dataset.set_index(base_key, inplace=True)
-                    augmented_dataset = augmented_dataset.join(dataset, how='left', lsuffix='_x', rsuffix='_y')  
-                    #augmented_dataset = pd.merge(augmented_dataset.set_index(base_key), 
-                    #                             dataset.set_index(base_key),
-                    #                             how='left',
-                    #                             on=base_key)
+                    #augmented_dataset = augmented_dataset.join(dataset, how='left', lsuffix='_x', rsuffix='_y')  
+                    augmented_dataset = pd.merge(augmented_dataset,#.set_index(base_key), 
+                                                 dataset, #x.set_index(base_key),
+                                                 how='left',
+                                                 on=base_key,
+                                                 #lsuffix='_x',
+                                                 #rsuffix='_y',
+                                                 validate='m:1')
                     #print('done joining dataset', name)
         except (pd.errors.EmptyDataError, KeyError, ValueError) as e:
             print('there was an error for dataset', name, e)
@@ -106,10 +109,12 @@ def join_datasets(base_dataset,
                                                  left_on=[base_key],
                                                  right_on=[candidate_key_columns[name]])
                 else:
-                    augmented_dataset = pd.merge(augmented_dataset, 
-                                                 dataset,
-                                                 how='left',
-                                                 on=base_key)
+                    dataset.set_index(base_key, inplace=True)
+                    augmented_dataset = augmented_dataset.join(dataset, how='left')
+                    # augmented_dataset = pd.merge(augmented_dataset, 
+                    #                              dataset,
+                    #                              how='left',
+                    #                              on=base_key)
                 
             except (pd.errors.EmptyDataError, KeyError, ValueError):
                 continue
@@ -117,7 +122,7 @@ def join_datasets(base_dataset,
     #augmented_dataset = augmented_dataset.set_index(base_key)
     augmented_dataset = augmented_dataset.select_dtypes(include=['int64', 'float64'])
     augmented_dataset = augmented_dataset.replace([np.inf, -np.inf], np.nan)
-    augmented_dataset.columns = augmented_dataset.columns.str.rstrip('_x')
+    #augmented_dataset.columns = augmented_dataset.columns.str.rstrip('_x')
     print('augmented data shape', augmented_dataset.shape)
     if mean_data_imputation:
         mean = augmented_dataset.mean().replace(np.nan, 0.0)
@@ -133,6 +138,7 @@ def join_datasets(base_dataset,
         print('number of initial features', len(base_dataset.columns), 'augmented dataset', len(augmented_dataset.columns))
         #print('kept', augmented_dataset.columns.tolist())
         print('leaving join datasets')
+        new_data = new_data.loc[:,~new_data.columns.duplicated()]
         return new_data
 
     time2 = time.time()
@@ -140,6 +146,7 @@ def join_datasets(base_dataset,
     print('number of initial features', len(base_dataset.columns), 'augmented dataset', len(augmented_dataset.columns))
     #print('kept', augmented_dataset.columns.tolist())
     print('leaving join datasets')
+    augmented_dataset = augmented_dataset.loc[:,~augmented_dataset.columns.duplicated()]
     return augmented_dataset
 
 from sklearn.svm import SVC
@@ -188,11 +195,10 @@ from feature_factory import *
 
 
 def compute_features(query_key_values,
-                     candidate_dataset, 
+                     candidate_name, 
                      key, 
                      target_name, 
-                     augmented_dataset=pd.DataFrame([]),
-                     mean_data_imputation=True):
+                     augmented_dataset):
     '''
     This function generates features required to determine, through classification, 
     whether an augmentation with the candidate_dataset (which is single-feature) is likely to 
@@ -204,36 +210,41 @@ def compute_features(query_key_values,
     ## For now, we're only using number_of_columns, number_of_rows, row_to_column_ratio, 
     ## max_skewness, max_kurtosis, max_number_of_unique_values, so we remove the unnecessary elements 
     ## in the lines below
- 
+
+    candidate_dataset = augmented_dataset.reset_index()[[key, candidate_name]]
+    candidate_dataset = candidate_dataset.set_index(key)
+    candidate_dataset = candidate_dataset.fillna(candidate_dataset.mean())
     # Step 1: individual candidate features
+    #print(candidate_dataset.head())
     feature_factory_candidate = FeatureFactory(candidate_dataset)
     candidate_dataset_individual_features = feature_factory_candidate.get_individual_features(func=max_in_modulus)
     ## For now, we're only using number_of_rows, max_skewness, max_kurtosis, max_number_of_unique_values, 
     ## so we remove the unnecessary elements in the lines below 
     ## candidate_dataset_individual_features = [candidate_dataset_individual_features[index] for index in [1, 5, 6, 7]]
 
-    # Step 2: join the datasets and compute pairwise features
-    if augmented_dataset.empty:
-        augmented_dataset = pd.merge(query_dataset, 
-                                     candidate_dataset,
-                                     how='left',
-                                     on=key)
-    #augmented_dataset = augmented_dataset.set_index(key)
-    #augmented_dataset = augmented_dataset.replace([np.inf, -np.inf], np.nan).dropna(how="all")
-    if mean_data_imputation:
-        #print(augmented_dataset.mean())
-        #fill_NaN = SimpleImputer(missing_values=np.nan, strategy='mean')
-        #pd.DataFrame(fill_NaN.fit_transform(augmented_dataset))
-        new_dataset = augmented_dataset.fillna(augmented_dataset.mean())
-        new_dataset.columns = augmented_dataset.columns
-        new_dataset.index = augmented_dataset.index
-        augmented_dataset = new_dataset
+    # Step 2: join the datasets and compute pairwise features IF A NICE, CLEAN AUGMENTED_DATASET WERE NOT PASSED
+    # if augmented_dataset.empty:
+    #     augmented_dataset = pd.merge(query_dataset, 
+    #                                  candidate_dataset,
+    #                                  how='left',
+    #                                  on=key,
+    #                                  validate='m:1')
+    #     #augmented_dataset = augmented_dataset.set_index(key)
+    #     augmented_dataset = augmented_dataset.replace([np.inf, -np.inf], np.nan).dropna(how="all")
+    #     if mean_data_imputation:
+    #         #print(augmented_dataset.mean())
+    #         #fill_NaN = SimpleImputer(missing_values=np.nan, strategy='mean')
+    #         #pd.DataFrame(fill_NaN.fit_transform(augmented_dataset))
+    #         new_dataset = augmented_dataset.fillna(augmented_dataset.mean())
+    #         new_dataset.columns = augmented_dataset.columns
+    #         new_dataset.index = augmented_dataset.index
+    #         augmented_dataset = new_dataset
     
     # Step 3: get candidate-target features
     ## The features are, in order: max_query_candidate_pearson, max_query_candidate_spearman, 
     ## max_query_candidate_covariance, max_query_candidate_mutual_info
     column_names = candidate_dataset.columns.tolist() + [target_name]
-    feature_factory_candidate_target = FeatureFactory(augmented_dataset[column_names])
+    feature_factory_candidate_target = FeatureFactory(augmented_dataset[column_names].fillna(augmented_dataset[column_names].mean()))
     candidate_features_target = feature_factory_candidate_target.get_pairwise_features_with_target(target_name, func=max_in_modulus)
      # Step 4: get query-candidate feature "containment ratio". We may not use it in models, but it's 
     ## important to have this value in order to filter candidates in baselines, for example.
@@ -336,6 +347,7 @@ def augment_with_random_features(dataset, target_name, number_of_random_features
     Given a dataset, the name of the target, and a number of random features, this function derives
     random features that are based on the original ones in the dataset
     '''
+    dataset.dropna(inplace=True)
     #print('in augment_with_random_features')
     if dataset.shape[0] > MAX_ROWS_FOR_ESTIMATION:
         dataset = dataset.sample(n=MAX_ROWS_FOR_ESTIMATION, random_state=42)
@@ -541,13 +553,15 @@ def prune_candidates_with_ida(training_data,
                                                                                          func=max_in_modulus)
     query_key_values = base_dataset.index.values
     feature_vectors = []
+    #candidate_columns = list(set(augmented_dataset.columns.tolist()) - set(base_dataset.columns.tolist()))
     for name in candidate_names:
-        candidate_dataset = augmented_dataset.reset_index()[[key, name]]
+        #candidate_dataset = augmented_dataset.reset_index()[[key, name]]
+        #print(name, candidate_columns[index])
         candidate_features, candidate_features_target, containment_ratio = compute_features(query_key_values,
-                                                                                            candidate_dataset.set_index(key), 
+                                                                                            name, 
                                                                                             key, 
                                                                                             target_name, 
-                                                                                            augmented_dataset=augmented_dataset)
+                                                                                            augmented_dataset)
         feature_vectors.append(query_features + candidate_features + query_features_target + candidate_features_target + containment_ratio)
     predictions = model.predict(normalize_features(np.array(feature_vectors))) 
     gain_pred_probas = [elem[0] for elem in model.predict_proba(normalize_features(np.array(feature_vectors)))]
