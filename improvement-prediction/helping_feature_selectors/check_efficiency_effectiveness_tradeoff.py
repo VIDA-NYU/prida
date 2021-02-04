@@ -518,7 +518,8 @@ def prune_candidates_with_ida(training_data,
                               base_dataset,
                               target_name,
                               key,
-                              percentage=0.5):
+                              percentage=0.5,
+                              topN=None):
     '''
     This function trains and uses IDA as a pruner of candidates for augmentation.
     It keeps the top percentage (indicated by parameter percentage) of candidates.
@@ -566,8 +567,11 @@ def prune_candidates_with_ida(training_data,
     predictions = model.predict(normalize_features(np.array(feature_vectors))) 
     gain_pred_probas = [elem[0] for elem in model.predict_proba(normalize_features(np.array(feature_vectors)))]
     probs_dictionary = {name: prob for name, prob in zip(candidate_names, list(gain_pred_probas))}
-    pruned = sorted(probs_dictionary.items(), key = lambda x:x[1], reverse=True)[:int((1.0 - percentage)*len(probs_dictionary.items()))]
-    candidates_to_keep = [elem[0] for elem in pruned if elem[1] > 0.5] # if elem[1] > 0.5, it was classified as 'keepable'
+    if not topN:
+        pruned = sorted(probs_dictionary.items(), key = lambda x:x[1], reverse=True)[:int((1.0 - percentage)*len(probs_dictionary.items()))]
+    else:
+        pruned = sorted(probs_dictionary.items(), key = lambda x:x[1], reverse=True)[:topN]
+    candidates_to_keep = [elem[0] for elem in pruned]# if elem[1] > 0.5] # if elem[1] > 0.5, it was classified as 'keepable'
     time2 = time.time()
     print('time to predict what candidates to keep', (time2-time1)*1000.0, 'ms')
     print('initial number of candidates', len(candidate_names), 'final number of candidates', len(candidates_to_keep))
@@ -589,35 +593,6 @@ def boruta_algorithm(dataset, target_name):
     generously_selected = feat_selector.support_weak_
     feat_names = dataset.drop([target_name], axis=1).columns
     return [name for name, mask in zip(feat_names, generously_selected) if mask]
-
-def compute_user_model_performance(dataset, target_name, features, model_type='linear_regression'):
-    '''
-    This function checks how well a random forest (assumed to be the user's model), 
-    trained on a given set of features, performs in the prediction of a target
-    '''
-
-    time1 = time.time()
-    # Now let's split the data
-    X_train, X_test, y_train, y_test = train_test_split(dataset.drop([target_name], axis=1),
-                                                        dataset[target_name],
-                                                        test_size=0.33,
-                                                        random_state=42)
-    if model_type == 'random_forest':
-        model = RandomForestRegressor(n_estimators=100, random_state=42)
-        model.fit(X_train[features], y_train.ravel())
-        y_pred = model.predict(X_test[features])
-    elif model_type == 'linear_regression':
-        model = LinearRegression()
-        model.fit(X_train[features], y_train.ravel())
-        y_pred = model.predict(X_test[features])
-    else:
-        print('Specified user model is not implemented')
-        exit()
-    time2 = time.time()
-    print('time to create user\'s model with chosen candidates', (time2-time1)*1000.0, 'ms')
-    print('R2-score of user model', r2_score(y_test, y_pred))
-    #print('MAE of user model', mean_absolute_error(y_test, y_pred))
-    #print('MSE of user model', mean_squared_error(y_test, y_pred))
     
 from sklearn.feature_selection import RFE
 def stepwise_selection(data, target):
@@ -645,7 +620,8 @@ def check_efficiency_with_ida(base_dataset,
                               feature_selector=wrapper_algorithm,
                               gain_prob_threshold=0.5,
                               prepruning='containment', 
-                              percentage=0.5, 
+                              percentage=0.5,
+                              topN=None,
                               candidate_key_columns=None):
     '''
     This function gets the time to run a feature selector without pre-pruning 
@@ -666,7 +642,8 @@ def check_efficiency_with_ida(base_dataset,
                                                        base_dataset, 
                                                        target_name, 
                                                        key, 
-                                                       percentage=percentage)
+                                                       percentage=percentage,
+                                                       topN=topN)
         
         pruned_dataset = augmented_dataset[base_dataset.columns.to_list() + candidates_to_keep]
         #print('candidates kept by ida', base_dataset.drop([key], axis=1).columns.to_list() + candidates_to_keep)
@@ -738,13 +715,13 @@ def compute_user_model_performance(dataset, target_name, features, model_type='r
     This function checks how well a random forest (assumed to be the user's model), 
     trained on a given set of features, performs in the prediction of a target
     '''
-
+    print('**** FEATURES', features)
     time1 = time.time()
     # Now let's split the data
-    dataset.dropna(inplace=True)
-    indices_to_keep = ~dataset.isin([np.nan, np.inf, -np.inf]).any(1)
-    dataset = dataset[indices_to_keep]#.astype(np.float64)
-    X_train, X_test, y_train, y_test = train_test_split(dataset.drop([target_name], axis=1),
+    #dataset.dropna(inplace=True)
+    #indices_to_keep = ~dataset.isin([np.nan, np.inf, -np.inf]).any(1)
+    #dataset = dataset[indices_to_keep]#.astype(np.float64)
+    X_train, X_test, y_train, y_test = train_test_split(dataset[features], #.drop([target_name], axis=1),
                                                         dataset[target_name],
                                                         test_size=0.33,
                                                         random_state=42)
@@ -861,66 +838,161 @@ if __name__ == '__main__':
 
     
     print('query', path_to_base_table)
-    print('20%')
-    check_efficiency_with_ida(base_table,
-                              aug_table, 
-                              key, 
-                              target,
-                              openml_training_high_containment,
-                              rename_numerical=True,
-                              separator=',',
-                              prepruning='ida',
-                              #feature_selector=stepwise_selection,
-                              percentage=0.2)
+    # print('20%')
+    # check_efficiency_with_ida(base_table,
+    #                           aug_table, 
+    #                           key, 
+    #                           target,
+    #                           openml_training_high_containment,
+    #                           rename_numerical=True,
+    #                           separator=',',
+    #                           prepruning='ida',
+    #                           #feature_selector=stepwise_selection,
+    #                           percentage=0.2)
 
-    print('40%')
-    check_efficiency_with_ida(base_table,
-                              aug_table, 
-                              key, 
-                              target,
-                              openml_training_high_containment,
-                              rename_numerical=True,
-                              separator=',',
-                              prepruning='ida',
-                              #feature_selector=stepwise_selection,
-                              percentage=0.4)
-    print('60%')
-    check_efficiency_with_ida(base_table,
-                              aug_table, 
-                              key, 
-                              target,
-                              openml_training_high_containment,
-                              rename_numerical=True,
-                              separator=',',
-                              #feature_selector=stepwise_selection,
-                              prepruning='ida',
-                              percentage=0.6)
+    # print('40%')
+    # check_efficiency_with_ida(base_table,
+    #                           aug_table, 
+    #                           key, 
+    #                           target,
+    #                           openml_training_high_containment,
+    #                           rename_numerical=True,
+    #                           separator=',',
+    #                           prepruning='ida',
+    #                           #feature_selector=stepwise_selection,
+    #                           percentage=0.4)
+    # print('60%')
+    # check_efficiency_with_ida(base_table,
+    #                           aug_table, 
+    #                           key, 
+    #                           target,
+    #                           openml_training_high_containment,
+    #                           rename_numerical=True,
+    #                           separator=',',
+    #                           #feature_selector=stepwise_selection,
+    #                           prepruning='ida',
+    #                           percentage=0.6)
 
-    print('80%')
-    check_efficiency_with_ida(base_table,
-                              aug_table, 
-                              key, 
-                              target,
-                              openml_training_high_containment,
-                              rename_numerical=True,
-                              separator=',',
-                              #feature_selector=stepwise_selection,
-                              prepruning='ida',
-                              percentage=0.8)
+    # print('80%')
+    # check_efficiency_with_ida(base_table,
+    #                           aug_table, 
+    #                           key, 
+    #                           target,
+    #                           openml_training_high_containment,
+    #                           rename_numerical=True,
+    #                           separator=',',
+    #                           #feature_selector=stepwise_selection,
+    #                           prepruning='ida',
+    #                           percentage=0.8)
 
-    print('90%')
-    check_efficiency_with_ida(base_table,
-                              aug_table, 
-                              key, 
-                              target,
-                              openml_training_high_containment,
-                              rename_numerical=True,
-                              separator=',',
-                              prepruning='ida',
-                              #feature_selector=stepwise_selection,
-                              percentage=0.9)
+    # print('90%')
+    # check_efficiency_with_ida(base_table,
+    #                           aug_table, 
+    #                           key, 
+    #                           target,
+    #                           openml_training_high_containment,
+    #                           rename_numerical=True,
+    #                           separator=',',
+    #                           prepruning='ida',
+    #                           #feature_selector=stepwise_selection,
+    #                           percentage=0.9)
 
-    print('95%')
+    # print('95%')
+    # check_efficiency_with_ida(base_table,
+    #                           aug_table, 
+    #                           key, 
+    #                           target,
+    #                           openml_training_high_containment,
+    #                           rename_numerical=True,
+    #                           separator=',',
+    #                           #feature_selector=stepwise_selection,
+    #                           prepruning='ida',
+    #                           percentage=0.95)
+
+    # print('99%')
+    # check_efficiency_with_ida(base_table,
+    #                           aug_table, 
+    #                           key, 
+    #                           target,
+    #                           openml_training_high_containment,
+    #                           rename_numerical=True,
+    #                           separator=',',
+    #                           #feature_selector=stepwise_selection,
+    #                           prepruning='ida',
+    #                           percentage=0.99)
+
+    # print('top-100')
+    # check_efficiency_with_ida(base_table,
+    #                           aug_table, 
+    #                           key, 
+    #                           target,
+    #                           openml_training_high_containment,
+    #                           rename_numerical=True,
+    #                           separator=',',
+    #                           prepruning='ida',
+    #                           #feature_selector=stepwise_selection,
+    #                           topN=100)
+
+    # print('top-50')
+    # check_efficiency_with_ida(base_table,
+    #                           aug_table, 
+    #                           key, 
+    #                           target,
+    #                           openml_training_high_containment,
+    #                           rename_numerical=True,
+    #                           separator=',',
+    #                           prepruning='ida',
+    #                           #feature_selector=stepwise_selection,
+    #                           topN=50)
+    # print('top-20')
+    # check_efficiency_with_ida(base_table,
+    #                           aug_table, 
+    #                           key, 
+    #                           target,
+    #                           openml_training_high_containment,
+    #                           rename_numerical=True,
+    #                           separator=',',
+    #                           #feature_selector=stepwise_selection,
+    #                           prepruning='ida',
+    #                           topN=20)
+
+    # print('top-10')
+    # check_efficiency_with_ida(base_table,
+    #                           aug_table, 
+    #                           key, 
+    #                           target,
+    #                           openml_training_high_containment,
+    #                           rename_numerical=True,
+    #                           separator=',',
+    #                           #feature_selector=stepwise_selection,
+    #                           prepruning='ida',
+    #                           topN=10)
+
+    # print('top-5')
+    # check_efficiency_with_ida(base_table,
+    #                           aug_table, 
+    #                           key, 
+    #                           target,
+    #                           openml_training_high_containment,
+    #                           rename_numerical=True,
+    #                           separator=',',
+    #                           prepruning='ida',
+    #                           #feature_selector=stepwise_selection,
+    #                           topN=5)
+
+    # print('top-3')
+    # check_efficiency_with_ida(base_table,
+    #                           aug_table, 
+    #                           key, 
+    #                           target,
+    #                           openml_training_high_containment,
+    #                           rename_numerical=True,
+    #                           separator=',',
+    #                           #feature_selector=stepwise_selection,
+    #                           prepruning='ida',
+    #                           topN=3)
+
+    print('top-1')
     check_efficiency_with_ida(base_table,
                               aug_table, 
                               key, 
@@ -930,4 +1002,4 @@ if __name__ == '__main__':
                               separator=',',
                               #feature_selector=stepwise_selection,
                               prepruning='ida',
-                              percentage=0.95)
+                              topN=1)
