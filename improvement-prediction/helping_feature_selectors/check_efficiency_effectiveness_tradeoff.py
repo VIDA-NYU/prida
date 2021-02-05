@@ -463,7 +463,7 @@ def wrapper_algorithm(augmented_dataset, target_name, key, thresholds_T, eta, k_
     '''
     This function searches for the best subset of features by doing an exponential search
     '''
-    
+
     augmented_dataset.dropna(inplace=True)
     indices_to_keep = ~augmented_dataset.isin([np.nan, np.inf, -np.inf]).any(1)
     augmented_dataset = augmented_dataset[indices_to_keep].astype(np.float64)
@@ -527,8 +527,8 @@ def prune_candidates_with_ida(training_data,
     
     #Let's train our IDA model over the training dataset
     time1 = time.time()
-    #feature_scaler, model = train_random_forest(training_data[FEATURES], training_data['class_pos_neg']) 
-    feature_scaler, model = train_rbf_svm(training_data[FEATURES], training_data['class_pos_neg'])
+    feature_scaler, model = train_random_forest(training_data[FEATURES], training_data['class_pos_neg']) 
+    #feature_scaler, model = train_rbf_svm(training_data[FEATURES], training_data['class_pos_neg'])
     time2 = time.time()
     print('time to train our model', (time2-time1)*1000.0, 'ms')
     
@@ -571,7 +571,8 @@ def prune_candidates_with_ida(training_data,
         pruned = sorted(probs_dictionary.items(), key = lambda x:x[1], reverse=True)[:int((1.0 - percentage)*len(probs_dictionary.items()))]
     else:
         pruned = sorted(probs_dictionary.items(), key = lambda x:x[1], reverse=True)[:topN]
-    candidates_to_keep = [elem[0] for elem in pruned]# if elem[1] > 0.5] # if elem[1] > 0.5, it was classified as 'keepable'
+        
+    candidates_to_keep = [elem[0] for elem in pruned if elem[1] > 0.5] # if elem[1] > 0.5, it was classified as 'keepable'
     time2 = time.time()
     print('time to predict what candidates to keep', (time2-time1)*1000.0, 'ms')
     print('initial number of candidates', len(candidate_names), 'final number of candidates', len(candidates_to_keep))
@@ -659,6 +660,7 @@ def check_efficiency_with_ida(base_dataset,
     #Step 3: select features with selector over pruned dataset (if RIFS, we inject 20% of random features)
     time1 = time.time()
     if feature_selector == wrapper_algorithm:
+        print('pruned_dataset columns', pruned_dataset.columns.tolist())
         selected_pruned = wrapper_algorithm(pruned_dataset,  
                                             target_name, 
                                             key, 
@@ -745,7 +747,6 @@ def compute_user_model_performance(dataset, target_name, features, model_type='r
     print('MAE of user model', mean_absolute_error(y_test, y_pred))
     print('MSE of user model', mean_squared_error(y_test, y_pred))
     
-        
 def assess_classifier_quality(classifier, 
                               base_dataset, 
                               dataset_directory, 
@@ -936,73 +937,73 @@ if __name__ == '__main__':
                               #feature_selector=stepwise_selection,
                               topN=100)
 
-    print('top-50')
-    check_efficiency_with_ida(base_table,
-                              aug_table, 
-                              key, 
-                              target,
-                              openml_training_high_containment,
-                              rename_numerical=True,
-                              separator=',',
-                              prepruning='ida',
-                              #feature_selector=stepwise_selection,
-                              topN=50)
-    print('top-20')
-    check_efficiency_with_ida(base_table,
-                              aug_table, 
-                              key, 
-                              target,
-                              openml_training_high_containment,
-                              rename_numerical=True,
-                              separator=',',
-                              #feature_selector=stepwise_selection,
-                              prepruning='ida',
-                              topN=20)
+    # print('top-50')
+    # check_efficiency_with_ida(base_table,
+    #                           aug_table, 
+    #                           key, 
+    #                           target,
+    #                           openml_training_high_containment,
+    #                           rename_numerical=True,
+    #                           separator=',',
+    #                           prepruning='ida',
+    #                           #feature_selector=stepwise_selection,
+    #                           topN=50)
+    # print('top-20')
+    # check_efficiency_with_ida(base_table,
+    #                           aug_table, 
+    #                           key, 
+    #                           target,
+    #                           openml_training_high_containment,
+    #                           rename_numerical=True,
+    #                           separator=',',
+    #                           #feature_selector=stepwise_selection,
+    #                           prepruning='ida',
+    #                           topN=20)
 
-    print('top-10')
-    check_efficiency_with_ida(base_table,
-                              aug_table, 
-                              key, 
-                              target,
-                              openml_training_high_containment,
-                              rename_numerical=True,
-                              separator=',',
-                              #feature_selector=stepwise_selection,
-                              prepruning='ida',
-                              topN=10)
+    # print('top-10')
+    # check_efficiency_with_ida(base_table,
+    #                           aug_table, 
+    #                           key, 
+    #                           target,
+    #                           openml_training_high_containment,
+    #                           rename_numerical=True,
+    #                           separator=',',
+    #                           #feature_selector=stepwise_selection,
+    #                           prepruning='ida',
+    #                           topN=10)
 
-    print('top-5')
-    check_efficiency_with_ida(base_table,
-                              aug_table, 
-                              key, 
-                              target,
-                              openml_training_high_containment,
-                              rename_numerical=True,
-                              separator=',',
-                              prepruning='ida',
-                              #feature_selector=stepwise_selection,
-                              topN=5)
+    # print('top-5')
+    # check_efficiency_with_ida(base_table,
+    #                           aug_table, 
+    #                           key, 
+    #                           target,
+    #                           openml_training_high_containment,
+    #                           rename_numerical=True,
+    #                           separator=',',
+    #                           prepruning='ida',
+    #                           #feature_selector=stepwise_selection,
+    #                           topN=5)
 
-    print('top-3')
-    check_efficiency_with_ida(base_table,
-                              aug_table, 
-                              key, 
-                              target,
-                              openml_training_high_containment,
-                              rename_numerical=True,
-                              separator=',',
-                              #feature_selector=stepwise_selection,
-                              prepruning='ida',
-                              topN=3)
+    # print('top-3')
+    # check_efficiency_with_ida(base_table,
+    #                           aug_table, 
+    #                           key, 
+    #                           target,
+    #                           openml_training_high_containment,
+    #                           rename_numerical=True,
+    #                           separator=',',
+    #                           #feature_selector=stepwise_selection,
+    #                           prepruning='ida',
+    #                           topN=3)
 
-    print('top-1')
-    check_efficiency_with_ida(base_table,
-                              aug_table, 
-                              key, 
-                              target,
-                              openml_training_high_containment,
-                              rename_numerical=True,
-                              separator=',',
-                              #feature_selector=stepwise_selection,
-                              prepruning='ida',
-                              topN=1)
+    # print('top-1')
+    # check_efficiency_with_ida(base_table,
+    #                           aug_table, 
+    #                           key, 
+    #                           target,
+    #                           openml_training_high_containment,
+    #                           rename_numerical=True,
+    #                           separator=',',
+    #                           #feature_selector=stepwise_selection,
+    #                           prepruning='ida',
+    #                           topN=1)
