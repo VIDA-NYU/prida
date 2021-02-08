@@ -601,6 +601,11 @@ def stepwise_selection(data, target):
     estimator = LinearRegression()
     selector = RFE(estimator)
     print('before selector')
+    #data.dropna(inplace=True)
+    mean = data.mean().replace(np.nan, 0.0)
+    data = data.fillna(mean)
+    #indices_to_keep = ~data.isin([np.nan, np.inf, -np.inf]).any(1)
+    #data = data[indices_to_keep].astype(np.float64)
     reduced = selector.fit(data, target)
     print('after selector')
     return [elem for elem, label in zip(list(data.columns), list(reduced.support_)) if label]
@@ -695,22 +700,6 @@ def check_efficiency_with_ida(base_dataset,
     #print('size of entire dataset', augmented_dataset.shape[1], 'size of pruned', pruned.shape[1])
     #print('size of selected features when you use prepruner', prepruning, len(selected_pruned))
     #return selected_all, candidates_to_keep, selected_pruned, model, probs_dictionary
-
-from boruta import BorutaPy
-from sklearn.ensemble import RandomForestClassifier
-def boruta_algorithm(dataset, target_name):
-    '''
-    This function selects features in the dataset using an implementation 
-    of the boruta algorithm
-    '''
-    print('USING BORUTA')
-    rf = RandomForestClassifier(n_estimators=100, random_state=42)
-    feat_selector = BorutaPy(rf, n_estimators='auto', random_state=1)
-    feat_selector.fit(dataset.drop([target_name], axis=1).values, dataset[target_name].values.ravel())
-    filtered = feat_selector.transform(dataset.drop([target_name], axis=1).values)
-    generously_selected = feat_selector.support_weak_
-    feat_names = dataset.drop([target_name], axis=1).columns
-    return [name for name, mask in zip(feat_names, generously_selected) if mask]
 
 def compute_user_model_performance(dataset, target_name, features, model_type='random_forest'):
     '''
@@ -934,76 +923,76 @@ if __name__ == '__main__':
                               rename_numerical=True,
                               separator=',',
                               prepruning='ida',
-                              #feature_selector=stepwise_selection,
+                              feature_selector=stepwise_selection,
                               topN=100)
 
-    # print('top-50')
-    # check_efficiency_with_ida(base_table,
-    #                           aug_table, 
-    #                           key, 
-    #                           target,
-    #                           openml_training_high_containment,
-    #                           rename_numerical=True,
-    #                           separator=',',
-    #                           prepruning='ida',
-    #                           #feature_selector=stepwise_selection,
-    #                           topN=50)
-    # print('top-20')
-    # check_efficiency_with_ida(base_table,
-    #                           aug_table, 
-    #                           key, 
-    #                           target,
-    #                           openml_training_high_containment,
-    #                           rename_numerical=True,
-    #                           separator=',',
-    #                           #feature_selector=stepwise_selection,
-    #                           prepruning='ida',
-    #                           topN=20)
+    print('top-50')
+    check_efficiency_with_ida(base_table,
+                              aug_table, 
+                              key, 
+                              target,
+                              openml_training_high_containment,
+                              rename_numerical=True,
+                              separator=',',
+                              prepruning='ida',
+                              feature_selector=stepwise_selection,
+                              topN=50)
+    print('top-20')
+    check_efficiency_with_ida(base_table,
+                              aug_table, 
+                              key, 
+                              target,
+                              openml_training_high_containment,
+                              rename_numerical=True,
+                              separator=',',
+                              feature_selector=stepwise_selection,
+                              prepruning='ida',
+                              topN=20)
 
-    # print('top-10')
-    # check_efficiency_with_ida(base_table,
-    #                           aug_table, 
-    #                           key, 
-    #                           target,
-    #                           openml_training_high_containment,
-    #                           rename_numerical=True,
-    #                           separator=',',
-    #                           #feature_selector=stepwise_selection,
-    #                           prepruning='ida',
-    #                           topN=10)
+    print('top-10')
+    check_efficiency_with_ida(base_table,
+                              aug_table, 
+                              key, 
+                              target,
+                              openml_training_high_containment,
+                              rename_numerical=True,
+                              separator=',',
+                              feature_selector=stepwise_selection,
+                              prepruning='ida',
+                              topN=10)
 
-    # print('top-5')
-    # check_efficiency_with_ida(base_table,
-    #                           aug_table, 
-    #                           key, 
-    #                           target,
-    #                           openml_training_high_containment,
-    #                           rename_numerical=True,
-    #                           separator=',',
-    #                           prepruning='ida',
-    #                           #feature_selector=stepwise_selection,
-    #                           topN=5)
+    print('top-5')
+    check_efficiency_with_ida(base_table,
+                              aug_table, 
+                              key, 
+                              target,
+                              openml_training_high_containment,
+                              rename_numerical=True,
+                              separator=',',
+                              prepruning='ida',
+                              feature_selector=stepwise_selection,
+                              topN=5)
 
-    # print('top-3')
-    # check_efficiency_with_ida(base_table,
-    #                           aug_table, 
-    #                           key, 
-    #                           target,
-    #                           openml_training_high_containment,
-    #                           rename_numerical=True,
-    #                           separator=',',
-    #                           #feature_selector=stepwise_selection,
-    #                           prepruning='ida',
-    #                           topN=3)
+    print('top-3')
+    check_efficiency_with_ida(base_table,
+                              aug_table, 
+                              key, 
+                              target,
+                              openml_training_high_containment,
+                              rename_numerical=True,
+                              separator=',',
+                              feature_selector=stepwise_selection,
+                              prepruning='ida',
+                              topN=3)
 
-    # print('top-1')
-    # check_efficiency_with_ida(base_table,
-    #                           aug_table, 
-    #                           key, 
-    #                           target,
-    #                           openml_training_high_containment,
-    #                           rename_numerical=True,
-    #                           separator=',',
-    #                           #feature_selector=stepwise_selection,
-    #                           prepruning='ida',
-    #                           topN=1)
+    print('top-1')
+    check_efficiency_with_ida(base_table,
+                              aug_table, 
+                              key, 
+                              target,
+                              openml_training_high_containment,
+                              rename_numerical=True,
+                              separator=',',
+                              feature_selector=stepwise_selection,
+                              prepruning='ida',
+                              topN=1)
