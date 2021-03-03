@@ -14,7 +14,8 @@ def join_datasets(base_dataset,
                   rename_numerical=True, 
                   separator='|', 
                   prepruning=None, 
-                  percentage=0.5, 
+                  percentage=0.5,
+                  topN=None,
                   candidate_key_columns=None):
     '''
     Given (1) a base dataset, (2) a directory with datasets that only have two 
@@ -29,7 +30,7 @@ def join_datasets(base_dataset,
     time1 = time.time()
     augmented_dataset = base_dataset
     #print(augmented_dataset.columns)
-    augmented_dataset.set_index(base_key, inplace=True)
+    #augmented_dataset.set_index(base_key, inplace=True)
     dataset_names = [f for f in os.listdir(dataset_directory)]
     
     containments = {}
@@ -48,7 +49,7 @@ def join_datasets(base_dataset,
     
             ### Step 3: augment the table
             if prepruning == 'containment':
-                base_keys = set(base_dataset[base_key])
+                base_keys = set(base_dataset.index.values) #[base_key])
                 if candidate_key_columns:
                     candidate_keys = set(dataset[candidate_key_columns[name]])
                 else:
@@ -81,13 +82,13 @@ def join_datasets(base_dataset,
             continue
 
     if prepruning == 'containment':
-        #print('all containments')
-        #print([elem for elem in sorted(containments.items(), key= lambda x: x[1], reverse=True)])
-        if percentage < 1:
-            chosen_candidates = [elem[0] for elem in sorted(containments.items(), key= lambda x: x[1], reverse=True)[:int((1.0 - percentage)*len(containments.items()))]]
+        if topN:
+            chosen_candidates = [elem[0] for elem in sorted(containments.items(), key= lambda x: x[1], reverse=True)[:topN]]
         else:
-            chosen_candidates = [elem[0] for elem in sorted(containments.items(), key= lambda x: x[1], reverse=True)[:percentage]]
-        #print('&&&& initial', len(containments.items()), 'final', len(chosen_candidates))
+            if percentage < 1:
+                chosen_candidates = [elem[0] for elem in sorted(containments.items(), key= lambda x: x[1], reverse=True)[:int((1.0 - percentage)*len(containments.items()))]]
+            else:
+                chosen_candidates = [elem[0] for elem in sorted(containments.items(), key= lambda x: x[1], reverse=True)[:percentage]]
         for name in chosen_candidates:
             #print('here is candidate', name)
             try:
@@ -110,13 +111,14 @@ def join_datasets(base_dataset,
                                                  right_on=[candidate_key_columns[name]])
                 else:
                     dataset.set_index(base_key, inplace=True)
-                    augmented_dataset = augmented_dataset.join(dataset, how='left')
-                    # augmented_dataset = pd.merge(augmented_dataset, 
-                    #                              dataset,
-                    #                              how='left',
-                    #                              on=base_key)
+                    augmented_dataset = pd.merge(augmented_dataset,#.set_index(base_key), 
+                                                 dataset, #x.set_index(base_key),
+                                                 how='left',
+                                                 on=base_key,
+                                                 validate='m:1')
                 
             except (pd.errors.EmptyDataError, KeyError, ValueError):
+                print('there was an error for dataset', name) #, e)
                 continue
     
     #augmented_dataset = augmented_dataset.set_index(base_key)
@@ -409,7 +411,6 @@ def aggregate_features_by_quality(rankings):
                 feats_quality[feature] += feature_in_front_of_random(feature, rank)
             else:
                 feats_quality[feature] = feature_in_front_of_random(feature, rank)
-    print(feats_quality)
     sorted_feats =  sorted(feats_quality.items(), 
                            key=lambda x: x[1], 
                            reverse=True)
@@ -444,7 +445,7 @@ def random_injection_feature_selection(augmented_dataset,
         rf_coefs = rf.feature_importances_
         #print('done fitting random forest')
         ## coef = STRidge().fit(augmented_dataset_features, target_column_data).coef_
-        ## print(rf_coefs, augmented_dataset_with_random.drop([target_name], axis=1).columns)
+        ## print(coef, augmented_dataset_features.columns)
         ## print(len(rf.feature_importances_))
         
         ## This version of lasso is giving lower weights to random features, which is good
@@ -458,7 +459,6 @@ def random_injection_feature_selection(augmented_dataset,
     # Now, for each non-random feature, we get the number of times it appeared in front of 
     ## all random features
     sorted_features = aggregate_features_by_quality(rankings)
-    print('sorted by quality', sorted_features)
     return [elem[0] for elem in sorted_features if elem[1] >= tau]
     
 def wrapper_algorithm(augmented_dataset, target_name, key, thresholds_T, eta, k_random_seeds):
@@ -466,9 +466,11 @@ def wrapper_algorithm(augmented_dataset, target_name, key, thresholds_T, eta, k_
     This function searches for the best subset of features by doing an exponential search
     '''
 
+    #print('shape before', augmented_dataset.shape)
     augmented_dataset.dropna(inplace=True)
     indices_to_keep = ~augmented_dataset.isin([np.nan, np.inf, -np.inf]).any(1)
     augmented_dataset = augmented_dataset[indices_to_keep].astype(np.float64)
+    #print('shape after', augmented_dataset.shape)
     X_train, X_test, y_train, y_test = train_test_split(augmented_dataset.drop(target_name, axis=1), 
                                                         augmented_dataset[target_name], 
                                                         test_size=0.33,
@@ -520,8 +522,7 @@ def prune_candidates_with_ida(training_data,
                               base_dataset,
                               target_name,
                               key,
-                              percentage=0.5,
-                              topN=None):
+                              percentage=0.5):
     '''
     This function trains and uses IDA as a pruner of candidates for augmentation.
     It keeps the top percentage (indicated by parameter percentage) of candidates.
@@ -529,8 +530,8 @@ def prune_candidates_with_ida(training_data,
     
     #Let's train our IDA model over the training dataset
     time1 = time.time()
-    feature_scaler, model = train_random_forest(training_data[FEATURES], training_data['class_pos_neg']) 
-    #feature_scaler, model = train_rbf_svm(training_data[FEATURES], training_data['class_pos_neg'])
+    #feature_scaler, model = train_random_forest(training_data[FEATURES], training_data['class_pos_neg']) 
+    feature_scaler, model = train_rbf_svm(training_data[FEATURES], training_data['class_pos_neg'])
     time2 = time.time()
     print('time to train our model', (time2-time1)*1000.0, 'ms')
     
@@ -569,11 +570,7 @@ def prune_candidates_with_ida(training_data,
     predictions = model.predict(normalize_features(np.array(feature_vectors))) 
     gain_pred_probas = [elem[0] for elem in model.predict_proba(normalize_features(np.array(feature_vectors)))]
     probs_dictionary = {name: prob for name, prob in zip(candidate_names, list(gain_pred_probas))}
-    if not topN:
-        pruned = sorted(probs_dictionary.items(), key = lambda x:x[1], reverse=True)[:int((1.0 - percentage)*len(probs_dictionary.items()))]
-    else:
-        pruned = sorted(probs_dictionary.items(), key = lambda x:x[1], reverse=True)[:topN]
-        
+    pruned = sorted(probs_dictionary.items(), key = lambda x:x[1], reverse=True)[:int((1.0 - percentage)*len(probs_dictionary.items()))]
     candidates_to_keep = [elem[0] for elem in pruned if elem[1] > 0.5] # if elem[1] > 0.5, it was classified as 'keepable'
     time2 = time.time()
     print('time to predict what candidates to keep', (time2-time1)*1000.0, 'ms')
@@ -612,10 +609,8 @@ def stepwise_selection(data, target):
     print('after selector')
     return [elem for elem, label in zip(list(data.columns), list(reduced.support_)) if label]
 
-
 import random
 def check_efficiency_with_ida(base_dataset, 
-                              augmented_dataset, 
                               key, 
                               target_name, 
                               training_data, 
@@ -624,9 +619,11 @@ def check_efficiency_with_ida(base_dataset,
                               k_random_seeds=[42, 17, 23, 2, 5, 19, 37, 41, 13, 33], #REFACTOR: this parameter is only used by RIFS
                               mean_data_imputation=True, 
                               rename_numerical=True, 
-                              separator='|', 
+                              separator=',',
+                              augmented_dataset=None, 
                               feature_selector=wrapper_algorithm,
                               gain_prob_threshold=0.5,
+                              path_to_candidates=None,
                               prepruning='containment', 
                               percentage=0.5,
                               topN=None,
@@ -637,10 +634,7 @@ def check_efficiency_with_ida(base_dataset,
     '''
     print('Initial performance')
     #print('***', base_dataset.columns)
-    if key in base_dataset.columns:
-        compute_user_model_performance(base_dataset, target_name, base_dataset.drop([target_name], axis=1).columns)
-    else:
-        compute_user_model_performance(base_dataset, target_name, base_dataset.drop([target_name], axis=1).columns)
+    compute_user_model_performance(base_dataset, target_name, base_dataset.drop([target_name], axis=1).columns)
     print('******* PREPRUNING STRATEGY ********', prepruning)
     
     #Step 2: let's see how much time it takes to run chosen pre-pruner
@@ -650,24 +644,34 @@ def check_efficiency_with_ida(base_dataset,
                                                        base_dataset, 
                                                        target_name, 
                                                        key, 
-                                                       percentage=percentage,
-                                                       topN=topN)
+                                                       percentage=percentage)
         
         pruned_dataset = augmented_dataset[base_dataset.columns.to_list() + candidates_to_keep]
-        #print('candidates kept by ida', pruned_dataset.columns.to_list())
-    elif prepruning == 'none' or prepruning == 'containment':
-        # if the prepruning is 'containment', the pruning is already done in the augmentation itself
+        #print('candidates kept by ida', base_dataset.drop([key], axis=1).columns.to_list() + candidates_to_keep)
+    elif prepruning == 'none':
         pruned_dataset = augmented_dataset
+    elif prepruning == 'containment':
+        # if the prepruning is 'containment', the pruning has to be done in the augmentation itself
+        pruned_dataset = join_datasets(base_dataset,
+                                       path_to_candidates,
+                                       key,
+                                       topN=topN,
+                                       separator=separator,
+                                       percentage=percentage,
+                                       prepruning=prepruning)
+        augmented_dataset = pruned_dataset
+        print('** pruned', pruned_dataset.columns.to_list())
+        #print('Done creating the pruned dataset', pruned_dataset.shape, pruned_dataset.index)
     elif prepruning == 'random':
         # if the prepruning is random, it will select sqrt(len(candidate_features)) features at random
         candidate_features = set(augmented_dataset.columns.to_list()) - set(base_dataset.columns.to_list()) 
         candidates_to_keep = random.sample(candidate_features, int((1.0 - percentage)*len(candidate_features)))
         pruned_dataset = augmented_dataset[base_dataset.columns.to_list() + candidates_to_keep]
-
+        
     #Step 3: select features with selector over pruned dataset (if RIFS, we inject 20% of random features)
     time1 = time.time()
     if feature_selector == wrapper_algorithm:
-        print('pruned_dataset columns', pruned_dataset.columns.tolist())
+        #print('pruned_dataset columns', pruned_dataset.columns.tolist())
         selected_pruned = wrapper_algorithm(pruned_dataset,  
                                             target_name, 
                                             key, 
@@ -698,11 +702,6 @@ def check_efficiency_with_ida(base_dataset,
         time2 = time.time()
         print('time to create and assess user\'s model with pruner', prepruning, (time2-time1)*1000.0, 'ms')
     
-        
-    #print('size of entire dataset', augmented_dataset.shape[1], 'size of pruned', pruned.shape[1])
-    #print('size of selected features when you use prepruner', prepruning, len(selected_pruned))
-    #return selected_all, candidates_to_keep, selected_pruned, model, probs_dictionary
-
 def compute_user_model_performance(dataset, target_name, features, model_type='random_forest'):
     '''
     This function checks how well a random forest (assumed to be the user's model), 
@@ -735,9 +734,10 @@ def compute_user_model_performance(dataset, target_name, features, model_type='r
     time2 = time.time()
     print('time to create user\'s model with chosen candidates', (time2-time1)*1000.0, 'ms')
     print('R2-score of user model', r2_score(y_test, y_pred))
-    #print('MAE of user model', mean_absolute_error(y_test, y_pred))
-    #print('MSE of user model', mean_squared_error(y_test, y_pred))
+    print('MAE of user model', mean_absolute_error(y_test, y_pred))
+    print('MSE of user model', mean_squared_error(y_test, y_pred))
     
+        
 def assess_classifier_quality(classifier, 
                               base_dataset, 
                               dataset_directory, 
@@ -823,96 +823,93 @@ if __name__ == '__main__':
     openml_training_high_containment = openml_training.loc[openml_training['containment_fraction'] >= THETA]
 
 
-    base_table = pd.read_csv(path_to_base_table)
+    base_table = pd.read_csv(path_to_base_table).set_index(key)
     #Step 1: do the join with every candidate dataset in dataset_directory. 
     ## This has to be done both with and without prepruners.
     ## If the prepruning is containment, we already "prune" the augmented dataset while creating it
-    aug_table = join_datasets(base_table, path_to_candidates, key, separator=',', prepruning='ida')
-    #aug_table = aug_table.loc[:,~aug_table.columns.duplicated()] #removing duplicate columns
-    print('Done creating the augmented dataset')
 
     
     print('query', path_to_base_table)
     
     print('top-100')
     check_efficiency_with_ida(base_table,
-                              aug_table, 
                               key, 
                               target,
                               openml_training_high_containment,
                               rename_numerical=True,
                               separator=',',
-                              prepruning='ida',
+                              path_to_candidates=path_to_candidates,
+                              prepruning='containment',
                               #feature_selector=stepwise_selection,
-                              topN=100)
+                              topN=26)
 
     print('top-50')
     check_efficiency_with_ida(base_table,
-                              aug_table, 
                               key, 
                               target,
                               openml_training_high_containment,
                               rename_numerical=True,
+                              path_to_candidates=path_to_candidates,
                               separator=',',
-                              prepruning='ida',
-                              #feature_selector=stepwise_selection,
-                              topN=50)
+                              prepruning='containment',
+                              feature_selector=stepwise_selection,
+                              topN=26)
     print('top-20')
     check_efficiency_with_ida(base_table,
-                              aug_table, 
                               key, 
                               target,
                               openml_training_high_containment,
                               rename_numerical=True,
+                              path_to_candidates=path_to_candidates,
                               separator=',',
-                              #feature_selector=stepwise_selection,
-                              prepruning='ida',
-                              topN=20)
+                              feature_selector=stepwise_selection,
+                              prepruning='containment',
+                              topN=18)
 
     print('top-10')
     check_efficiency_with_ida(base_table,
-                              aug_table, 
                               key, 
                               target,
                               openml_training_high_containment,
                               rename_numerical=True,
+                              path_to_candidates=path_to_candidates,
                               separator=',',
                               feature_selector=stepwise_selection,
-                              prepruning='ida',
-                              topN=10)
+                              prepruning='containment',
+                              topN=8)
 
     print('top-5')
     check_efficiency_with_ida(base_table,
-                              aug_table, 
                               key, 
                               target,
                               openml_training_high_containment,
                               rename_numerical=True,
+                              path_to_candidates=path_to_candidates,
                               separator=',',
-                              prepruning='ida',
-                              #feature_selector=stepwise_selection,
-                              topN=5)
+                              prepruning='containment',
+                              feature_selector=stepwise_selection,
+                              topN=3)
 
     print('top-3')
     check_efficiency_with_ida(base_table,
-                              aug_table, 
                               key, 
                               target,
                               openml_training_high_containment,
                               rename_numerical=True,
+                              path_to_candidates=path_to_candidates,
                               separator=',',
-                              #feature_selector=stepwise_selection,
-                              prepruning='ida',
-                              topN=3)
+                              feature_selector=stepwise_selection,
+                              prepruning='containment',
+                              topN=1)
 
     print('top-1')
     check_efficiency_with_ida(base_table,
-                              aug_table, 
                               key, 
                               target,
                               openml_training_high_containment,
                               rename_numerical=True,
+                              path_to_candidates=path_to_candidates,
                               separator=',',
                               #feature_selector=stepwise_selection,
-                              prepruning='ida',
+                              prepruning='containment',
                               topN=1)
