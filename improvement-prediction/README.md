@@ -126,7 +126,3 @@ value for each test instance. Each line in the file is in the format:
 real_decrease_in_mean_squared_error_predicting_target, predicted_decrease_in_mean_squared_error_predicting_target, real_decrease_in_median_absolute_error_predicting_target,
 predicted_decrease_in_median_absolute_error_predicting_target, real_relative_gain_in_r2_score_predicting_target, predicted_relative_gain_in_r2_score_predicting_target>
 
-### Recommending candidate datasets for augmentation
-
-** TODO **
-
