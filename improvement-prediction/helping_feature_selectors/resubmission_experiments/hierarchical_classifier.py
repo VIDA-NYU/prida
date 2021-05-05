@@ -14,11 +14,19 @@ argv[4] => target variable
 import sys
 import pandas as pd
 import numpy as np
+import time
+import os
+from sklearn.metrics import r2_score
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor
 import warnings; warnings.simplefilter('ignore')
 from sklearn.ensemble import RandomForestClassifier
+sys.path.append('../../')
+from feature_factory import *
 
-TRAINING_FILENAME = '../classification/training-simplified-data-generation.csv'
-THETA = 0.7
+TRAINING_FILENAME = '../../classification/training-simplified-data-generation.csv'
+THETA = 0.0
 SEPARATOR = ','
 RENAME_NUMERICAL = True
 MEAN_DATA_IMPUTATION = True
@@ -130,7 +138,7 @@ def join_datasets(base_dataset,
 
     augmented_dataset = base_dataset
     augmented_dataset.set_index(base_key, inplace=True)
-
+    names_and_columns = {}
     for name in candidate_datasets.keys():
         try:
             if candidate_key_columns:
@@ -139,12 +147,15 @@ def join_datasets(base_dataset,
                                              how='left',
                                              left_on=[base_key],
                                              right_on=[candidate_key_columns[name]])
+                names_and_columns[name] = list(set(candidate_datasets[name].columns.tolist()) - set([candidate_key_columns[name]]))
             else:
+                print('**** name', name)
                 augmented_dataset = pd.merge(augmented_dataset, 
-                                             candidate_datasets[name].set_index(base_key, inplace=True),
+                                             candidate_datasets[name], #.set_index(base_key, inplace=True),
                                              how='left',
                                              on=base_key,
                                              validate='m:1')
+                names_and_columns[name] = list(set(candidate_datasets[name].columns.tolist()) - set([base_key]))
                 #print('done joining dataset', name)
         except (pd.errors.EmptyDataError, KeyError, ValueError) as e:
             print('there was an error for dataset', name, e)
@@ -162,15 +173,15 @@ def join_datasets(base_dataset,
         #print('kept', augmented_dataset.columns.tolist())
         print('leaving join datasets')
         new_data = new_data.loc[:,~new_data.columns.duplicated()]
-        return new_data
+        return new_data, names_and_columns
 
     #print('kept', augmented_dataset.columns.tolist())
     print('leaving join datasets')
     augmented_dataset = augmented_dataset.loc[:,~augmented_dataset.columns.duplicated()]
-    return augmented_dataset
+    return augmented_dataset, names_and_columns
 
 def compute_complex_candidate_features(query_key_values,
-                                       candidate_name, 
+                                       candidate_columns, 
                                        key, 
                                        target_name, 
                                        augmented_dataset):
@@ -179,8 +190,7 @@ def compute_complex_candidate_features(query_key_values,
     through classification, whether an augmentation with the candidate_dataset (which is single-feature) 
     is likely to hamper the model (or simply bring no gain)
     '''
-    
-    candidate_dataset = augmented_dataset.reset_index()[[key, candidate_name]].set_index(key).fillna(candidate_dataset.mean())
+    candidate_dataset = augmented_dataset[candidate_columns] #name]].set_index(key).fillna(candidate_dataset.mean())
     # Get candidate-target features
     ## The features are, in order: max_query_candidate_pearson, max_query_candidate_spearman, 
     ## max_query_candidate_covariance, max_query_candidate_mutual_info
@@ -198,7 +208,7 @@ def prune_candidates(training_data,
                      candidate_directory,
                      key, 
                      target_name,
-                     topN=topN):
+                     topN=100):
     '''
     This function trains and uses a hierarchical classifier as a pruner of candidates for augmentation.
     It keeps the top percentage (indicated by parameter percentage) of candidates.
@@ -247,7 +257,7 @@ def prune_candidates(training_data,
 
     #Let's augment the dataset with all candidates that were kept by model1
     time1 = time.time()
-    augmented_dataset = join_datasets(base_dataset, candidates_kept, key)
+    augmented_dataset, names_and_columns = join_datasets(base_dataset, candidates_kept, key)
     time2 = time.time()
     print('time to train augment dataset with candidates kept by model1', (time2-time1)*1000.0, 'ms')
 
@@ -257,7 +267,7 @@ def prune_candidates(training_data,
     feature_vectors = []
     for name in sorted(candidates_kept.keys()):
         candidate_target_features, candidate_query_features = compute_complex_candidate_features(query_key_values,
-                                                                                                 name, 
+                                                                                                 names_and_columns[name], 
                                                                                                  key, 
                                                                                                  target_name, 
                                                                                                  augmented_dataset)
@@ -286,7 +296,6 @@ def check_efficiency_and_effectiveness(base_dataset,
                                        training_data,
                                        rename_numerical=True,
                                        separator=SEPARATOR,
-                                       feature_selector=rfe, 
                                        topN=100):
     '''
     This function gets the time to run a feature selector with and without
@@ -294,15 +303,16 @@ def check_efficiency_and_effectiveness(base_dataset,
     '''
     
     print('Initial performance')
-    compute_user_model_performance(base_dataset, target_name, base_dataset.drop([target_name], axis=1).columns)
+    compute_user_model_performance(base_dataset, target, base_dataset.drop([key, target], axis=1).columns)
     print('******* PRUNING WITH HIERARCHICAL CLASSIFIER ********')
     #Step 2: let's see how much time it takes to run the classifier-based pruner
     candidates_to_keep = prune_candidates(training_data,  
                                           base_dataset,
                                           path_to_candidates,
                                           key, 
-                                          target_name,
+                                          target,
                                           topN=topN)
+    print('candidates!', candidates_to_keep)
     
     # TODO REFACTOR AND FINISH THIS CODE
     #     pruned_dataset = augmented_dataset[base_dataset.columns.to_list() + candidates_to_keep]
