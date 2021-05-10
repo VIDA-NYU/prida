@@ -23,7 +23,9 @@ from sklearn.ensemble import RandomForestRegressor
 import warnings; warnings.simplefilter('ignore')
 from sklearn.ensemble import RandomForestClassifier
 sys.path.append('../../')
+sys.path.append('.')
 from feature_factory import *
+from feature_selectors import *
 
 TRAINING_FILENAME = '../../classification/training-simplified-data-generation.csv'
 THETA = 0.0
@@ -149,7 +151,6 @@ def join_datasets(base_dataset,
                                              right_on=[candidate_key_columns[name]])
                 names_and_columns[name] = list(set(candidate_datasets[name].columns.tolist()) - set([candidate_key_columns[name]]))
             else:
-                print('**** name', name)
                 augmented_dataset = pd.merge(augmented_dataset, 
                                              candidate_datasets[name], #.set_index(base_key, inplace=True),
                                              how='left',
@@ -203,12 +204,12 @@ def compute_complex_candidate_features(query_key_values,
     containment_ratio = [intersection_size/len(query_key_values)]
     return candidate_features_target, containment_ratio
 
-def prune_candidates(training_data,  
-                     base_dataset,
-                     candidate_directory,
-                     key, 
-                     target_name,
-                     topN=100):
+def prune_candidates_hierarchical(training_data,  
+                                  base_dataset,
+                                  candidate_directory,
+                                  key, 
+                                  target_name,
+                                  topN=100):
     '''
     This function trains and uses a hierarchical classifier as a pruner of candidates for augmentation.
     It keeps the top percentage (indicated by parameter percentage) of candidates.
@@ -280,14 +281,16 @@ def prune_candidates(training_data,
         pruned = sorted(probs_dictionary.items(), key = lambda x:x[1], reverse=True)[:int((1.0 - percentage)*len(probs_dictionary.items()))]
     else:
         pruned = sorted(probs_dictionary.items(), key = lambda x:x[1], reverse=True)[:topN]
- 
-    final_kept_candidates = [elem[0] for elem in pruned if elem[1] > 0.5] # if elem[1] > 0.5, it was classified as 'keepable'
+
+    final_kept_candidates = {elem[0]: candidates[elem[0]] for elem in pruned if elem[1] > 0.5}
+
+    #[elem[0] for elem in pruned if elem[1] > 0.5] # if elem[1] > 0.5, it was classified as 'keepable'
     time2 = time.time()
     print('time to predict what candidates to keep', (time2-time1)*1000.0, 'ms')
     print('initial number of candidates', len(candidates.keys()),
           'mid number of candidates', len(candidates_kept.keys()),
           'final number of candidates', len(final_kept_candidates))
-    return final_kept_candidates    
+    return final_kept_candidates
 
 def check_efficiency_and_effectiveness(base_dataset,
                                        path_to_candidates,
@@ -296,69 +299,58 @@ def check_efficiency_and_effectiveness(base_dataset,
                                        training_data,
                                        rename_numerical=True,
                                        separator=SEPARATOR,
+                                       feature_selector=recursive_feature_elimination, #rifs,
+                                       prepruning=prune_candidates_hierarchical, 
                                        topN=100):
     '''
     This function gets the time to run a feature selector with and without
-    pre-pruning using the hierarchical classifier
+    pre-pruning using either the hierarchical classifier or classic prida
     '''
     
     print('Initial performance')
     compute_user_model_performance(base_dataset, target, base_dataset.drop([key, target], axis=1).columns)
     print('******* PRUNING WITH HIERARCHICAL CLASSIFIER ********')
     #Step 2: let's see how much time it takes to run the classifier-based pruner
-    candidates_to_keep = prune_candidates(training_data,  
-                                          base_dataset,
-                                          path_to_candidates,
-                                          key, 
-                                          target,
-                                          topN=topN)
-    print('candidates!', candidates_to_keep)
-    
-    # TODO REFACTOR AND FINISH THIS CODE
-    #     pruned_dataset = augmented_dataset[base_dataset.columns.to_list() + candidates_to_keep]
-    #     #print('candidates kept by ida', pruned_dataset.columns.to_list())
-    # elif prepruning == 'none' or prepruning == 'containment':
-    #     # if the prepruning is 'containment', the pruning is already done in the augmentation itself
-    #     pruned_dataset = augmented_dataset
-    # elif prepruning == 'random':
-    #     # if the prepruning is random, it will select sqrt(len(candidate_features)) features at random
-    #     candidate_features = set(augmented_dataset.columns.to_list()) - set(base_dataset.columns.to_list()) 
-    #     candidates_to_keep = random.sample(candidate_features, int((1.0 - percentage)*len(candidate_features)))
-    #     pruned_dataset = augmented_dataset[base_dataset.columns.to_list() + candidates_to_keep]
+    if prepruning == prune_candidates_hierarchical:
+        candidates_to_keep = prune_candidates_hierarchical(training_data,  
+                                              base_dataset,
+                                              path_to_candidates,
+                                              key, 
+                                              target,
+                                              topN=topN)
+    elif prepruning == prune_candidates_classic:
+        print('TODO')
+    else:
+        print('prepruner that was passed is not implemented')
+        exit()
+        
+    augmented_dataset, names_and_columns = join_datasets(base_dataset.reset_index(), candidates_to_keep, key)
+    print('candidates kept by hierarchical classifier', augmented_dataset.columns.to_list())
 
-    # #Step 3: select features with selector over pruned dataset (if RIFS, we inject 20% of random features)
-    # time1 = time.time()
-    # if feature_selector == wrapper_algorithm:
-    #     print('pruned_dataset columns', pruned_dataset.columns.tolist())
-    #     selected_pruned = wrapper_algorithm(pruned_dataset,  
-    #                                         target_name, 
-    #                                         key, 
-    #                                         thresholds_tau, 
-    #                                         eta, 
-    #                                         k_random_seeds)
-    #     #print('selected by rifs', selected_pruned)
-    # elif feature_selector == boruta_algorithm:
-    #     selected_pruned = boruta_algorithm(pruned_dataset, target_name)
-    # elif feature_selector == stepwise_selection:
-    #     selected_pruned = stepwise_selection(pruned_dataset.drop([target_name], axis=1), pruned_dataset[target_name])
-    # elif feature_selector == recursive_feature_elimination:
-    #     selected_pruned = recursive_feature_elimination(pruned_dataset.drop([target_name], axis=1), pruned_dataset[target_name])
-    # else:
-    #     print('feature selector that was passed is not implemented')
-    #     exit()
-    # time2 = time.time()
-    # print('time to run feature selector', (time2-time1)*1000.0, 'ms')
+    #Step 3: select features with selector over pruned dataset (if RIFS, we inject 20% of random features)
+    time1 = time.time()
+    if feature_selector == rifs:
+        selected_pruned = rifs(augmented_dataset,  
+                               target, 
+                               key) 
+    elif feature_selector == recursive_feature_elimination:
+        selected_pruned = recursive_feature_elimination(augmented_dataset.drop([target], axis=1), augmented_dataset[target])
+    else:
+        print('feature selector that was passed is not implemented')
+        exit()
+    time2 = time.time()
+    print('time to run feature selector', (time2-time1)*1000.0, 'ms')
 
-    # #Step 4: compute the user's regression model with features selected_pruned 
-    # if len(selected_pruned) == 0:
-    #     print('No features were selected. Can\'t run user\'s model.')
-    # else:
-    #     time1 = time.time()
-    #     compute_user_model_performance(augmented_dataset, 
-    #                                    target_name, 
-    #                                    selected_pruned)
-    #     time2 = time.time()
-    #     print('time to create and assess user\'s model with pruner', prepruning, (time2-time1)*1000.0, 'ms')
+    #Step 4: compute the user's regression model with features selected_pruned 
+    if len(selected_pruned) == 0:
+        print('No features were selected. Can\'t run user\'s model.')
+    else:
+        time1 = time.time()
+        compute_user_model_performance(augmented_dataset, 
+                                       target, 
+                                       selected_pruned)
+        time2 = time.time()
+        print('time to create and assess user\'s model with pruner', prepruning.__name__, (time2-time1)*1000.0, 'ms')
 
 if __name__ == '__main__':    
     path_to_base_table = sys.argv[1]
