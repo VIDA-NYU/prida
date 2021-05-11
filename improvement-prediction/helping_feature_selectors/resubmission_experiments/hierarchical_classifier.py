@@ -158,7 +158,7 @@ def check_efficiency_and_effectiveness(base_dataset,
                                        rename_numerical=True,
                                        separator=SEPARATOR,
                                        feature_selector=rifs,
-                                       prepruning=prune_candidates_classic, 
+                                       prepruning=prune_candidates_regression, 
                                        topN=100):
     '''
     This function gets the time to run a feature selector with and without
@@ -167,7 +167,7 @@ def check_efficiency_and_effectiveness(base_dataset,
     
     print('Initial performance')
     compute_user_model_performance(base_dataset, target, base_dataset.drop([key, target], axis=1).columns)
-    print('******* PRUNING WITH HIERARCHICAL CLASSIFIER ********')
+    print('******* PRUNING ********')
     #Step 2: let's see how much time it takes to run the classifier-based pruner
     if prepruning == prune_candidates_hierarchical:
         candidates_to_keep = prune_candidates_hierarchical(training_data,  
@@ -187,6 +187,23 @@ def check_efficiency_and_effectiveness(base_dataset,
                                                      target,
                                                      topN=topN)
         print('candidates kept by classic PRIDA classifier', augmented_dataset.columns.to_list())
+
+    elif prepruning == prune_containment_based:
+        augmented_dataset = prune_containment_based(base_dataset,
+                                                    path_to_candidates,
+                                                    key,
+                                                    topN=topN)
+        print('candidates kept by containment strategy', augmented_dataset.columns.to_list())
+
+    elif prepruning == prune_candidates_regression:
+        augmented_dataset = prune_candidates_regression(training_data,  
+                                                        base_dataset,
+                                                        path_to_candidates,
+                                                        key, 
+                                                        target,
+                                                        topN=topN)
+        print('candidates kept by the regression-based version of PRIDA', augmented_dataset.columns.to_list())
+        
     else:
         print('prepruner that was passed is not implemented')
         exit()
