@@ -23,26 +23,11 @@ from sklearn.ensemble import RandomForestRegressor
 import warnings; warnings.simplefilter('ignore')
 from sklearn.ensemble import RandomForestClassifier
 sys.path.append('../../')
-sys.path.append('.')
 from feature_factory import *
 from feature_selectors import *
-
-TRAINING_FILENAME = '../../classification/training-simplified-data-generation.csv'
-THETA = 0.0
-SEPARATOR = ','
-RENAME_NUMERICAL = True
-MEAN_DATA_IMPUTATION = True
-
-CLASS_ATTRIBUTE_NAME = 'class_pos_neg'
-
-DATASET_FEATURES = ['query_num_of_columns', 'query_num_of_rows', 'query_row_column_ratio', 'query_max_mean', 'query_max_outlier_percentage', 
-                    'query_max_skewness', 'query_max_kurtosis', 'query_max_unique', 'candidate_num_of_columns', 'candidate_num_rows', 
-                    'candidate_row_column_ratio', 'candidate_max_mean', 'candidate_max_outlier_percentage', 'candidate_max_skewness',
-                    'candidate_max_kurtosis', 'candidate_max_unique']
-QUERY_TARGET_FEATURES = ['query_target_max_pearson', 'query_target_max_spearman', 'query_target_max_covariance', 'query_target_max_mutual_info']
-CANDIDATE_TARGET_FEATURES = ['candidate_target_max_pearson', 'candidate_target_max_spearman',
-                             'candidate_target_max_covariance', 'candidate_target_max_mutual_info']
-DATASET_DATASET_FEATURES = ['containment_fraction']
+from prida_constants import *
+from baseline_pruners import *
+from prida_core import *
 
 def compute_user_model_performance(dataset, target_name, attributes, model_type='random_forest'):
     '''
@@ -77,133 +62,6 @@ def compute_user_model_performance(dataset, target_name, attributes, model_type=
     print('time to create user\'s model with chosen candidates', (time2-time1)*1000.0, 'ms')
     print('R2-score of user model', r2_score(y_test, y_pred))
 
-def train_random_forest(features, classes):
-    '''
-    Builds a model using features to predict associated classes
-    '''
-    #print('using random forest')
-    feature_scaler = MinMaxScaler().fit(features)
-    features_train = feature_scaler.transform(features)
-    clf = RandomForestClassifier(n_estimators=100, random_state=42)
-    clf.fit(features_train, classes)
-    return feature_scaler, clf
-
-def read_candidates(candidate_directory, base_key, separator=SEPARATOR, rename_numerical=RENAME_NUMERICAL):
-    '''
-    Given a directory with candidates, this function reads and partially 
-    processes them
-    '''
-    candidates = {}
-    candidate_names = [f for f in os.listdir(candidate_directory)]
-    for name in candidate_names:
-        dataset = pd.read_csv(os.path.join(candidate_directory, name), sep=separator)
-        dataset = dataset.replace([np.inf, -np.inf], np.nan).dropna(how="all")
-        dataset = dataset.replace([np.nan], 0.0).dropna(how="all")
-        ### optional step:  rename the numerical column in the dataset
-        if rename_numerical:
-            numerical_column = [i for i in dataset.columns if i != base_key][0]
-            dataset = dataset.rename(columns={numerical_column: name.split('.')[0]})
-        candidates[name] = dataset
-    return candidates
-
-def compute_candidate_features(candidate_dataset, key):
-    '''
-    This function calculates the individual candidate features 
-    (see CANDIDATE_FEATURES)
-    '''
-
-    candidate_dataset = candidate_dataset.set_index(key).fillna(candidate_dataset.mean())
-    feature_factory_candidate = FeatureFactory(candidate_dataset)
-    individual_features = feature_factory_candidate.get_individual_features(func=max_in_modulus)
-    return individual_features
-
-def normalize_features(features, scaler=None):
-    '''
-    This function normalizes features using sklearn's StandardScaler
-    '''
-    if not scaler:
-        scaler = MinMaxScaler().fit(features)
-    return scaler.transform(features)
-
-def join_datasets(base_dataset,
-                  candidate_datasets, 
-                  base_key, 
-                  mean_data_imputation=MEAN_DATA_IMPUTATION, 
-                  #rename_numerical=RENAME_NUMERICAL, 
-                  #separator=SEPARATOR, 
-                  candidate_key_columns=None):
-    '''
-    Given (1) a base dataset, (2) candidate datasets with only two 
-    columns (one key and one numerical attribute), and (3) keys  for joining purposes, 
-    this function generates a big table composed of all joined datasets.
-    '''
-
-    augmented_dataset = base_dataset
-    augmented_dataset.set_index(base_key, inplace=True)
-    names_and_columns = {}
-    for name in candidate_datasets.keys():
-        try:
-            if candidate_key_columns:
-                augmented_dataset = pd.merge(augmented_dataset,
-                                             candidate_datasets[name], 
-                                             how='left',
-                                             left_on=[base_key],
-                                             right_on=[candidate_key_columns[name]])
-                names_and_columns[name] = list(set(candidate_datasets[name].columns.tolist()) - set([candidate_key_columns[name]]))
-            else:
-                augmented_dataset = pd.merge(augmented_dataset, 
-                                             candidate_datasets[name], #.set_index(base_key, inplace=True),
-                                             how='left',
-                                             on=base_key,
-                                             validate='m:1')
-                names_and_columns[name] = list(set(candidate_datasets[name].columns.tolist()) - set([base_key]))
-                #print('done joining dataset', name)
-        except (pd.errors.EmptyDataError, KeyError, ValueError) as e:
-            print('there was an error for dataset', name, e)
-            continue
-    
-    augmented_dataset = augmented_dataset.select_dtypes(include=['int64', 'float64'])
-    augmented_dataset = augmented_dataset.replace([np.inf, -np.inf], np.nan)
-    #print('augmented data shape', augmented_dataset.shape)
-    if mean_data_imputation:
-        mean = augmented_dataset.mean().replace(np.nan, 0.0)
-        new_data = augmented_dataset.fillna(mean)
-        new_data.index = augmented_dataset.index
-        new_data.columns = augmented_dataset.columns
-        print('number of initial features', len(base_dataset.columns), 'augmented dataset', len(augmented_dataset.columns))
-        #print('kept', augmented_dataset.columns.tolist())
-        print('leaving join datasets')
-        new_data = new_data.loc[:,~new_data.columns.duplicated()]
-        return new_data, names_and_columns
-
-    #print('kept', augmented_dataset.columns.tolist())
-    print('leaving join datasets')
-    augmented_dataset = augmented_dataset.loc[:,~augmented_dataset.columns.duplicated()]
-    return augmented_dataset, names_and_columns
-
-def compute_complex_candidate_features(query_key_values,
-                                       candidate_columns, 
-                                       key, 
-                                       target_name, 
-                                       augmented_dataset):
-    '''
-    This function generates candidate-target and candidate-candidate features required to determine, 
-    through classification, whether an augmentation with the candidate_dataset (which is single-feature) 
-    is likely to hamper the model (or simply bring no gain)
-    '''
-    candidate_dataset = augmented_dataset[candidate_columns] #name]].set_index(key).fillna(candidate_dataset.mean())
-    # Get candidate-target features
-    ## The features are, in order: max_query_candidate_pearson, max_query_candidate_spearman, 
-    ## max_query_candidate_covariance, max_query_candidate_mutual_info
-    column_names = candidate_dataset.columns.tolist() + [target_name]
-    feature_factory_candidate_target = FeatureFactory(augmented_dataset[column_names].fillna(augmented_dataset[column_names].mean()))
-    candidate_features_target = feature_factory_candidate_target.get_pairwise_features_with_target(target_name, func=max_in_modulus)
-    # Get query-candidate feature "containment ratio". 
-    candidate_key_values = candidate_dataset.index.values
-    intersection_size = len(set(query_key_values) & set(candidate_key_values))
-    containment_ratio = [intersection_size/len(query_key_values)]
-    return candidate_features_target, containment_ratio
-
 def prune_candidates_hierarchical(training_data,  
                                   base_dataset,
                                   candidate_directory,
@@ -212,7 +70,7 @@ def prune_candidates_hierarchical(training_data,
                                   topN=100):
     '''
     This function trains and uses a hierarchical classifier as a pruner of candidates for augmentation.
-    It keeps the top percentage (indicated by parameter percentage) of candidates.
+    It keeps the topN candidates.
     '''
     
     #Let's train the first, dataset-feature-based model over the training dataset
@@ -299,8 +157,8 @@ def check_efficiency_and_effectiveness(base_dataset,
                                        training_data,
                                        rename_numerical=True,
                                        separator=SEPARATOR,
-                                       feature_selector=recursive_feature_elimination, #rifs,
-                                       prepruning=prune_candidates_hierarchical, 
+                                       feature_selector=rifs,
+                                       prepruning=prune_candidates_classic, 
                                        topN=100):
     '''
     This function gets the time to run a feature selector with and without
@@ -313,19 +171,26 @@ def check_efficiency_and_effectiveness(base_dataset,
     #Step 2: let's see how much time it takes to run the classifier-based pruner
     if prepruning == prune_candidates_hierarchical:
         candidates_to_keep = prune_candidates_hierarchical(training_data,  
-                                              base_dataset,
-                                              path_to_candidates,
-                                              key, 
-                                              target,
-                                              topN=topN)
+                                                           base_dataset,
+                                                           path_to_candidates,
+                                                           key, 
+                                                           target,
+                                                           topN=topN)
+        augmented_dataset, names_and_columns = join_datasets(base_dataset.reset_index(), candidates_to_keep, key)
+        print('candidates kept by hierarchical classifier', augmented_dataset.columns.to_list())
+
     elif prepruning == prune_candidates_classic:
-        print('TODO')
+        augmented_dataset = prune_candidates_classic(training_data,  
+                                                     base_dataset,
+                                                     path_to_candidates,
+                                                     key, 
+                                                     target,
+                                                     topN=topN)
+        print('candidates kept by classic PRIDA classifier', augmented_dataset.columns.to_list())
     else:
         print('prepruner that was passed is not implemented')
         exit()
         
-    augmented_dataset, names_and_columns = join_datasets(base_dataset.reset_index(), candidates_to_keep, key)
-    print('candidates kept by hierarchical classifier', augmented_dataset.columns.to_list())
 
     #Step 3: select features with selector over pruned dataset (if RIFS, we inject 20% of random features)
     time1 = time.time()
