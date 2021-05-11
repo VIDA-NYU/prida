@@ -40,5 +40,5 @@ if __name__=='__main__':
     print('Feature selection time', feature_selection_time/1000, 'seconds')
     print('Final user model time', final_user_model_time/1000, 'seconds')
     print('Total augmentation time', (pruning_time + feature_selection_time + final_user_model_time)/1000, 'seconds')
-    print('R2 score before', initial_user_model_R2_score/1000, 'seconds')
-    print('R2 score after', final_user_model_R2_score/1000, 'seconds')
+    print('R2 score before', initial_user_model_R2_score)
+    print('R2 score after', final_user_model_R2_score)
