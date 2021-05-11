@@ -9,6 +9,8 @@ argv[1] => base table
 argv[2] => candidates' directory
 argv[3] => key
 argv[4] => target variable
+argv[5] => feature selector (e.g., rifs or recursive_feature_elimination)
+argv[6] => prepruner (e.g., prune_candidates_hierarchical, prune_candidates_classic, prune_containment_based, or prune_candidates_regression)
 '''
 
 import sys
@@ -118,7 +120,7 @@ def prune_candidates_hierarchical(training_data,
     time1 = time.time()
     augmented_dataset, names_and_columns = join_datasets(base_dataset, candidates_kept, key)
     time2 = time.time()
-    print('time to train augment dataset with candidates kept by model1', (time2-time1)*1000.0, 'ms')
+    print('time to augment dataset with candidates kept by model1', (time2-time1)*1000.0, 'ms')
 
     #Now let's generate a label for every feature in the augmented dataset according to model2
     time1 = time.time()
@@ -158,7 +160,7 @@ def check_efficiency_and_effectiveness(base_dataset,
                                        rename_numerical=True,
                                        separator=SEPARATOR,
                                        feature_selector=rifs,
-                                       prepruning=prune_candidates_regression, 
+                                       prepruning=prune_candidates_hierarchical, 
                                        topN=100):
     '''
     This function gets the time to run a feature selector with and without
@@ -239,7 +241,9 @@ if __name__ == '__main__':
     path_to_candidates = sys.argv[2]
     key = sys.argv[3]
     target = sys.argv[4]
-
+    feature_selector = sys.argv[5]
+    prepruning = sys.argv[6]
+    
     openml_training = pd.read_csv(TRAINING_FILENAME)
     openml_training[CLASS_ATTRIBUTE_NAME] = ['gain' if row['gain_in_r2_score'] > 0 else 'loss'
                                         for index, row in openml_training.iterrows()]

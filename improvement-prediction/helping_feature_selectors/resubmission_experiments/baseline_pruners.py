@@ -145,7 +145,7 @@ def prune_containment_based(base_dataset,
         new_data.index = augmented_dataset.index
         new_data.columns = augmented_dataset.columns
         time2 = time.time()
-        print('time to perform join', (time2-time1)*1000.0, 'ms')
+        print('time to prune by containment', (time2-time1)*1000.0, 'ms')
         print('number of initial features', len(base_dataset.columns), 'augmented dataset', len(augmented_dataset.columns))
         #print('kept', augmented_dataset.columns.tolist())
         print('leaving join datasets')
@@ -153,7 +153,7 @@ def prune_containment_based(base_dataset,
         return new_data
 
     time2 = time.time()
-    print('time to perform join', (time2-time1)*1000.0, 'ms')
+    print('time to prune by containment', (time2-time1)*1000.0, 'ms')
     print('number of initial features', len(base_dataset.columns), 'augmented dataset', len(augmented_dataset.columns))
     #print('kept', augmented_dataset.columns.tolist())
     print('leaving join datasets')
