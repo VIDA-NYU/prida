@@ -132,7 +132,8 @@ def prune_candidates_hierarchical(training_data,
                                                                                                  key, 
                                                                                                  target_name, 
                                                                                                  augmented_dataset)
-        feature_vectors.append(query_features + individual_candidate_features[name] + query_features_target + candidate_target_features + candidate_query_features)
+        if candidate_target_features and candidate_query_features:
+            feature_vectors.append(query_features + individual_candidate_features[name] + query_features_target + candidate_target_features + candidate_query_features)
 
     predictions2 = model2.predict(normalize_features(np.array(feature_vectors)))
     gain_pred_probas = [elem[0] for elem in model2.predict_proba(normalize_features(np.array(feature_vectors)))]
