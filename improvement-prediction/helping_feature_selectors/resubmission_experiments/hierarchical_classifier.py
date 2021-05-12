@@ -135,23 +135,23 @@ def prune_candidates_hierarchical(training_data,
         if candidate_target_features and candidate_query_features:
             feature_vectors.append(query_features + individual_candidate_features[name] + query_features_target + candidate_target_features + candidate_query_features)
 
-    predictions2 = model2.predict(normalize_features(np.array(feature_vectors)))
-    gain_pred_probas = [elem[0] for elem in model2.predict_proba(normalize_features(np.array(feature_vectors)))]
-    probs_dictionary = {name: prob for name, prob in zip(sorted(candidates_kept.keys()), list(gain_pred_probas))}
-    if not topN:
-        pruned = sorted(probs_dictionary.items(), key = lambda x:x[1], reverse=True)[:int((1.0 - percentage)*len(probs_dictionary.items()))]
-    else:
+    if feature_vectors:
+        predictions2 = model2.predict(normalize_features(np.array(feature_vectors)))
+        gain_pred_probas = [elem[0] for elem in model2.predict_proba(normalize_features(np.array(feature_vectors)))]
+        probs_dictionary = {name: prob for name, prob in zip(sorted(candidates_kept.keys()), list(gain_pred_probas))}
         pruned = sorted(probs_dictionary.items(), key = lambda x:x[1], reverse=True)[:topN]
-
-    final_kept_candidates = {elem[0]: candidates[elem[0]] for elem in pruned if elem[1] > 0.5}
-
-    #[elem[0] for elem in pruned if elem[1] > 0.5] # if elem[1] > 0.5, it was classified as 'keepable'
-    time2 = time.time()
-    print('time to predict what candidates to keep', (time2-time1)*1000.0, 'ms')
-    print('initial number of candidates', len(candidates.keys()),
-          'mid number of candidates', len(candidates_kept.keys()),
-          'final number of candidates', len(final_kept_candidates))
-    return final_kept_candidates
+        
+        final_kept_candidates = {elem[0]: candidates[elem[0]] for elem in pruned if elem[1] > 0.5}
+        
+        #[elem[0] for elem in pruned if elem[1] > 0.5] # if elem[1] > 0.5, it was classified as 'keepable'
+        time2 = time.time()
+        print('time to predict what candidates to keep', (time2-time1)*1000.0, 'ms')
+        print('initial number of candidates', len(candidates.keys()),
+              'mid number of candidates', len(candidates_kept.keys()),
+              'final number of candidates', len(final_kept_candidates))
+        augmented_dataset, names_and_columns = join_datasets(base_dataset.reset_index(), final_kept_candidates, key)
+        return augmented_dataset
+    return base_dataset
 
 def check_efficiency_and_effectiveness(base_dataset,
                                        path_to_candidates,
@@ -172,17 +172,17 @@ def check_efficiency_and_effectiveness(base_dataset,
     compute_user_model_performance(base_dataset, target, base_dataset.drop([key, target], axis=1).columns)
     print('******* PRUNING ********')
     #Step 2: let's see how much time it takes to run the classifier-based pruner
-    if prepruning == prune_candidates_hierarchical:
-        candidates_to_keep = prune_candidates_hierarchical(training_data,  
-                                                           base_dataset,
-                                                           path_to_candidates,
-                                                           key, 
-                                                           target,
-                                                           topN=topN)
-        augmented_dataset, names_and_columns = join_datasets(base_dataset.reset_index(), candidates_to_keep, key)
+    if prepruning == 'prune_candidates_hierarchical':
+        augmented_dataset = prune_candidates_hierarchical(training_data,  
+                                                          base_dataset,
+                                                          path_to_candidates,
+                                                          key, 
+                                                          target,
+                                                          topN=topN)
+
         print('candidates kept by hierarchical classifier', augmented_dataset.columns.to_list())
 
-    elif prepruning == prune_candidates_classic:
+    elif prepruning == 'prune_candidates_classic':
         augmented_dataset = prune_candidates_classic(training_data,  
                                                      base_dataset,
                                                      path_to_candidates,
@@ -191,14 +191,14 @@ def check_efficiency_and_effectiveness(base_dataset,
                                                      topN=topN)
         print('candidates kept by classic PRIDA classifier', augmented_dataset.columns.to_list())
 
-    elif prepruning == prune_containment_based:
+    elif prepruning == 'prune_containment_based':
         augmented_dataset = prune_containment_based(base_dataset,
                                                     path_to_candidates,
                                                     key,
                                                     topN=topN)
         print('candidates kept by containment strategy', augmented_dataset.columns.to_list())
 
-    elif prepruning == prune_candidates_regression:
+    elif prepruning == 'prune_candidates_regression':
         augmented_dataset = prune_candidates_regression(training_data,  
                                                         base_dataset,
                                                         path_to_candidates,
@@ -206,19 +206,28 @@ def check_efficiency_and_effectiveness(base_dataset,
                                                         target,
                                                         topN=topN)
         print('candidates kept by the regression-based version of PRIDA', augmented_dataset.columns.to_list())
-        
+    elif prepruning == 'prune_candidates_hybrid':
+        augmented_dataset = prune_candidates_hybrid(training_data,  
+                                                    base_dataset,
+                                                    path_to_candidates,
+                                                    key, 
+                                                    target,
+                                                    topN=topN)
+        print('candidates kept by the hybrid (classification+regression) version of PRIDA', augmented_dataset.columns.to_list())
     else:
         print('prepruner that was passed is not implemented')
         exit()
         
-
+    if sorted(augmented_dataset.columns.tolist()) == sorted(base_dataset.columns.tolist()):
+        print('All candidates were pruned and no augmentation was performed')
+        exit()
     #Step 3: select features with selector over pruned dataset (if RIFS, we inject 20% of random features)
     time1 = time.time()
-    if feature_selector == rifs:
+    if feature_selector == 'rifs':
         selected_pruned = rifs(augmented_dataset,  
                                target, 
                                key) 
-    elif feature_selector == recursive_feature_elimination:
+    elif feature_selector == 'recursive_feature_elimination':
         selected_pruned = recursive_feature_elimination(augmented_dataset.drop([target], axis=1), augmented_dataset[target])
     else:
         print('feature selector that was passed is not implemented')
@@ -235,7 +244,7 @@ def check_efficiency_and_effectiveness(base_dataset,
                                        target, 
                                        selected_pruned)
         time2 = time.time()
-        print('time to create and assess user\'s model with pruner', prepruning.__name__, (time2-time1)*1000.0, 'ms')
+        print('time to create and assess user\'s model with pruner', prepruning, (time2-time1)*1000.0, 'ms')
 
 if __name__ == '__main__':    
     path_to_base_table = sys.argv[1]
@@ -259,4 +268,6 @@ if __name__ == '__main__':
                                        openml_training_high_containment,
                                        rename_numerical=True,
                                        separator=SEPARATOR,
-                                       topN=100)
+                                       topN=100,
+                                       feature_selector=feature_selector,
+                                       prepruning=prepruning)

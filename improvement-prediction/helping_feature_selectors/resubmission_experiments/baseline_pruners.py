@@ -215,3 +215,86 @@ def prune_candidates_regression(training_data,
     print('time to predict what candidates to keep', (time2-time1)*1000.0, 'ms')
     print('initial number of candidates', len(candidates.keys()), 'final number of candidates', len(candidates_to_keep))
     return augmented_dataset[base_dataset.columns.to_list() + candidates_to_keep]    
+
+
+def prune_candidates_hybrid(training_data,  
+                            base_dataset,
+                            candidate_directory,
+                            key, 
+                            target_name,
+                            topN=100):
+    '''
+    This function trains and uses a combination of a classifier and a regressor as a pruner of candidates for augmentation.
+    It keeps the topN candidates.
+    '''
+    
+    #Let's train a dataset-feature-based model over the training dataset
+    time1 = time.time()
+    feature_scaler, model1 = train_random_forest(training_data[DATASET_FEATURES + QUERY_TARGET_FEATURES], training_data[CLASS_ATTRIBUTE_NAME]) 
+    time2 = time.time()
+    print('time to train dataset-feature/query-target-feature model', (time2-time1)*1000.0, 'ms')
+    
+    #Generate a label for every feature in the augmented dataset according to model1
+    time1 = time.time()
+    
+    ## We just need to compute query and query-target features once!
+    ## In order, the returned features are number_of_columns, number_of_rows, row_to_column_ratio,
+    ## max_mean, max_outlier_percentage, max_skewness, max_kurtosis, max_number_of_unique_values.
+    feature_factory_query = FeatureFactory(base_dataset.drop([target_name], axis=1))
+    query_features = feature_factory_query.get_individual_features(func=max_in_modulus)
+
+    ## The features are, in order: max_query_target_pearson, max_query_target_spearman, 
+    ## max_query_target_covariance, max_query_target_mutual_info
+    feature_factory_full_query = FeatureFactory(base_dataset)
+    query_features_target = feature_factory_full_query.get_pairwise_features_with_target(target_name, 
+                                                                                         func=max_in_modulus)
+    
+    candidates = read_candidates(candidate_directory, key)
+    individual_candidate_features = {}
+    feature_vectors = []
+    for name in sorted(candidates.keys()):
+        candidate_features = compute_candidate_features(candidates[name], key)
+        individual_candidate_features[name] = candidate_features
+        feature_vectors.append(query_features + candidate_features + query_features_target)
+        
+    predictions1 = model1.predict(normalize_features(np.array(feature_vectors)))
+    candidates_kept = {name: candidates[name] for name, pred in zip(sorted(candidates.keys()), predictions1) if pred == 'gain'}
+    time2 = time.time()
+    print('time to predict what candidates to keep with model1', (time2-time1)*1000.0, 'ms')
+
+    #Let's train the a full-feature regressor over the training dataset
+    time1 = time.time()
+    feature_scaler, model2 = train_random_forest_regressor(training_data[FEATURES], training_data[GAIN_ATTRIBUTE_NAME]) 
+    time2 = time.time()
+    print('time to train full-feature model', (time2-time1)*1000.0, 'ms')
+
+    #Let's augment the dataset with all candidates that were kept by model1
+    time1 = time.time()
+    augmented_dataset, names_and_columns = join_datasets(base_dataset, candidates_kept, key)
+    time2 = time.time()
+    print('time to augment dataset with candidates kept by model1', (time2-time1)*1000.0, 'ms')
+
+    #Now let's generate a label for every feature in the augmented dataset according to model2
+    time1 = time.time()
+    query_key_values = base_dataset.index.values
+    feature_vectors = []
+    for name in sorted(candidates_kept.keys()):
+        candidate_target_features, candidate_query_features = compute_complex_candidate_features(query_key_values,
+                                                                                                 names_and_columns[name], 
+                                                                                                 key, 
+                                                                                                 target_name, 
+                                                                                                 augmented_dataset)
+        if candidate_target_features and candidate_query_features:
+            feature_vectors.append(query_features + individual_candidate_features[name] + query_features_target + candidate_target_features + candidate_query_features)
+
+    if feature_vectors:
+        predictions2 = model2.predict(normalize_features(np.array(feature_vectors))) 
+        scores_dictionary = {names_and_columns[name][0]: score for name, score in zip(sorted(candidates_kept.keys()), predictions2)}
+        pruned = sorted(scores_dictionary.items(), key = lambda x:x[1], reverse=True)[:topN]
+        
+        candidates_to_keep = [elem[0] for elem in pruned if elem[1] > 0.5] # if elem[1] > 0.5, it was classified as 'keepable'
+        time2 = time.time()
+        print('time to predict what candidates to keep', (time2-time1)*1000.0, 'ms')
+        print('initial number of candidates', len(candidates.keys()), 'final number of candidates', len(candidates_to_keep))
+        return augmented_dataset[base_dataset.columns.to_list() + candidates_to_keep]    
+    return base_dataset

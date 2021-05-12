@@ -60,14 +60,16 @@ def join_datasets(base_dataset,
                                              candidate_datasets[name], 
                                              how='left',
                                              left_on=[base_key],
-                                             right_on=[candidate_key_columns[name]])
+                                             right_on=[candidate_key_columns[name]],
+                                             suffixes=['','_r'])
                 names_and_columns[name] = list(set(candidate_datasets[name].columns.tolist()) - set([candidate_key_columns[name]]))
             else:
                 augmented_dataset = pd.merge(augmented_dataset, 
                                              candidate_datasets[name], #.set_index(base_key, inplace=True),
                                              how='left',
                                              on=base_key,
-                                             validate='m:1')
+                                             validate='m:1',
+                                             suffixes=['','_r'])
                 #print(name, list(candidate_datasets[name].columns))
                 names_and_columns[name] = list(set(candidate_datasets[name].columns.tolist()) - set([base_key]))
                 #print('done joining dataset', name)
@@ -141,18 +143,17 @@ def compute_complex_candidate_features(query_key_values,
     through classification, whether an augmentation with the candidate_dataset (which is single-feature) 
     is likely to hamper the model (or simply bring no gain)
     '''
-    try:
-        candidate_dataset = augmented_dataset[candidate_columns] 
-        # Get candidate-target features
-        ## The features are, in order: max_query_candidate_pearson, max_query_candidate_spearman, 
-        ## max_query_candidate_covariance, max_query_candidate_mutual_info
-        column_names = candidate_dataset.columns.tolist() + [target_name]
-        feature_factory_candidate_target = FeatureFactory(augmented_dataset[column_names].fillna(augmented_dataset[column_names].mean()))
-        candidate_features_target = feature_factory_candidate_target.get_pairwise_features_with_target(target_name, func=max_in_modulus)
-        # Get query-candidate feature "containment ratio". 
-        candidate_key_values = candidate_dataset.index.values
-        intersection_size = len(set(query_key_values) & set(candidate_key_values))
-        containment_ratio = [intersection_size/len(query_key_values)]
-        return candidate_features_target, containment_ratio
-    except:
-        return [], []
+
+    candidate_dataset = augmented_dataset[candidate_columns] 
+    # Get candidate-target features
+    ## The features are, in order: max_query_candidate_pearson, max_query_candidate_spearman, 
+    ## max_query_candidate_covariance, max_query_candidate_mutual_info
+    column_names = candidate_dataset.columns.tolist() + [target_name]
+    feature_factory_candidate_target = FeatureFactory(augmented_dataset[column_names].fillna(augmented_dataset[column_names].mean()))
+    candidate_features_target = feature_factory_candidate_target.get_pairwise_features_with_target(target_name, func=max_in_modulus)
+    # Get query-candidate feature "containment ratio". 
+    candidate_key_values = candidate_dataset.index.values
+    intersection_size = len(set(query_key_values) & set(candidate_key_values))
+    containment_ratio = [intersection_size/len(query_key_values)]
+    return candidate_features_target, containment_ratio
+    
