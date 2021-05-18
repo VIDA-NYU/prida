@@ -164,8 +164,8 @@ def check_efficiency_and_effectiveness(base_dataset,
                                        prepruning=prune_candidates_hierarchical, 
                                        topN=100):
     '''
-    This function gets the time to run a feature selector with and without
-    pre-pruning using either the hierarchical classifier or classic prida
+    This function gets the time to run a feature selector using 
+    different prepruners
     '''
     
     print('Initial performance')

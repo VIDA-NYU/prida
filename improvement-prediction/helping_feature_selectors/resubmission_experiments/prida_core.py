@@ -73,8 +73,8 @@ def join_datasets(base_dataset,
                 #print(name, list(candidate_datasets[name].columns))
                 names_and_columns[name] = list(set(candidate_datasets[name].columns.tolist()) - set([base_key]))
                 #print('done joining dataset', name)
-        except (pd.errors.EmptyDataError, KeyError, ValueError) as e:
-            print('there was an error for dataset', name, e)
+        except: #(pd.errors.EmptyDataError, KeyError, ValueError) as e:
+            print('there was an error for dataset', name)#, e)
             continue
     
     augmented_dataset = augmented_dataset.select_dtypes(include=['int64', 'float64'])
@@ -88,12 +88,10 @@ def join_datasets(base_dataset,
         print('number of initial features', len(base_dataset.columns), 'augmented dataset', len(augmented_dataset.columns))
         #print('kept', augmented_dataset.columns.tolist())
         print('leaving join datasets')
-        new_data = new_data.loc[:,~new_data.columns.duplicated()]
         return new_data, names_and_columns
 
-    #print('kept', augmented_dataset.columns.tolist())
+    print('kept', len(augmented_dataset.columns.tolist()))
     print('leaving join datasets')
-    augmented_dataset = augmented_dataset.loc[:,~augmented_dataset.columns.duplicated()]
     return augmented_dataset, names_and_columns
 
 def read_candidates(candidate_directory, base_key, separator=SEPARATOR, rename_numerical=RENAME_NUMERICAL):
