@@ -39,9 +39,9 @@ def compute_user_model_performance(dataset, target_name, attributes, model_type=
     print('**** ATTRIBUTES', list(attributes))
     time1 = time.time()
     # Now let's split the data
-    #dataset.dropna(inplace=True)
-    mean = dataset.mean().replace(np.nan, 0.0)
-    dataset = dataset.fillna(mean)
+    dataset.dropna(inplace=True)
+    #mean = dataset.mean().replace(np.nan, 0.0)
+    #dataset = dataset.fillna(mean)
     #indices_to_keep = ~dataset.isin([np.nan, np.inf, -np.inf]).any(1)
     #dataset = dataset[indices_to_keep]#.astype(np.float64)
     #print(dataset.shape)
@@ -160,7 +160,7 @@ def check_efficiency_and_effectiveness(base_dataset,
                                        training_data,
                                        rename_numerical=True,
                                        separator=SEPARATOR,
-                                       feature_selector=rifs,
+                                       feature_selector='rifs',
                                        prepruning=prune_candidates_hierarchical, 
                                        topN=100):
     '''

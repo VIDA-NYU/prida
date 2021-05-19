@@ -21,7 +21,7 @@ def perform_feature_selection(base_dataset,
                               key,
                               target,
                               training_data, 
-                              feature_selector='rifs', 
+                              feature_selector='f_regression', 
                               model_type='random_forest',
                               pruning=False,
                               topN=100):
@@ -54,13 +54,12 @@ def perform_feature_selection(base_dataset,
                                key) 
     elif feature_selector == 'recursive_feature_elimination':
         selected_pruned = recursive_feature_elimination(augmented_dataset.drop([target], axis=1), augmented_dataset[target])
-
     elif feature_selector == 'f_regression':
-        pass #TODO
+        selected_pruned = select_f_regression(augmented_dataset.drop([target], axis=1), augmented_dataset[target])
     elif feature_selector == 'correlation':
-        pass #TODO
+        selected_pruned = select_based_on_correlation(augmented_dataset.drop([target], axis=1), augmented_dataset[target])
     elif feature_selector == 'mutual_info_regression':
-        pass #TODO    
+        selected_pruned = select_mutual_info_regression(augmented_dataset.drop([target], axis=1), augmented_dataset[target])
     else:
         print('feature selector that was passed is not implemented')
         exit()

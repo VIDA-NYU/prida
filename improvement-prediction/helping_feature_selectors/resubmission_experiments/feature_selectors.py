@@ -9,7 +9,8 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Lasso
-from sklearn.feature_selection import RFE
+from sklearn.feature_selection import RFE, SelectKBest, f_regression, mutual_info_regression
+from scipy.stats import pearsonr
 
 # =============== RIFS ================= #
 
@@ -134,6 +135,7 @@ def rifs(augmented_dataset, target_name, key):
     for the best subset of features by doing an exponential search
     '''
 
+    print('USING RIFS')
     augmented_dataset.dropna(inplace=True)
     indices_to_keep = ~augmented_dataset.isin([np.nan, np.inf, -np.inf]).any(1)
     augmented_dataset = augmented_dataset[indices_to_keep].astype(np.float64)
@@ -162,7 +164,7 @@ def rifs(augmented_dataset, target_name, key):
             break
     return selected
 
-# ====================== RFE ===================== #
+# ====================== OTHER SELECTORS ===================== #
 
 def recursive_feature_elimination(data, target):
     print('USING RECURSIVE FEATURE ELIMINATION')
@@ -173,5 +175,36 @@ def recursive_feature_elimination(data, target):
     data = data.fillna(mean)
     #indices_to_keep = ~data.isin([np.nan, np.inf, -np.inf]).any(1)
     #data = data[indices_to_keep].astype(np.float64)
-    reduced = selector.fit(data, target)
+    reduced = selector.fit(data.replace(np.nan, 0.0), target)
     return [elem for elem, label in zip(list(data.columns), list(reduced.support_)) if label]
+
+def select_f_regression(data, target):
+    print('USING F_REGRESSION')
+    selector = SelectKBest(score_func=f_regression, k=int(np.sqrt(len(list(data.columns)))))
+    selector.fit(data.replace(np.nan, 0.0), target)
+    cols = selector.get_support(indices=True)
+    new_data = data.iloc[:,cols]
+    return new_data.columns.tolist()
+
+def select_based_on_correlation(data, target):
+    print('USING CORRELATION')
+    correlations = {}
+    for attribute in data.columns:
+        try:
+            corr, pvalue = pearsonr(np.array(data[attribute].replace(np.nan, 0.0)), np.array(target))
+            
+            if not np.isnan(corr):# != float('nan'):
+                correlations[attribute] = corr
+        except:
+            continue
+        
+    columns = [elem[0] for elem in sorted(correlations.items(), key =lambda x: np.fabs(x[1]), reverse=True)][:int(np.sqrt(len(correlations)))]
+    return columns
+
+def select_mutual_info_regression(data, target):
+    print('USING MUTUAL INFO REGRESSION')
+    selector = SelectKBest(score_func=mutual_info_regression, k=int(np.sqrt(len(list(data.columns)))))
+    selector.fit(data.replace(np.nan, 0.0), target)
+    cols = selector.get_support(indices=True)
+    new_data = data.iloc[:,cols]
+    return new_data.columns.tolist()
