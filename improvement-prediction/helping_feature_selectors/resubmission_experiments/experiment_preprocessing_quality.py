@@ -9,6 +9,7 @@ argv[2] => candidates' directory
 argv[3] => key
 argv[4] => target variable
 argv[5] => feature selector (e.g., rifs or recursive_feature_elimination)
+argv[6] => topN
 '''
 
 import sys
@@ -104,6 +105,7 @@ if __name__ == '__main__':
     key = sys.argv[3]
     target = sys.argv[4]
     feature_selector = sys.argv[5]
+    topN = sys.argv[6]
     
     openml_training = pd.read_csv(TRAINING_FILENAME)
     openml_training[CLASS_ATTRIBUTE_NAME] = ['gain' if row['gain_in_r2_score'] > 0 else 'loss'
@@ -119,7 +121,7 @@ if __name__ == '__main__':
                                 openml_training_high_containment,
                                 rename_numerical=True,
                                 separator=SEPARATOR,
-                                topN=100,
+                                topN=topN,
                                 feature_selector=feature_selector)
     
     #check_preprocessing_quality.cache_clear()
@@ -132,6 +134,6 @@ if __name__ == '__main__':
                                 openml_training_high_containment,
                                 rename_numerical=True,
                                 separator=SEPARATOR,
-                                topN=100,
+                                topN=topN,
                                 feature_selector=feature_selector,
                                 pruning=True)
