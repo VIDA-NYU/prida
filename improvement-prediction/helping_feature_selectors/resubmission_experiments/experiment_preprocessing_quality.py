@@ -105,7 +105,7 @@ if __name__ == '__main__':
     key = sys.argv[3]
     target = sys.argv[4]
     feature_selector = sys.argv[5]
-    topN = sys.argv[6]
+    topN = int(sys.argv[6])
     
     openml_training = pd.read_csv(TRAINING_FILENAME)
     openml_training[CLASS_ATTRIBUTE_NAME] = ['gain' if row['gain_in_r2_score'] > 0 else 'loss'
