@@ -14,6 +14,6 @@ The code to predict performance improvement is available [here](improvement-pred
 
 ## Generating Training Data
 
-The generate ground-truth data for training and testing, we use datasets from the D3M project and from OpenML. The main idea is to break each dataset into different query and candidate datasets, randomly choosing the columns. We also randomly remove records from query and candidate datasets, to avoid perfect joins.
+To generate ground-truth data for training and testing, we use datasets from the D3M project and from OpenML. The main idea is to break each dataset into different query and candidate datasets, randomly choosing the columns. We also randomly remove records from query and candidate datasets, to avoid perfect joins.
 
 The code to generate training data is available [here](data-generation).
