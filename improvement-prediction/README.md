@@ -9,25 +9,7 @@
 * [scikit-learn](https://scikit-learn.org/stable/)
 * [Apache Spark 2.3.0](https://spark.apache.org/)
 
-
-## Predicting Improvement
-
-To predict the improvement in the prediction of a target variable after performing a certain data augmentation, we first have to configure a parameter file, e.g., [`params.json`](params.json):
-
-```
-{
-  "learning_data_training": reference to file that stores information about the learning task for training
-  "learning_data_test": reference to file that stores information about the learning task for test
-  "id_to_dataset_training": reference to file that stores all the datasets used for training
-  "id_to_dataset_test": reference to file that stores all the datasets used for test
-  "augmentation_learning_data_filename": reference to file that stores all features, and improvements obtained via data augmentation according to different metrics 
-  "cluster": false,
-  "hdfs_address": "http://gray01.poly.edu:50070",
-  "hdfs_user": "fsc234"
-}
-```
-
-### Generating features and relative prediction improvements
+### Generating feature and relative prediction improvements after augmentation (which is used to determine improvement labels) 
 
 File `learning_data_file` is composed of JSON objects in the format:
 
@@ -112,17 +94,4 @@ decrease_in_median_absolute_error_predicting_target, relative_gain_in_r2_score_p
 
 ### Generating machine learning models for improvement prediction
 
-The data in `augmentation_learning_data_filename` is used to create models that learn to discern between good and bad data augmentations. These models use the computed
-features, or a subset of them, and predict values for the following: decrease_in_mean_absolute_error_predicting_target, decrease_in_mean_squared_error_predicting_target,
-decrease_in_median_absolute_error_predicting_target, or relative_gain_in_r2_score_predicting_target. To build and run such models, do:
-
-    $ python learn_to_augment.py
-
-Parameter `n_splits` indicates how many folds are used in the cross-validation, through which different models can be evaluated and compared. ** TODO **
-This script generates `output_filename`, a file that stores real performance improvements, such as relative_gain_in_r2_score_predicting_target, and their corresponding estimated
-value for each test instance. Each line in the file is in the format: 
-
-<query dataset filename, candidate dataset filename, target variable name, real_decrease_in_mean_absolute_error_predicting_target, predicted_decrease_in_mean_absolute_error_predicting_target,
-real_decrease_in_mean_squared_error_predicting_target, predicted_decrease_in_mean_squared_error_predicting_target, real_decrease_in_median_absolute_error_predicting_target,
-predicted_decrease_in_median_absolute_error_predicting_target, real_relative_gain_in_r2_score_predicting_target, predicted_relative_gain_in_r2_score_predicting_target>
-
+**TODO** Refactor this part to reflect the classification approach present in the [resubmission experiments](https://github.com/VIDA-NYU/prida/tree/master/improvement-prediction/helping_feature_selectors/resubmission_experiments).
